@@ -25,6 +25,8 @@ elif [[ "$1" == "digest" ]]; then
   exec bash tools/run-digest.sh
 elif [[ "$1" == "doctor" ]]; then
   exec bash install.sh --check
+elif [[ "$1" == "telegram" ]]; then
+  exec bash tools/setup-telegram.sh
 else
   exec claude -p "$*" --model sonnet
 fi

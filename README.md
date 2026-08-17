@@ -28,6 +28,8 @@ Claude Code session.
   any page of the dashboard.
 - **Chat with workers** — delegate coding or research tasks; Jarvis spawns
   background Claude agents and delivers results back into the conversation.
+- **Telegram** — `jarvis telegram` connects a bot bound to your chat only:
+  message Jarvis from your phone, get worker results pushed back.
 
 ## Requirements
 

@@ -20,9 +20,15 @@ function send(payload: object) {
   }
 }
 
+// server-side subscribers (e.g. the Telegram surface) hear pushes too
+type Listener = (e: object) => void;
+const listeners = new Set<Listener>();
+export function onEvent(fn: Listener) { listeners.add(fn); }
+
 // immediate push (no debounce) — e.g. "a worker finished for session X"
 export function pushEvent(payload: object) {
   send({ ...payload, at: Date.now() });
+  for (const fn of listeners) { try { fn(payload); } catch {} }
 }
 
 function onFsEvent() {

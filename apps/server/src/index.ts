@@ -17,6 +17,7 @@ import { logRoutes } from "./routes/logs.js";
 import { noteRoutes } from "./routes/notes.js";
 import { addClient, startWatching } from "./live/liveState.js";
 import { startWatchdog } from "./integrations/watchdog.js";
+import { startTelegram } from "./integrations/telegram.js";
 
 // bodyLimit raised for pasted screenshots (4 × ~7MB data URLs)
 const app = Fastify({ logger: { level: "warn" }, bodyLimit: 32 * 1024 * 1024 });
@@ -30,6 +31,7 @@ await app.register(websocket);
 app.get("/api/live", { websocket: true }, (socket) => addClient(socket));
 startWatching();
 startWatchdog();
+startTelegram();
 
 callRoutes(app);
 contentRoutes(app);
