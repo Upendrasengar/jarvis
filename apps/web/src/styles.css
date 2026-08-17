@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* Jarvis design tokens — same palette as the legacy dashboard, as CSS vars so
+   the light theme is a single class flip on <html>. Components reference them
+   via arbitrary-value utilities (bg-[var(--panel)] etc.). */
+:root {
+  --bg: #04070f;
+  --panel: rgba(10, 22, 40, 0.55);
+  --line: rgba(60, 140, 220, 0.18);
+  --cyan: #39d7ff;
+  --cyan-dim: #1a7fa8;
+  --amber: #ffcf5c;
+  --text: #cfe8ff;
+  --dim: #5f89ad;
+  --green: #3ee08a;
+  --red: #ff5c7a;
+  --field: rgba(6, 12, 24, 0.75);
+  --chipbg: rgba(10, 22, 40, 0.5);
+  --bright: #ffffff;
+}
+html.light {
+  --bg: #eef3fa;
+  --panel: rgba(255, 255, 255, 0.78);
+  --line: rgba(20, 80, 150, 0.16);
+  --cyan: #0369a1;
+  --cyan-dim: #5b9ec4;
+  --amber: #9a6b00;
+  --text: #22394f;
+  --dim: #61788e;
+  --green: #0c7f4d;
+  --red: #c72e50;
+  --field: rgba(255, 255, 255, 0.85);
+  --chipbg: rgba(255, 255, 255, 0.6);
+  --bright: #12263a;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background:
+    radial-gradient(1400px 800px at 50% -20%, rgba(40, 120, 200, 0.18), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font: 13px/1.5 "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+html.light body {
+  background:
+    radial-gradient(1400px 800px at 50% -20%, rgba(90, 160, 230, 0.16), transparent 60%),
+    var(--bg);
+}
+
+/* one hairline scrollbar everywhere */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(95, 137, 173, 0.28); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(57, 215, 255, 0.55); }
+
+@keyframes blip { 50% { opacity: 0.4; } }
+.blip { animation: blip 1.1s infinite; }

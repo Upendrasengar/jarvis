@@ -1,0 +1,4 @@
+# Obsidian vaults Jarvis can READ for Second-Brain Recall. One absolute path
+# per line; ~ = your home. The brain vault is always included automatically.
+# Example:
+# ~/Documents/ObsidianVaults

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Keeps the call watcher running across logins.
+  Install (from the jarvis repo root):
+    sed "s|__JARVIS_DIR__|$PWD|g" tools/com.jarvis.callwatch.plist.example \
+      > ~/Library/LaunchAgents/com.jarvis.callwatch.plist
+    launchctl load ~/Library/LaunchAgents/com.jarvis.callwatch.plist
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.jarvis.callwatch.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jarvis.callwatch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__JARVIS_DIR__/tools/call-watch.sh</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key>
+  <string>__JARVIS_DIR__/reports/callwatch.log</string>
+  <key>StandardErrorPath</key>
+  <string>__JARVIS_DIR__/reports/callwatch.err</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>

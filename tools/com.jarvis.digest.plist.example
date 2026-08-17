@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs the daily digest every morning at 08:00.
+  Install (from the jarvis repo root):
+    sed "s|__JARVIS_DIR__|$PWD|g" tools/com.jarvis.digest.plist.example \
+      > ~/Library/LaunchAgents/com.jarvis.digest.plist
+    launchctl load ~/Library/LaunchAgents/com.jarvis.digest.plist
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.jarvis.digest.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.jarvis.digest</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__JARVIS_DIR__/tools/run-digest.sh</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>__JARVIS_DIR__/reports/cron.log</string>
+  <key>StandardErrorPath</key><string>__JARVIS_DIR__/reports/cron.err</string>
+</dict>
+</plist>

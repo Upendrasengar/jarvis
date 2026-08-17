@@ -1,0 +1,80 @@
+# Jarvis
+
+A personal AI agent that lives on your Mac, powered by [Claude Code](https://claude.com/claude-code).
+It watches your projects, records and summarizes your calls (fully locally),
+remembers what you tell it, and briefs you every morning — through a
+dashboard, voice, or the terminal.
+
+**Everything private stays on your machine.** Call audio is transcribed
+locally with whisper.cpp and never uploaded. Your memory, notes, reports, and
+recordings live in gitignored directories. The only thing that leaves your
+Mac is text sent to Claude via your own Claude Code login — the same as any
+Claude Code session.
+
+## What it does
+
+- **Daily Project Digest** — every morning: what moved across your repos,
+  what's uncommitted and at risk, and a carry-forward ledger of every open
+  action item from your calls — items persist until you check them off.
+- **Call Notes** — detects meetings (Google Meet, Teams desktop/web, Zoom,
+  Webex in browser tabs), records both sides, transcribes locally
+  (multilingual), and writes Copilot-style minutes with named speaker
+  attribution and action items.
+- **Second-Brain Recall** — ask "what do I know about X?" and it answers from
+  your own Obsidian vaults and its growing knowledge base.
+- **Actions inbox** — one unified list of every open action item across all
+  calls and notes, with comments and one-click completion.
+- **Voice** — wake-word ("Jarvis"), conversation mode, or push-to-talk, from
+  any page of the dashboard.
+- **Chat with workers** — delegate coding or research tasks; Jarvis spawns
+  background Claude agents and delivers results back into the conversation.
+
+## Requirements
+
+- **macOS** (ScreenCaptureKit and CoreAudio power the call recording — this
+  is Mac-only)
+- **[Claude Code](https://claude.com/claude-code)** with your own account —
+  Jarvis's brain; the CLI must be on your PATH (`claude --version`)
+- Node 20+ and pnpm
+- ffmpeg + whisper.cpp (`brew install ffmpeg whisper-cpp`)
+
+## Quickstart
+
+```bash
+git clone https://github.com/<you>/jarvis && cd jarvis
+./install.sh          # checks deps, builds audio helpers, downloads a whisper model
+./jarvis start        # server + call watcher → http://localhost:4321
+```
+
+First run creates `memory/` from the shipped templates. Tell Jarvis who you
+are — edit `memory/about-me.md` and list your repos in
+`memory/active-projects.md`, or just open the dashboard and talk.
+
+`./jarvis doctor` diagnoses a broken setup; `./jarvis` opens a terminal
+session; `./jarvis digest` runs the morning brief on demand.
+
+## Consent, privacy, and recording laws
+
+Call recording is **off by default**. When you enable it, recording is *not*
+announced to other participants the way native Meet/Teams recording is —
+obtaining consent is **your** responsibility, and recording laws vary by
+jurisdiction (some require all-party consent). Audio never leaves your
+machine and is purged after a configurable retention window (default 7
+days); transcripts and notes are yours, in plain markdown.
+
+## Architecture
+
+pnpm monorepo: React dashboard (`apps/web`) + Fastify server (`apps/server`)
+sharing zod contracts (`packages/shared`), over a set of deliberately plain
+shell tools (`tools/`) that do the deterministic work — detection, recording,
+scanning — with LLM calls reserved for judgement and prose. Markdown files
+are the source of truth; SQLite is just a rebuildable index. The Claude
+integration is embedded in the server (it spawns your local `claude` CLI —
+no API keys, no gateway service). See `docs/jarvis_architecture.md`.
+
+Config lives in `memory/settings/` as one-value-per-file text files —
+readable by both TypeScript and shell. See `memory.example/settings/README.md`.
+
+## License
+
+MIT

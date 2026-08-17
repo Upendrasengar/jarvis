@@ -1,0 +1,21 @@
+{
+  "name": "jarvis",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Personal AI agent \u2014 monorepo (apps/server API, apps/web UI, packages/shared contracts). The tools/ shell pipeline is framework-free by design.",
+  "scripts": {
+    "server:dev": "pnpm --filter @jarvis/server dev",
+    "server:build": "pnpm --filter @jarvis/server build",
+    "server:test": "pnpm --filter @jarvis/server test",
+    "typecheck": "pnpm -r typecheck",
+    "web:dev": "pnpm --filter @jarvis/web dev",
+    "web:build": "pnpm --filter @jarvis/web build"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "better-sqlite3"
+    ]
+  }
+}

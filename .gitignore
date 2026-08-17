@@ -1,0 +1,28 @@
+# ---- user data: everything Jarvis learns about YOU stays out of git ----
+# Your instance's memory, reports, call recordings, brain vault, and secrets
+# live in these directories. The repo ships memory.example/ as the template.
+memory/
+reports/
+brain/
+data/
+secrets/
+models/
+
+# never any secrets, anywhere
+*.pem
+*.key
+.env
+
+# logs
+*.log
+*.err
+
+# built native helpers (compiled per-machine by install.sh)
+tools/call-capture/bin/
+
+# monorepo build artifacts
+node_modules/
+apps/server/dist/
+apps/web/dist/
+*.tsbuildinfo
+__pycache__/

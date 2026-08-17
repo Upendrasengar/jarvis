@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Talk to Jarvis. Usage:
+#   jarvis            -> open an interactive Jarvis session (type or /voice)
+#   jarvis start      -> start everything: UI + call-notes watcher
+#   jarvis stop|restart|status  -> manage those services
+#   jarvis digest     -> run today's digest and print it
+#   jarvis "what do I know about X"  -> one-shot question
+cd "$(dirname "$0")" || exit 1
+
+# first run: seed your private data dirs from the shipped templates
+if [[ ! -d memory ]]; then
+  cp -R memory.example memory
+  mkdir -p reports brain secrets data
+  echo "jarvis: created memory/ from memory.example — edit memory/about-me.md"
+  echo "        and memory/active-projects.md (or just tell Jarvis who you are)."
+fi
+
+if [[ $# -eq 0 ]]; then
+  exec claude          # interactive: type, or hold space for voice
+elif [[ "$1" == "start" || "$1" == "stop" || "$1" == "restart" || "$1" == "status" ]]; then
+  exec bash tools/services.sh "$1"
+elif [[ "$1" == "ui" ]]; then
+  exec bash tools/services.sh start
+elif [[ "$1" == "digest" ]]; then
+  exec bash tools/run-digest.sh
+elif [[ "$1" == "doctor" ]]; then
+  exec bash install.sh --check
+else
+  exec claude -p "$*" --model sonnet
+fi
