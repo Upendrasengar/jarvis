@@ -1,9 +1,10 @@
-// Knowledge graph built from vault wikilinks (work + projects vaults).
+// Knowledge graph built from wikilinks across all configured vaults + brain.
 // Faithful port of the legacy builder, including its group labels.
 import fs from "node:fs";
 import path from "node:path";
 import type { Graph } from "@jarvis/shared";
-import { PROJECTS_VAULT, WORK_VAULT } from "../config.js";
+import { BRAIN_DIR, PROJECTS_VAULT } from "../config.js";
+import { readVaults } from "./env.js";
 
 type Node = { id: string; group: string | number; path?: string; deg: number };
 
@@ -27,8 +28,9 @@ export function buildGraph(): Graph {
       }
     }
   };
-  walk(WORK_VAULT, "work");
-  walk(PROJECTS_VAULT, "projects");
+  const roots = new Set(readVaults(BRAIN_DIR));
+  roots.add(PROJECTS_VAULT);
+  for (const dir of roots) walk(dir, path.basename(dir));
   for (const l of links) {
     if (!nodes.has(l.target)) nodes.set(l.target, { id: l.target, group: "ref", deg: 0 });
     const s = nodes.get(l.source);

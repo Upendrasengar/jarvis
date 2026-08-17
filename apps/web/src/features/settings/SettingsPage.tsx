@@ -156,10 +156,11 @@ export function SettingsPage() {
             <span className="text-xs text-[var(--dim)]">medium = better names, ~3× slower</span>
             <select
               value={settings.whisperModel}
-              onChange={(e) => patch.mutate({ whisperModel: e.target.value as "small" | "medium" })}
+              onChange={(e) => patch.mutate({ whisperModel: e.target.value as "base" | "small" | "medium" })}
               className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
             >
               <option value="medium">medium (recommended)</option>
+              <option value="base">base (fastest)</option>
               <option value="small">small (faster)</option>
             </select>
           </label>

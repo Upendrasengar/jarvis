@@ -3,7 +3,7 @@
 // them directly, and each stays independently editable):
 //   memory/settings/ui.json             voiceMode (UI-only settings)
 //   memory/settings/autorecord.txt      auto-record on/off (call-watch reads it)
-//   memory/settings/whisper-model.txt   small | medium (process-call reads it)
+//   memory/settings/whisper-model.txt   base | small | medium (process-call reads it)
 //   memory/settings/retention-days.txt  audio retention (call-watch reads it)
 //   memory/settings/voice.txt           ElevenLabs voice id (TTS reads it)
 import fs from "node:fs";
@@ -24,8 +24,8 @@ function readJson(): Record<string, unknown> {
 
 export function readSettings(): Settings {
   const j = readJson();
-  let whisper = "medium";
-  try { whisper = fs.readFileSync(WHISPER_FILE, "utf8").trim() || "medium"; } catch {}
+  let whisper = "base";
+  try { whisper = fs.readFileSync(WHISPER_FILE, "utf8").trim() || "base"; } catch {}
   let retention = 7;
   try { retention = parseInt(fs.readFileSync(RETENTION_FILE, "utf8").trim(), 10) || 7; } catch {}
   // voice id → preset name when we know it
@@ -34,7 +34,7 @@ export function readSettings(): Settings {
   return {
     voiceMode: (j.voiceMode as Settings["voiceMode"]) ?? "on-demand",
     autorecord: getAutorecord().on,
-    whisperModel: whisper === "small" ? "small" : "medium",
+    whisperModel: whisper === "small" || whisper === "medium" ? whisper : "base",
     retentionDays: Math.min(90, Math.max(1, retention)),
     voice: byId?.[0] ?? vid,
   };

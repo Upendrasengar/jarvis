@@ -110,7 +110,7 @@ export type VoiceMode = z.infer<typeof VoiceMode>;
 export const Settings = z.object({
   voiceMode: VoiceMode,
   autorecord: z.boolean(),
-  whisperModel: z.enum(["small", "medium"]),
+  whisperModel: z.enum(["base", "small", "medium"]),
   retentionDays: z.number().int().min(1).max(90),
   voice: z.string(),   // ElevenLabs preset name (or raw id)
 });
