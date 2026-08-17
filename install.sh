@@ -62,7 +62,9 @@ else
 fi
 
 echo "── JS workspace ──"
-if [[ $CHECK_ONLY == 1 ]]; then
+if [[ -L node_modules ]]; then
+  ok "managed by Homebrew (engine in $(readlink node_modules | sed 's|/node_modules$||'))"
+elif [[ $CHECK_ONLY == 1 ]]; then
   [[ -d node_modules ]] && ok "dependencies installed" || bad "dependencies — run ./install.sh"
   [[ -d apps/web/dist ]] && ok "web app built" || bad "web app not built — run ./install.sh"
 else
