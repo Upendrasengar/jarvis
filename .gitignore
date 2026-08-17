@@ -1,12 +1,12 @@
 # ---- user data: everything Jarvis learns about YOU stays out of git ----
 # Your instance's memory, reports, call recordings, brain vault, and secrets
 # live in these directories. The repo ships memory.example/ as the template.
-memory/
-reports/
-brain/
-data/
-secrets/
-models/
+/memory/
+/reports/
+/brain/
+/data/
+/secrets/
+/models/
 
 # never any secrets, anywhere
 *.pem
