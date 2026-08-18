@@ -1,5 +1,7 @@
 // KRONOS second-brain graph — 3d-force-graph with Obsidian-style always-on
-// labels; port of the legacy renderer including the slow camera orbit.
+// labels, plus an Obsidian-style control panel: filters (search, orphans),
+// display (node size, link width, labels, arrows), forces (repel, distance).
+// Control state persists in localStorage.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ForceGraph3D from "3d-force-graph";
@@ -31,54 +33,134 @@ const palette = () =>
         particle: "#39d7ff",
       };
 
+type Controls = {
+  search: string;
+  orphans: boolean;     // show notes with no links
+  nodeSize: number;     // 1..8
+  linkWidth: number;    // 0..3
+  labelSize: number;    // 0..2 (0 = hide labels)
+  arrows: boolean;
+  repel: number;        // 10..250 (applied negative)
+  linkDist: number;     // 10..150
+};
+const DEFAULTS: Controls = {
+  search: "", orphans: true, nodeSize: 3, linkWidth: 1,
+  labelSize: 1, arrows: false, repel: 70, linkDist: 40,
+};
+const STORE_KEY = "jarvis_brain_controls";
+function loadControls(): Controls {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}"), search: "" }; }
+  catch { return DEFAULTS; }
+}
+
+const idOf = (x: any) => (typeof x === "object" && x !== null ? x.id : x);
+
+function filterData(data: any, ctl: Controls) {
+  let nodes = data.nodes as any[];
+  if (!ctl.orphans) {
+    const linked = new Set<string>();
+    for (const l of data.links) { linked.add(idOf(l.source)); linked.add(idOf(l.target)); }
+    nodes = nodes.filter((n) => linked.has(n.id));
+  }
+  const q = ctl.search.trim().toLowerCase();
+  if (q) {
+    const hits = new Set(nodes.filter((n) => String(n.id).toLowerCase().includes(q)).map((n) => n.id));
+    const keep = new Set(hits);
+    for (const l of data.links) {          // matches + one-hop neighborhood
+      if (hits.has(idOf(l.source))) keep.add(idOf(l.target));
+      if (hits.has(idOf(l.target))) keep.add(idOf(l.source));
+    }
+    nodes = nodes.filter((n) => keep.has(n.id));
+  }
+  const ids = new Set(nodes.map((n) => n.id));
+  const links = data.links.filter((l: any) => ids.has(idOf(l.source)) && ids.has(idOf(l.target)));
+  return { nodes, links };
+}
+
+function Slider({ label, min, max, step, value, onChange }: {
+  label: string; min: number; max: number; step: number; value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-[2px] flex justify-between text-[10px] text-[var(--dim)]">
+        <span>{label}</span><span>{value}</span>
+      </span>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-[var(--cyan)]"
+      />
+    </label>
+  );
+}
+
+function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between text-[11px] text-[var(--text)]">
+      {label}
+      <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)}
+        className="accent-[var(--cyan)]" />
+    </label>
+  );
+}
+
 export function BrainPage() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState("loading…");
+  const [ctl, setCtl] = useState<Controls>(loadControls);
+  const [panelOpen, setPanelOpen] = useState(true);
   const navigate = useNavigate();
+  const graphRef = useRef<any>(null);
+  const dataRef = useRef<any>(null);
+  const ctlRef = useRef(ctl);
+  ctlRef.current = ctl;
+  const palRef = useRef(palette());
+  const rankRef = useRef(new Map<string, number>());
+
+  const colorFor = (g: string) =>
+    g === "ref" ? palRef.current.ref
+      : palRef.current.series[(rankRef.current.get(g) ?? 0) % palRef.current.series.length];
+
+  const makeSprite = (n: any) => {
+    if (ctlRef.current.labelSize <= 0) return null as any;   // labels off
+    const s = new SpriteText(n.id);
+    s.color = colorFor(n.group);
+    s.textHeight = (2.6 + Math.min(n.deg ?? 0, 16) * 0.4) * ctlRef.current.labelSize;
+    s.fontWeight = "600";
+    s.position.set(0, -(5 + Math.min(n.deg ?? 0, 14) * 0.6), 0);
+    s.material.depthWrite = false;
+    s.material.depthTest = false;
+    s.renderOrder = 10;
+    return s;
+  };
 
   useEffect(() => {
     const wrap = wrapRef.current!;
-    let graph: any = null;
     let orbiting = true;
     let cancelled = false;
-    let pal = palette();
-    // group → palette rank, filled in once the data arrives (biggest first)
-    let groupRank = new Map<string, number>();
-    const colorFor = (g: string) =>
-      g === "ref" ? pal.ref : pal.series[(groupRank.get(g) ?? 0) % pal.series.length];
-
-    const makeSprite = (n: any) => {
-      const s = new SpriteText(n.id);
-      s.color = colorFor(n.group);
-      s.textHeight = 2.6 + Math.min(n.deg ?? 0, 16) * 0.4;
-      s.fontWeight = "600";
-      s.position.set(0, -(5 + Math.min(n.deg ?? 0, 14) * 0.6), 0);
-      s.material.depthWrite = false;
-      s.material.depthTest = false;
-      s.renderOrder = 10;
-      return s;
-    };
 
     // follow the theme switcher without a page reload
     const mo = new MutationObserver(() => {
-      pal = palette();
-      graph
-        ?.backgroundColor(pal.bg)
+      palRef.current = palette();
+      graphRef.current
+        ?.backgroundColor(palRef.current.bg)
         .nodeColor((n: any) => colorFor(n.group))
-        .linkColor(() => pal.link)
-        .linkDirectionalParticleColor(() => pal.particle)
-        .nodeThreeObject((n: any) => makeSprite(n));   // new identity → sprites rebuild
+        .linkColor(() => palRef.current.link)
+        .linkDirectionalParticleColor(() => palRef.current.particle)
+        .nodeThreeObject((n: any) => makeSprite(n));
     });
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
     (async () => {
       const data = await (await fetch("/api/graph")).json();
       if (cancelled) return;
+      dataRef.current = data;
       const counts: Record<string, number> = {};
       for (const n of data.nodes)
         if (n.group !== "ref") counts[n.group] = (counts[n.group] ?? 0) + 1;
       const ordered = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-      groupRank = new Map(ordered.map((g, i) => [g, i]));
+      rankRef.current = new Map(ordered.map((g, i) => [g, i]));
       setStats(`${data.nodes.length} notes · ${data.links.length} links · ${ordered.length} vaults`);
 
       const probe = document.createElement("canvas");
@@ -87,17 +169,22 @@ export function BrainPage() {
         return;
       }
 
-      graph = new ForceGraph3D(wrap)
-        .graphData(data)
+      const c = ctlRef.current;
+      const pal = palRef.current;
+      const graph = new ForceGraph3D(wrap)
+        .graphData(filterData(data, c))
         .backgroundColor(pal.bg)
         .nodeColor((n: any) => colorFor(n.group))
-        .nodeRelSize(3)
+        .nodeRelSize(c.nodeSize)
         .nodeVal((n: any) => 0.6 + Math.min(n.deg ?? 0, 14) * 0.4)
         .nodeOpacity(0.9)
         .nodeThreeObjectExtend(true)
         .nodeThreeObject((n: any) => makeSprite(n))
         .linkColor(() => pal.link)
         .linkOpacity(0.4)
+        .linkWidth(c.linkWidth)
+        .linkDirectionalArrowLength(c.arrows ? 3.5 : 0)
+        .linkDirectionalArrowRelPos(1)
         .linkDirectionalParticles(1)
         .linkDirectionalParticleWidth(1.4)
         .linkDirectionalParticleColor(() => pal.particle)
@@ -109,13 +196,15 @@ export function BrainPage() {
           );
           navigate("/chat");
         });
-      graph.d3Force("charge")?.strength(-70);
+      graph.d3Force("charge")?.strength(-c.repel);
+      graph.d3Force("link")?.distance(c.linkDist);
+      graphRef.current = graph;
 
       let angle = 0;
       const orbit = () => {
-        if (!orbiting || !graph) return;
+        if (!orbiting || !graphRef.current) return;
         angle += 0.0016;
-        graph.cameraPosition({ x: 340 * Math.sin(angle), z: 340 * Math.cos(angle) });
+        graphRef.current.cameraPosition({ x: 340 * Math.sin(angle), z: 340 * Math.cos(angle) });
         requestAnimationFrame(orbit);
       };
       orbit();
@@ -125,10 +214,35 @@ export function BrainPage() {
       cancelled = true;
       orbiting = false;
       mo.disconnect();
-      graph?._destructor?.();
+      graphRef.current?._destructor?.();
+      graphRef.current = null;
       wrap.innerHTML = "";
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // apply control changes to the live graph (re-layout only when the node
+  // set actually changes — slider moves shouldn't reshuffle the universe)
+  const prevFilter = useRef({ search: ctl.search, orphans: ctl.orphans });
+  useEffect(() => {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ ...ctl, search: "" }));
+    const g = graphRef.current;
+    if (!g) return;
+    g.nodeRelSize(ctl.nodeSize)
+      .linkWidth(ctl.linkWidth)
+      .linkDirectionalArrowLength(ctl.arrows ? 3.5 : 0)
+      .nodeThreeObject((n: any) => makeSprite(n));
+    g.d3Force("charge")?.strength(-ctl.repel);
+    g.d3Force("link")?.distance(ctl.linkDist);
+    if (prevFilter.current.search !== ctl.search || prevFilter.current.orphans !== ctl.orphans) {
+      prevFilter.current = { search: ctl.search, orphans: ctl.orphans };
+      if (dataRef.current) g.graphData(filterData(dataRef.current, ctl));
+    }
+    g.d3ReheatSimulation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctl]);
+
+  const set = (patch: Partial<Controls>) => setCtl((c) => ({ ...c, ...patch }));
 
   return (
     <div className="relative h-full">
@@ -138,6 +252,40 @@ export function BrainPage() {
         </div>
         <div className="text-[11px] text-[var(--dim)]">{stats}</div>
       </div>
+
+      {/* Obsidian-style controls */}
+      <div className="absolute right-4 top-4 z-[6] w-[230px] rounded-xl border border-[var(--line)] bg-[var(--panel)] backdrop-blur">
+        <div className="flex items-center justify-between px-3 py-2">
+          <button onClick={() => setPanelOpen(!panelOpen)}
+            className="text-[10px] tracking-[2px] text-[var(--cyan)]">
+            {panelOpen ? "▾" : "▸"} GRAPH CONTROLS
+          </button>
+          {panelOpen && (
+            <button title="Reset to defaults" onClick={() => setCtl({ ...DEFAULTS })}
+              className="text-[11px] text-[var(--dim)] hover:text-[var(--cyan)]">↺</button>
+          )}
+        </div>
+        {panelOpen && (
+          <div className="space-y-3 px-3 pb-3">
+            <input
+              value={ctl.search}
+              onChange={(e) => set({ search: e.target.value })}
+              placeholder="Search notes…"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--field)] px-2 py-1 text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+            />
+            <Toggle label="Orphans" value={ctl.orphans} onChange={(v) => set({ orphans: v })} />
+            <div className="border-t border-[var(--line)] pt-2 text-[9px] tracking-[2px] text-[var(--dim)]">DISPLAY</div>
+            <Toggle label="Arrows" value={ctl.arrows} onChange={(v) => set({ arrows: v })} />
+            <Slider label="Node size" min={1} max={8} step={0.5} value={ctl.nodeSize} onChange={(v) => set({ nodeSize: v })} />
+            <Slider label="Link thickness" min={0} max={3} step={0.25} value={ctl.linkWidth} onChange={(v) => set({ linkWidth: v })} />
+            <Slider label="Text size" min={0} max={2} step={0.25} value={ctl.labelSize} onChange={(v) => set({ labelSize: v })} />
+            <div className="border-t border-[var(--line)] pt-2 text-[9px] tracking-[2px] text-[var(--dim)]">FORCES</div>
+            <Slider label="Repel force" min={10} max={250} step={10} value={ctl.repel} onChange={(v) => set({ repel: v })} />
+            <Slider label="Link distance" min={10} max={150} step={5} value={ctl.linkDist} onChange={(v) => set({ linkDist: v })} />
+          </div>
+        )}
+      </div>
+
       <div ref={wrapRef} className="h-full" />
     </div>
   );
