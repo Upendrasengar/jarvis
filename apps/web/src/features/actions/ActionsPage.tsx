@@ -3,7 +3,7 @@
 // group is a log entry; its outstanding items hang off the rail beneath it.
 // Owners sit in a fixed lane so a vertical scan answers "who owes what";
 // items older than a day carry an amber age tag.
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ActionItem } from "@jarvis/shared";
 import { useActions, useToggleAction } from "./hooks";
@@ -12,6 +12,13 @@ import { ago, parseStamp } from "../../lib/time";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Who = "all" | "me" | "others";
+
+// **bold** → <b>, XSS-safe (no innerHTML) — same treatment as NotesView
+function inline(text: string) {
+  return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
+    i % 2 ? <b key={i} className="text-[var(--bright)]">{part}</b> : <Fragment key={i}>{part}</Fragment>,
+  );
+}
 
 function ageDays(callStarted: string): number {
   const d = new Date(callStarted.slice(0, 10) + "T12:00:00").getTime();
@@ -49,13 +56,13 @@ function ItemRow({ item, onToggle, onComment }: { item: ActionItem; onToggle: ()
       <OwnerLane owner={item.owner} />
       <span className="min-w-0 flex-1">
         <span className={item.done ? "text-[var(--dim)] line-through" : "text-[var(--text)]"}>
-          {item.text}
+          {inline(item.text)}
         </span>
         {item.comments.map((c, i) => {
           const { when, text } = parseStamp(c);
           return (
             <span key={i} className="mt-[2px] block text-[11.5px] leading-snug text-[var(--dim)]">
-              <span className="text-[var(--cyan-dim,#5b9ec4)]">↳</span> {text}
+              <span className="text-[var(--cyan-dim,#5b9ec4)]">↳</span> {inline(text)}
               {when && (
                 <span className="ml-2 text-[9.5px] opacity-70" title={new Date(when).toLocaleString()}>
                   · {ago(when)}
