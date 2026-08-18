@@ -36,6 +36,7 @@ const palette = () =>
 type Controls = {
   search: string;
   orphans: boolean;     // show notes with no links
+  hiddenGroups: string[];   // vaults toggled off in the Filters section
   nodeSize: number;     // 1..8
   linkWidth: number;    // 0..3
   labelSize: number;    // 0..2 (0 = hide labels)
@@ -44,7 +45,7 @@ type Controls = {
   linkDist: number;     // 10..150
 };
 const DEFAULTS: Controls = {
-  search: "", orphans: true, nodeSize: 3, linkWidth: 1,
+  search: "", orphans: true, hiddenGroups: [], nodeSize: 3, linkWidth: 1,
   labelSize: 1, arrows: false, repel: 70, linkDist: 40,
 };
 const STORE_KEY = "jarvis_brain_controls";
@@ -57,6 +58,11 @@ const idOf = (x: any) => (typeof x === "object" && x !== null ? x.id : x);
 
 function filterData(data: any, ctl: Controls) {
   let nodes = data.nodes as any[];
+  if (ctl.hiddenGroups.length) {
+    const hidden = new Set(ctl.hiddenGroups);
+    // "ref" nodes belong to no vault — they survive as long as any vault shows
+    nodes = nodes.filter((n) => !hidden.has(n.group));
+  }
   if (!ctl.orphans) {
     const linked = new Set<string>();
     for (const l of data.links) { linked.add(idOf(l.source)); linked.add(idOf(l.target)); }
@@ -109,6 +115,7 @@ export function BrainPage() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState("loading…");
   const [ctl, setCtl] = useState<Controls>(loadControls);
+  const [vaults, setVaults] = useState<string[]>([]);
   const [panelOpen, setPanelOpen] = useState(true);
   const navigate = useNavigate();
   const graphRef = useRef<any>(null);
@@ -161,6 +168,7 @@ export function BrainPage() {
         if (n.group !== "ref") counts[n.group] = (counts[n.group] ?? 0) + 1;
       const ordered = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
       rankRef.current = new Map(ordered.map((g, i) => [g, i]));
+      setVaults(ordered);
       setStats(`${data.nodes.length} notes · ${data.links.length} links · ${ordered.length} vaults`);
 
       const probe = document.createElement("canvas");
@@ -223,7 +231,7 @@ export function BrainPage() {
 
   // apply control changes to the live graph (re-layout only when the node
   // set actually changes — slider moves shouldn't reshuffle the universe)
-  const prevFilter = useRef({ search: ctl.search, orphans: ctl.orphans });
+  const prevFilter = useRef({ search: ctl.search, orphans: ctl.orphans, hidden: ctl.hiddenGroups.join() });
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify({ ...ctl, search: "" }));
     const g = graphRef.current;
@@ -234,8 +242,10 @@ export function BrainPage() {
       .nodeThreeObject((n: any) => makeSprite(n));
     g.d3Force("charge")?.strength(-ctl.repel);
     g.d3Force("link")?.distance(ctl.linkDist);
-    if (prevFilter.current.search !== ctl.search || prevFilter.current.orphans !== ctl.orphans) {
-      prevFilter.current = { search: ctl.search, orphans: ctl.orphans };
+    const hidden = ctl.hiddenGroups.join();
+    if (prevFilter.current.search !== ctl.search || prevFilter.current.orphans !== ctl.orphans ||
+        prevFilter.current.hidden !== hidden) {
+      prevFilter.current = { search: ctl.search, orphans: ctl.orphans, hidden };
       if (dataRef.current) g.graphData(filterData(dataRef.current, ctl));
     }
     g.d3ReheatSimulation();
@@ -274,6 +284,29 @@ export function BrainPage() {
               className="w-full rounded-md border border-[var(--line)] bg-[var(--field)] px-2 py-1 text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
             />
             <Toggle label="Orphans" value={ctl.orphans} onChange={(v) => set({ orphans: v })} />
+            {vaults.length > 1 && (
+              <div className="space-y-1">
+                <div className="text-[9px] tracking-[2px] text-[var(--dim)]">VAULTS</div>
+                {vaults.map((v) => (
+                  <label key={v} className="flex cursor-pointer items-center gap-2 text-[11px] text-[var(--text)]">
+                    <input
+                      type="checkbox"
+                      checked={!ctl.hiddenGroups.includes(v)}
+                      onChange={(e) =>
+                        set({
+                          hiddenGroups: e.target.checked
+                            ? ctl.hiddenGroups.filter((g) => g !== v)
+                            : [...ctl.hiddenGroups, v],
+                        })
+                      }
+                      className="accent-[var(--cyan)]"
+                    />
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: colorFor(v) }} />
+                    <span className="truncate">{v}</span>
+                  </label>
+                ))}
+              </div>
+            )}
             <div className="border-t border-[var(--line)] pt-2 text-[9px] tracking-[2px] text-[var(--dim)]">DISPLAY</div>
             <Toggle label="Arrows" value={ctl.arrows} onChange={(v) => set({ arrows: v })} />
             <Slider label="Node size" min={1} max={8} step={0.5} value={ctl.nodeSize} onChange={(v) => set({ nodeSize: v })} />
