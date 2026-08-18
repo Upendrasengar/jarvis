@@ -3,6 +3,7 @@ import { z } from "zod";
 import { SettingsPatch } from "@jarvis/shared";
 import { patchSettings, readSettings, setVoiceListening, voicesInfo } from "../services/settings.js";
 import { localOnly } from "../plugins/localOnly.js";
+import { voiceActive } from "../live/liveState.js";
 
 export function settingsRoutes(app: FastifyInstance) {
   app.get("/api/settings", async () => readSettings());
@@ -14,6 +15,9 @@ export function settingsRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/voices", async () => voicesInfo());
+
+  // the call watcher polls this: live socket presence OR recent heartbeat
+  app.get("/api/voicestate", async () => ({ listening: voiceActive() }));
 
   app.post("/api/voicestate", { preHandler: localOnly }, async (req, reply) => {
     const body = z.object({ listening: z.boolean() }).safeParse(req.body);

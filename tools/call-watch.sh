@@ -86,6 +86,15 @@ TEAMS_TAB_RE='teams\.(microsoft|live)\.com'
 # while its heartbeat file is fresh, the teams-web trigger must stand down
 # or every listening session with a Teams tab open becomes a phantom call.
 voice_listening() {
+  # primary: live presence — the dashboard declares "Jarvis holds the mic"
+  # over its WebSocket, so this is exact and dies with the tab (heartbeat
+  # timers get throttled in background tabs; sockets don't)
+  local port
+  port="$(head -1 "$JARVIS_DIR/memory/settings/port.txt" 2>/dev/null | tr -cd '0-9')"
+  if curl -s --max-time 2 "http://localhost:${port:-4321}/api/voicestate" 2>/dev/null       | grep -q '"listening":true'; then
+    return 0
+  fi
+  # fallback: heartbeat file (covers a server-down window)
   local f="$JARVIS_DIR/data/voice-listening"
   [ -f "$f" ] || return 1
   [ $(( $(date +%s) - $(stat -f %m "$f" 2>/dev/null || echo 0) )) -lt 90 ]

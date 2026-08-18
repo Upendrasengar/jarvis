@@ -4,6 +4,20 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+// Voice presence rides the live socket: the server treats "a connected
+// socket that declared voice=on" as proof Jarvis holds the mic, so the call
+// watcher won't mistake it for a Teams call. A socket dies the instant the
+// tab does — unlike heartbeat timers, which browsers throttle.
+let liveWs: WebSocket | null = null;
+let voiceOn = false;
+function pushVoice() {
+  try { liveWs?.send(JSON.stringify({ type: "voice", on: voiceOn })); } catch {}
+}
+export function setVoicePresence(on: boolean) {
+  voiceOn = on;
+  pushVoice();
+}
+
 export function useLive() {
   const qc = useQueryClient();
   useEffect(() => {
@@ -12,6 +26,8 @@ export function useLive() {
     const connect = () => {
       const proto = location.protocol === "https:" ? "wss" : "ws";
       ws = new WebSocket(`${proto}://${location.host}/api/live`);
+      liveWs = ws;
+      ws.onopen = () => pushVoice();   // re-declare after every reconnect
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data);

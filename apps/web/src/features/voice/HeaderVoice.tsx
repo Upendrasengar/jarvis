@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
 import { appendTranscript, currentSessionId, streamChatTurn } from "../../lib/chatTransport";
 import { speak } from "../../lib/tts";
+import { setVoicePresence } from "../../lib/live";
 
 type VState = "idle" | "listening" | "thinking" | "speaking";
 
@@ -308,6 +309,7 @@ export function HeaderVoice() {
   const attachAnalyser = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setVoicePresence(true);   // mic is ours — tell the call watcher
       streamRef.current = stream;
       const actx = new AudioContext();
       const src = actx.createMediaStreamSource(stream);
@@ -319,6 +321,7 @@ export function HeaderVoice() {
   };
 
   const stopAll = () => {
+    setVoicePresence(false);
     activeRef.current = false;
     setPersistent(false);
     setAttentive(false);

@@ -48,9 +48,20 @@ export function startWatching() {
   setInterval(onFsEvent, 30_000).unref();
 }
 
+// sockets whose client declared "Jarvis holds the mic" — presence, not
+// heartbeat: membership ends the moment the socket closes
+const voiceClients = new Set<WebSocket>();
+export function voiceActive(): boolean { return voiceClients.size > 0; }
+
 export function addClient(ws: WebSocket) {
   clients.add(ws);
   ws.send(JSON.stringify({ type: "hello", at: Date.now() }));
-  ws.on("close", () => clients.delete(ws));
-  ws.on("error", () => clients.delete(ws));
+  ws.on("message", (buf: Buffer) => {
+    try {
+      const m = JSON.parse(String(buf));
+      if (m?.type === "voice") m.on ? voiceClients.add(ws) : voiceClients.delete(ws);
+    } catch {}
+  });
+  ws.on("close", () => { clients.delete(ws); voiceClients.delete(ws); });
+  ws.on("error", () => { clients.delete(ws); voiceClients.delete(ws); });
 }
