@@ -41,12 +41,13 @@ type Controls = {
   linkWidth: number;    // 0..3
   labelSize: number;    // 0..2 (0 = hide labels)
   arrows: boolean;
+  motion: boolean;      // slow camera orbit
   repel: number;        // 10..250 (applied negative)
   linkDist: number;     // 10..150
 };
 const DEFAULTS: Controls = {
   search: "", orphans: true, hiddenGroups: [], nodeSize: 3, linkWidth: 1,
-  labelSize: 1, arrows: false, repel: 70, linkDist: 40,
+  labelSize: 1, arrows: false, motion: true, repel: 70, linkDist: 40,
 };
 const STORE_KEY = "jarvis_brain_controls";
 function loadControls(): Controls {
@@ -208,11 +209,16 @@ export function BrainPage() {
       graph.d3Force("link")?.distance(c.linkDist);
       graphRef.current = graph;
 
+      // orbit keeps ticking while mounted; the motion toggle gates whether it
+      // actually moves the camera, so pausing frees the mouse for manual
+      // rotation and resuming picks up where it left off
       let angle = 0;
       const orbit = () => {
         if (!orbiting || !graphRef.current) return;
-        angle += 0.0016;
-        graphRef.current.cameraPosition({ x: 340 * Math.sin(angle), z: 340 * Math.cos(angle) });
+        if (ctlRef.current.motion) {
+          angle += 0.0016;
+          graphRef.current.cameraPosition({ x: 340 * Math.sin(angle), z: 340 * Math.cos(angle) });
+        }
         requestAnimationFrame(orbit);
       };
       orbit();
@@ -308,6 +314,7 @@ export function BrainPage() {
               </div>
             )}
             <div className="border-t border-[var(--line)] pt-2 text-[9px] tracking-[2px] text-[var(--dim)]">DISPLAY</div>
+            <Toggle label="Motion (orbit)" value={ctl.motion} onChange={(v) => set({ motion: v })} />
             <Toggle label="Arrows" value={ctl.arrows} onChange={(v) => set({ arrows: v })} />
             <Slider label="Node size" min={1} max={8} step={0.5} value={ctl.nodeSize} onChange={(v) => set({ nodeSize: v })} />
             <Slider label="Link thickness" min={0} max={3} step={0.25} value={ctl.linkWidth} onChange={(v) => set({ linkWidth: v })} />
