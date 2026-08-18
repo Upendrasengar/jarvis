@@ -83,7 +83,7 @@ export function NeuralCore({ status }: { status: CoreStatus }) {
               y1={50 + Math.sin(rad) * (RY - 5)}
               x2={50 + Math.cos(rad) * RX_IN}
               y2={50 + Math.sin(rad) * RY_IN}
-              stroke="rgba(57,215,255,.35)"
+              stroke="var(--node-line)"
               strokeWidth={1}
               strokeDasharray="2 3"
               vectorEffect="non-scaling-stroke"
@@ -103,10 +103,10 @@ export function NeuralCore({ status }: { status: CoreStatus }) {
             style={{ left: `${xPct}%`, top: `${yPct}%` }}
             className="group absolute z-[2] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(57,215,255,.45)] bg-[var(--chipbg)] text-[var(--cyan)] shadow-[0_0_14px_rgba(57,215,255,.2)] backdrop-blur transition group-hover:shadow-[0_0_22px_rgba(57,215,255,.5)]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--node-border)] bg-[var(--chipbg)] text-[var(--cyan)] shadow-[0_0_14px_var(--node-glow)] backdrop-blur transition group-hover:shadow-[0_0_22px_var(--node-glow-h)]">
               <Icon name={s.icon} />
             </span>
-            <span className="text-[9px] tracking-[2px] text-[var(--dim)] transition group-hover:text-[var(--cyan)]">
+            <span className="text-[9.5px] font-semibold tracking-[2px] text-[var(--text)] opacity-80 transition group-hover:text-[var(--cyan)] group-hover:opacity-100">
               {s.label}
             </span>
           </button>
@@ -115,7 +115,7 @@ export function NeuralCore({ status }: { status: CoreStatus }) {
 
       {/* JARVIS badge, bottom center — the identity mark from the mockup */}
       <div className="absolute bottom-6 left-1/2 z-[2] flex -translate-x-1/2 flex-col items-center gap-1">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(57,215,255,.45)] bg-[var(--chipbg)] text-[var(--cyan)] shadow-[0_0_14px_rgba(57,215,255,.2)] backdrop-blur">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--node-border)] bg-[var(--chipbg)] text-[var(--cyan)] shadow-[0_0_14px_var(--node-glow)] backdrop-blur">
           <Icon name="jarvis" />
         </span>
         <span className="text-[9px] tracking-[3px] text-[var(--dim)]">JARVIS</span>

@@ -17,6 +17,11 @@
   --field: rgba(6, 12, 24, 0.75);
   --chipbg: rgba(10, 22, 40, 0.5);
   --bright: #ffffff;
+  /* neural-core satellite nodes — alpha accents that must survive both themes */
+  --node-border: rgba(57, 215, 255, 0.45);
+  --node-line: rgba(57, 215, 255, 0.35);
+  --node-glow: rgba(57, 215, 255, 0.2);
+  --node-glow-h: rgba(57, 215, 255, 0.5);
 }
 html.light {
   --bg: #eef3fa;
@@ -32,6 +37,10 @@ html.light {
   --field: rgba(255, 255, 255, 0.85);
   --chipbg: rgba(255, 255, 255, 0.6);
   --bright: #12263a;
+  --node-border: rgba(3, 105, 161, 0.65);
+  --node-line: rgba(3, 105, 161, 0.5);
+  --node-glow: rgba(3, 105, 161, 0.15);
+  --node-glow-h: rgba(3, 105, 161, 0.35);
 }
 
 html, body, #root { height: 100%; }
