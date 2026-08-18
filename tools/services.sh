@@ -7,7 +7,9 @@
 set -uo pipefail
 
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT="${JARVIS_UI_PORT:-4321}"
+# Port precedence: JARVIS_UI_PORT env > memory/settings/port.txt > 4321
+PORT="${JARVIS_UI_PORT:-$(head -1 "$JARVIS_DIR/memory/settings/port.txt" 2>/dev/null | tr -cd '0-9')}"
+PORT="${PORT:-4321}"
 
 watch_pid()  { pgrep -f "bash.*call-watch\.sh" | head -1; }
 server_pid() { lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1; }

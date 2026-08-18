@@ -11,4 +11,5 @@
 | `brain-dir.txt` | Where Jarvis's knowledge vault lives (Obsidian-compatible markdown) | `brain/` in the repo |
 | `projects-vault.txt` | Optional vault with one page per project (Projects tab) | the brain |
 | `code-root.txt` | Optional folder code-workers may roam (e.g. `~/Projects`) | none |
+| `port.txt` | Port for the dashboard + API server | `4321` |
 | `ui.json` | UI prefs (voice mode etc.) — managed from the ⚙ Settings page | on-demand |

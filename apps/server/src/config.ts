@@ -11,9 +11,6 @@ import os from "node:os";
 export const JARVIS_DIR =
   process.env.JARVIS_DIR ?? path.resolve(import.meta.dirname, "..", "..", "..");
 
-// Production serves API + built web app on 4321 (the historic dashboard
-// port). Dev runs the API on 4322 with Vite on 5173 proxying to it.
-export const PORT = Number(process.env.JARVIS_API_PORT ?? 4321);
 export const WEB_DIST = path.join(JARVIS_DIR, "apps", "web", "dist");
 
 export const REPORTS_DIR = path.join(JARVIS_DIR, "reports");
@@ -46,3 +43,7 @@ export const BRAIN_CALLS_DIR = path.join(BRAIN_DIR, "Calls");
 // Optional: a vault holding one page per project powers the Projects tab.
 // Defaults to the brain so the tab works out of the box.
 export const PROJECTS_VAULT = setting("projects-vault") ?? BRAIN_DIR;
+
+// Port precedence: JARVIS_API_PORT env > memory/settings/port.txt > 4321
+// (dev runs on 4322 with Vite on 5173 proxying to it).
+export const PORT = Number(process.env.JARVIS_API_PORT ?? setting("port") ?? 4321);
