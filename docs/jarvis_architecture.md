@@ -71,7 +71,7 @@ graph TB
     end
 
     subgraph SCHED["⏰  Scheduling  · macOS launchd"]
-        PLIST_DIGEST["com.jarvis.digest.plist\n8am daily → run-digest.sh"]
+        PLIST_DIGEST["digest scheduler (in-server)\n8am daily → run-digest.sh"]
         PLIST_WATCH["com.jarvis.callwatch.plist\nkeep call-watch.sh running"]
     end
 
