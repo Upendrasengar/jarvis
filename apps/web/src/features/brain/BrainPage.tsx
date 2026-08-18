@@ -8,18 +8,24 @@ import SpriteText from "three-spritetext";
 // Two palettes — the WebGL scene can't read CSS variables, so mirror the
 // theme here and swap live when the html.light class flips.
 const isLight = () => document.documentElement.classList.contains("light");
+// Group names come from the user's vault directory names (any number of
+// them), so colors are assigned by rank: the biggest vault gets the
+// signature cyan, then green, purple, amber, rose. "ref" (link targets
+// with no page) stays deliberately muted.
 const palette = () =>
   isLight()
     ? {
         bg: "#eef3fa",
-        colors: { work: "#0369a1", projects: "#0c7f4d", ref: "#8fa6b8" } as Record<string, string>,
+        series: ["#0369a1", "#0c7f4d", "#7c3aed", "#9a6b00", "#c72e50"],
+        ref: "#8fa6b8",
         label: "#22394f",
         link: "rgba(3,105,161,0.28)",
         particle: "#0369a1",
       }
     : {
         bg: "#04070f",
-        colors: { work: "#39d7ff", projects: "#3ee08a", ref: "#2a3a4a" } as Record<string, string>,
+        series: ["#39d7ff", "#3ee08a", "#c792ea", "#ffcf5c", "#ff8fa3"],
+        ref: "#2a3a4a",
         label: "#cfe8ff",
         link: "rgba(57,215,255,0.22)",
         particle: "#39d7ff",
@@ -36,10 +42,14 @@ export function BrainPage() {
     let orbiting = true;
     let cancelled = false;
     let pal = palette();
+    // group → palette rank, filled in once the data arrives (biggest first)
+    let groupRank = new Map<string, number>();
+    const colorFor = (g: string) =>
+      g === "ref" ? pal.ref : pal.series[(groupRank.get(g) ?? 0) % pal.series.length];
 
     const makeSprite = (n: any) => {
       const s = new SpriteText(n.id);
-      s.color = pal.colors[n.group] ?? pal.label;
+      s.color = colorFor(n.group);
       s.textHeight = 2.6 + Math.min(n.deg ?? 0, 16) * 0.4;
       s.fontWeight = "600";
       s.position.set(0, -(5 + Math.min(n.deg ?? 0, 14) * 0.6), 0);
@@ -54,7 +64,7 @@ export function BrainPage() {
       pal = palette();
       graph
         ?.backgroundColor(pal.bg)
-        .nodeColor((n: any) => pal.colors[n.group] ?? "#888")
+        .nodeColor((n: any) => colorFor(n.group))
         .linkColor(() => pal.link)
         .linkDirectionalParticleColor(() => pal.particle)
         .nodeThreeObject((n: any) => makeSprite(n));   // new identity → sprites rebuild
@@ -64,7 +74,12 @@ export function BrainPage() {
     (async () => {
       const data = await (await fetch("/api/graph")).json();
       if (cancelled) return;
-      setStats(`${data.nodes.length} notes · ${data.links.length} links · 2 vaults`);
+      const counts: Record<string, number> = {};
+      for (const n of data.nodes)
+        if (n.group !== "ref") counts[n.group] = (counts[n.group] ?? 0) + 1;
+      const ordered = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+      groupRank = new Map(ordered.map((g, i) => [g, i]));
+      setStats(`${data.nodes.length} notes · ${data.links.length} links · ${ordered.length} vaults`);
 
       const probe = document.createElement("canvas");
       if (!(probe.getContext("webgl2") || probe.getContext("webgl"))) {
@@ -75,7 +90,7 @@ export function BrainPage() {
       graph = new ForceGraph3D(wrap)
         .graphData(data)
         .backgroundColor(pal.bg)
-        .nodeColor((n: any) => pal.colors[n.group] ?? "#888")
+        .nodeColor((n: any) => colorFor(n.group))
         .nodeRelSize(3)
         .nodeVal((n: any) => 0.6 + Math.min(n.deg ?? 0, 14) * 0.4)
         .nodeOpacity(0.9)
