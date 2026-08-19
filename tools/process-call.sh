@@ -160,7 +160,7 @@ Bullets, '- [ ]' checkboxes, owner FIRST: '- [ ] Arjun: send the design doc'. Us
 Bullets. Omit if none.
 End with EXACTLY one line connecting this call into the knowledge graph:
 **Topics:** [[Topic One]] [[Topic Two]]
-2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, no punctuation inside the brackets.
+2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, ONE theme per topic (never mush two themes into one name), no punctuation or slashes inside the brackets.
 Keep it scannable — read in 30 seconds." > "$NOTES"
 
 # Topic hubs: create a stub page for any topic the notes reference, so each
@@ -168,6 +168,7 @@ Keep it scannable — read in 30 seconds." > "$NOTES"
 mkdir -p "$TOPICS_DIR"
 grep -o '\[\[[^]]*\]\]' "$NOTES" | sed 's/^\[\[//;s/\]\]$//' | sort -u | while IFS= read -r t; do
   [ -z "$t" ] && continue
+  t="${t//\//-}"   # slashes would become subdirectories
   tf="$TOPICS_DIR/$t.md"
   [ -f "$tf" ] || printf -- '---\ntitle: %s\ncreated: %s\n---\n\nTopic hub — every call and note linking here forms this cluster.\n' "$t" "$(date +%Y-%m-%d)" > "$tf"
 done
