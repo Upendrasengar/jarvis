@@ -18,7 +18,11 @@ export type NoteMeta = {
   openItems: number;
 };
 
-const ID_RE = /^[\w-]+$/;
+// The Notes dir is shared with Obsidian, where "Current Action Items.md"
+// is a perfectly normal filename — allow anything that can't escape the
+// directory (no separators, no dot-prefix, no traversal).
+const ID_RE = /^(?!\.)[^/\\]+$/;
+const badId = (id: string) => !ID_RE.test(id) || id.includes("..");
 
 function parse(md: string): { title: string; call: string; body: string } {
   const fm = md.match(/^---\n([\s\S]*?)\n---\n?/);
@@ -55,7 +59,7 @@ export function listNotes(): NoteMeta[] {
 }
 
 export function readNote(id: string): { md: string } | { error: string } {
-  if (!ID_RE.test(id)) return { error: "bad id" };
+  if (badId(id)) return { error: "bad id" };
   try { return { md: fs.readFileSync(path.join(NOTES_DIR, id + ".md"), "utf8") }; }
   catch { return { error: "note not found" }; }
 }
@@ -86,7 +90,7 @@ export function createNote(title: string, call?: string): { id: string } | { err
 }
 
 export function updateNote(id: string, md: string): { ok: true } | { error: string } {
-  if (!ID_RE.test(id)) return { error: "bad id" };
+  if (badId(id)) return { error: "bad id" };
   const p = path.join(NOTES_DIR, id + ".md");
   if (!fs.existsSync(p)) return { error: "note not found" };
   try {
@@ -96,7 +100,7 @@ export function updateNote(id: string, md: string): { ok: true } | { error: stri
 }
 
 export function deleteNote(id: string): { ok: true } | { error: string } {
-  if (!ID_RE.test(id)) return { error: "bad id" };
+  if (badId(id)) return { error: "bad id" };
   try { fs.rmSync(path.join(NOTES_DIR, id + ".md"), { force: true }); return { ok: true }; }
   catch (e) { return { error: String(e).slice(0, 120) }; }
 }
