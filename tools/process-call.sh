@@ -126,6 +126,10 @@ fi
 # phonetically ("Harsh preet", "Insheeta"), and the prompt forbids inventing
 # names — without the roster it faithfully preserves the misspelling.
 ROSTER="$(head -c 6000 "$JARVIS_DIR/memory/about-me.md" 2>/dev/null)"
+# Controlled topic vocabulary — the brain's Topics/ pages. Feeding the list
+# into the prompt keeps one [[Claims]] hub instead of three near-duplicates.
+TOPICS_DIR="$BRAIN_DIR/Topics"
+TOPICS_LIST="$(ls "$TOPICS_DIR" 2>/dev/null | sed 's/\.md$//' | paste -sd ', ' -)"
 
 {
   cat meta.txt
@@ -154,7 +158,19 @@ Bullets, each with who drove it if clear. Omit section if none.
 Bullets, '- [ ]' checkboxes, owner FIRST: '- [ ] Arjun: send the design doc'. Use the named owner the call assigned it to; 'Me' for $OWNER's items; 'Unassigned' if nobody owns it. Omit if none.
 ## Open questions
 Bullets. Omit if none.
+End with EXACTLY one line connecting this call into the knowledge graph:
+**Topics:** [[Topic One]] [[Topic Two]]
+2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, no punctuation inside the brackets.
 Keep it scannable — read in 30 seconds." > "$NOTES"
+
+# Topic hubs: create a stub page for any topic the notes reference, so each
+# theme is a real node in the brain graph (and gets backlinks in Obsidian).
+mkdir -p "$TOPICS_DIR"
+grep -o '\[\[[^]]*\]\]' "$NOTES" | sed 's/^\[\[//;s/\]\]$//' | sort -u | while IFS= read -r t; do
+  [ -z "$t" ] && continue
+  tf="$TOPICS_DIR/$t.md"
+  [ -f "$tf" ] || printf -- '---\ntitle: %s\ncreated: %s\n---\n\nTopic hub — every call and note linking here forms this cluster.\n' "$t" "$(date +%Y-%m-%d)" > "$tf"
+done
 
 # File a copy in the second brain so vault-search / recall can find it.
 mkdir -p "$VAULT_CALLS"

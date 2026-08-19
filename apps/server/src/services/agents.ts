@@ -130,6 +130,7 @@ export function spawnAsk(task: string, sessionId = "") {
     "",
     "You MAY read files, run read-only shell (git log/status, grep, the tools/*.sh scripts in ~/jarvis),",
     "and search the Obsidian vaults. Do NOT write or modify anything. Be quick.",
+    "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, grep the vaults for the literal text [[X]] (e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
     "End your reply with a line 'ANSWER:' then 1-4 plain sentences a voice assistant can read aloud (no markdown, lists, or code).",
   ].join("\n");
   // code workers may also roam your projects folder (memory/settings/code-root.txt)
@@ -165,6 +166,7 @@ export function spawnNote(content: string, opts: { sessionId?: string; auto?: bo
     `- Write ONLY inside ${BRAIN_DIR}. Create or update the most relevant .md file; organize by topic with clear filenames.`,
     `- The user's own notes live in ${BRAIN_DIR}/Notes/ (one .md per topic; frontmatter: title, created, optional 'call: <call-id>' when tied to a recorded call; '- [ ]' lines become tracked action items). When the user asks to create/update MY NOTE about something, work there.`,
     `- Append as a short dated bullet; keep it tidy and Obsidian-style ([[links]] where natural). Don't duplicate facts already there.`,
+    `- Connect notes into the topic graph: Topics/ holds hub pages ([[Claims]], [[DAP]] etc.) — add matching [[Topic]] wikilinks when the note clearly belongs to an existing topic.`,
     `- If it's trivial, transient, or not worth remembering, write NOTHING and reply exactly: SKIP`,
     `- End with 'ANSWER:' then ONE short sentence saying what you saved (or that nothing was saved).`,
   ].join("\n");
