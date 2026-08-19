@@ -132,6 +132,9 @@ export function spawnAsk(task: string, sessionId = "") {
     "and search the Obsidian vaults. Do NOT write or modify anything. Be quick.",
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, grep the vaults for the literal text [[X]] (e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
     "End your reply with a line 'ANSWER:' then 1-4 plain sentences a voice assistant can read aloud (no markdown, lists, or code).",
+    "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
+    "SOURCES: /calls/<id> /notes/<id> ...",
+    "where <id> for calls is the YYYY-MM-DD-HHMM stamp from call-notes-<id>.md (or Calls/call-<id>.md), and for notes is the Notes/ filename without .md (URL-encode spaces as %20). List ONLY files you actually used, space-separated, max 6.",
   ].join("\n");
   // code workers may also roam your projects folder (memory/settings/code-root.txt)
   const codeRoot = setting("code-root");

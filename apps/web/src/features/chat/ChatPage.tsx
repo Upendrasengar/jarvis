@@ -2,10 +2,39 @@
 // the system (node + mono eyebrow, no bubble), you transmit in capsules.
 // Voice: 🎙 fills the composer via speech recognition; 🔈 reads replies aloud.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
+
+// "SOURCES: /calls/x /notes/y" (from recall workers) renders as link chips
+function splitSources(t: string): { body: string; sources: { to: string; label: string }[] } {
+  const m = t.match(/^SOURCES:\s*(.+)$/im);
+  if (!m) return { body: t, sources: [] };
+  const sources = (m[1].match(/\/(?:calls|notes)\/\S+/g) ?? []).map((raw) => {
+    const to = raw.replace(/[.,;]+$/, "");
+    const id = decodeURIComponent(to.split("/").pop() ?? "");
+    return { to, label: (to.startsWith("/calls/") ? "📞 " : "📝 ") + id };
+  });
+  return { body: t.replace(m[0], "").trimEnd(), sources };
+}
+
+function SourceChips({ sources }: { sources: { to: string; label: string }[] }) {
+  if (!sources.length) return null;
+  return (
+    <span className="mt-2 flex flex-wrap gap-1.5">
+      {sources.map((s, i) => (
+        <Link
+          key={i}
+          to={s.to}
+          className="rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-2 py-[2px] text-[10.5px] text-[var(--cyan)] no-underline hover:border-[var(--cyan)]"
+        >
+          {s.label}
+        </Link>
+      ))}
+    </span>
+  );
+}
 
 const QUICK = [
   "give me today's digest",
@@ -177,7 +206,11 @@ export function ChatPage() {
                   <span className="absolute left-[7px] top-[2px] h-[7px] w-[7px] rounded-full bg-[var(--cyan)] shadow-[0_0_10px_var(--cyan)]" />
                 </>
               )}
-              {m.t || <span className="blip text-[var(--dim)]">…</span>}
+              {(() => {
+                if (!m.t) return <span className="blip text-[var(--dim)]">…</span>;
+                const { body, sources } = splitSources(m.t);
+                return (<>{body}<SourceChips sources={sources} /></>);
+              })()}
             </div>
           );
         })}

@@ -4,6 +4,9 @@
 let current: HTMLAudioElement | null = null;
 
 export async function speak(text: string): Promise<void> {
+  // SOURCES: lines are for eyes (rendered as links), not for ears
+  text = text.replace(/^SOURCES:.*$/gim, "").trim();
+  if (!text) return;
   try {
     const r = await fetch("/api/tts", {
       method: "POST",
