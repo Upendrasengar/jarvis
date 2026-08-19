@@ -198,10 +198,22 @@ export function BrainPage() {
         .linkDirectionalParticleWidth(1.4)
         .linkDirectionalParticleColor(() => pal.particle)
         .onNodeClick((n: any) => {
-          // legacy behavior: clicking a note asks Jarvis about it
+          // clicking a node asks Jarvis about it — with enough context that
+          // the ask-worker goes straight to the node's page and its wikilink
+          // cluster instead of guessing what "X" refers to
+          const where = n.path
+            ? `Its page is at ${n.path}.`
+            : `It has no page of its own — only links point to it.`;
           sessionStorage.setItem(
             "jarvis_pending",
-            JSON.stringify({ text: `Tell me about ${n.id}`, voice: false }),
+            JSON.stringify({
+              text:
+                `Tell me about "${n.id}" from my knowledge graph. ${where} ` +
+                `Read that page and search my vaults for the literal text [[${n.id}]] ` +
+                `to gather every call and note linking to it, then give me the full picture: ` +
+                `what it is, recent activity, open action items.`,
+              voice: false,
+            }),
           );
           navigate("/chat");
         });
