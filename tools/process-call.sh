@@ -122,11 +122,19 @@ if ! grep -q '^\*\*\[' transcript.md; then
   exit 0
 fi
 
+# Known-people roster from the owner's memory: whisper spells names
+# phonetically ("Harsh preet", "Insheeta"), and the prompt forbids inventing
+# names — without the roster it faithfully preserves the misspelling.
+ROSTER="$(head -c 6000 "$JARVIS_DIR/memory/about-me.md" 2>/dev/null)"
+
 {
   cat meta.txt
   echo
   cat transcript.md
 } | claude -p --model sonnet "You are Jarvis writing meeting minutes for $OWNER, in the style of a good meeting facilitator (think Copilot meeting recap).
+KNOWN PEOPLE — the owner's memory file, listing their team and colleagues with canonical spellings:
+$ROSTER
+When a name in the transcript is plausibly a phonetic or misspelled rendering of someone above (transcription mangles names), use the CANONICAL spelling from the roster. Only match when clearly plausible in context — a genuinely unknown participant keeps the transcript's spelling with a (?) marker; never force-match a stranger onto the roster.
 Input: call metadata, then a transcript. 'Me' is ALWAYS $OWNER. 'Them' is every other participant mixed into one channel — attribute their lines to real people using conversational cues: people addressing each other by name ('Arjun, can you take this?'), self-introductions, who answers a question aimed at a name, who a task is assigned to. NEVER invent a name; if no cue exists, write 'Someone'. Transcription may have errors (possibly mixed-language) — smooth over obvious ones, translate non-English phrases into English in the notes.
 Output ONLY a markdown note, nothing else:
 # <short descriptive call title>
