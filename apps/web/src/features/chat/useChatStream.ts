@@ -4,6 +4,7 @@ import {
   loadTranscript, saveTranscript, streamChatTurn, type Msg,
 } from "../../lib/chatTransport";
 import type { ChatImage } from "../../lib/image";
+import { makeTypewriter } from "../../lib/typewriter";
 
 export type { Msg };
 
@@ -40,12 +41,13 @@ export function useChatStream(sessionId: string) {
         copy[copy.length - 1] = { c: "jarvis", t };
         return copy;
       });
+    const tw = makeTypewriter(setLast);
     try {
-      const finalText = await streamChatTurn(sessionId, message, setLast, images.map((i) => i.full));
-      setLast(finalText || "(no reply)");
+      const finalText = await streamChatTurn(sessionId, message, tw.feed, images.map((i) => i.full));
+      await tw.finish(finalText || "(no reply)");
       if (finalText) lastReply.current(finalText);
     } catch (e) {
-      setLast(`(connection lost — ${String(e).slice(0, 80)})`);
+      tw.abort(`(connection lost — ${String(e).slice(0, 80)})`);
     } finally {
       setStreaming(false);
     }
