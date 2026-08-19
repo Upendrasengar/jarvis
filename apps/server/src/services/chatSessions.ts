@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import os from "node:os";
-import { JARVIS_DIR } from "../config.js";
+import { JARVIS_DIR, MEMORY_DIR } from "../config.js";
 import { CLAUDE, WORKER_PATH } from "./env.js";
 
 const IDLE_MS = 15 * 60 * 1000;
@@ -23,9 +23,30 @@ const CONCISE =
   'ACTION:DELEGATE {"type":"ask","project":"<project name or empty>","task":"<clear self-contained instructions>"}\n' +
   'Types: "ask" = read-only lookups, recall, digests, questions about the user\'s files/vaults; "code" = change code in a specific project (worker branches safely); "note" = the user asks you to REMEMBER/save/note something durable — put the fact to remember in task, and it\'s written to your memory vault; "voice" = the user asks to change your speaking voice — put the voice name or ID in task (it applies immediately, no restart, so just confirm it\'s done — never mention servers or IDs out loud).\n' +
   "You have a growing memory vault; recall lookups can read it, so things you were told to remember can be recalled later.\n" +
-  "CRITICAL: You do NOT need tools and it is BY DESIGN that you have none. NEVER tell the user that tools, file access, or the Agent tool are unavailable, and NEVER offer manual workarounds (sed, terminal commands, 'run this yourself'). Delegating IS how you read/write files and change config, and it always works. NEVER answer a files/vault/project/config question from a partial memory snippet — always DELEGATE to get complete, fresh data. If unsure whether you can answer from knowledge, delegate.\n" +
+  "CORE MEMORY: your owner's memory files are included below, loaded fresh when this session started. Questions about who your owner is, their role, team, colleagues, preferences, or active projects: answer DIRECTLY from them, no delegation. They are complete copies, not snippets.\n" +
+  "CRITICAL: You do NOT need tools and it is BY DESIGN that you have none. NEVER tell the user that tools, file access, or the Agent tool are unavailable, and NEVER offer manual workarounds (sed, terminal commands, 'run this yourself'). Delegating IS how you read/write files and change config, and it always works. For anything NOT covered by the core memory below (vault notes, call notes, file or project contents, config), NEVER answer from guesswork — always DELEGATE to get complete, fresh data. If unsure whether you can answer from knowledge, delegate.\n" +
   "When the user refers to something by a specific name or Title-Case title (e.g. 'Secret Remediation Checklist'), or as THEIR/MY doc, note, list, checklist, file, or project, treat it as a reference to their own files and DELEGATE a lookup — do NOT substitute a generic explanation of the concept.\n" +
   'The task text must be self-contained (the worker has no chat history); for voice changes it should be ONLY the voice name or ID (e.g. "george"). Never claim you did the work yourself; a worker does it and reports back. Never block.';
+
+// Core memory rides in the system prompt: small owner-facts files the
+// dispatcher may answer from directly (identity, team, active projects).
+// Read at spawn — a recycled session picks up edits.
+function memoryBrief(): string {
+  let budget = 8000;
+  const parts: string[] = [];
+  try {
+    for (const f of fs.readdirSync(MEMORY_DIR).filter((f) => f.endsWith(".md")).sort()) {
+      let txt = "";
+      try { txt = fs.readFileSync(path.join(MEMORY_DIR, f), "utf8").trim(); } catch { continue; }
+      if (!txt) continue;
+      const chunk = `--- memory/${f} ---\n${txt.slice(0, budget)}`;
+      parts.push(chunk);
+      budget -= chunk.length;
+      if (budget <= 0) break;
+    }
+  } catch {}
+  return parts.length ? `\n\n=== CORE MEMORY (owner facts — answer from these directly) ===\n${parts.join("\n\n")}` : "";
+}
 
 type Turn = { onText: (t: string) => void; onDone: (finalText?: string) => void };
 type Session = {
@@ -60,7 +81,7 @@ function spawnWarm(sessionId: string): Session {
     "--input-format", "stream-json", "--output-format", "stream-json",
     "--include-partial-messages", "--model", "sonnet",
     ...sessArgs,
-    "--append-system-prompt", CONCISE,
+    "--append-system-prompt", CONCISE + memoryBrief(),
     "--disallowedTools", "Bash,Read,Edit,Write,Grep,Glob,WebFetch,WebSearch,Task,NotebookEdit",
   ], {
     cwd: JARVIS_DIR,
