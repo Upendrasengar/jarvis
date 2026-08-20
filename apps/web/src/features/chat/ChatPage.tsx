@@ -200,7 +200,7 @@ export function ChatPage() {
             >
               {groupFirst && (
                 <>
-                  <span className="absolute left-6 top-0 text-[9px] font-semibold tracking-[2.5px] text-[var(--cyan-dim)] [font-family:'SF_Mono',ui-monospace,monospace]">
+                  <span className="absolute left-6 top-0 text-[9px] font-semibold tracking-[2.5px] text-[var(--cyan-dim)] [font-family:'Roboto_Mono',ui-monospace,monospace]">
                     JARVIS
                   </span>
                   <span className="absolute left-[7px] top-[2px] h-[7px] w-[7px] rounded-full bg-[var(--cyan)] shadow-[0_0_10px_var(--cyan)]" />

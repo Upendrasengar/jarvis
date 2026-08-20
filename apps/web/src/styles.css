@@ -1,4 +1,16 @@
 @import "tailwindcss";
+/* Roboto everywhere — self-hosted (no CDN): Roboto for content (font-sans),
+   Roboto Mono for the console chrome (body default). */
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fontsource/roboto/700.css";
+@import "@fontsource/roboto-mono/400.css";
+@import "@fontsource/roboto-mono/600.css";
+
+@theme {
+  --font-sans: "Roboto", system-ui, -apple-system, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, Menlo, monospace;
+}
 
 /* Jarvis design tokens — same palette as the legacy dashboard, as CSS vars so
    the light theme is a single class flip on <html>. Components reference them
@@ -49,7 +61,7 @@ body {
     radial-gradient(1400px 800px at 50% -20%, rgba(40, 120, 200, 0.18), transparent 60%),
     var(--bg);
   color: var(--text);
-  font: 13px/1.5 "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font: 13px/1.5 "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 html.light body {
   background:
