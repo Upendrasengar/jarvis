@@ -66,9 +66,9 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
       <span className="min-w-0 flex-1">
         <span className={item.done ? "text-[var(--dim)] line-through" : "text-[var(--text)]"}>
           {inline(item.text)}
-          {chips?.map((c, k) => (
-            <span key={k} className={`ml-2 rounded-full border px-[7px] py-[1px] text-[9.5px] ${CHIP_STYLE[c.kind] ?? ""}`}>
-              {c.kind === "overdue" ? "🔴 " : c.kind === "blocked" ? "🚧 " : "⏰ "}{c.label}
+          {chips?.slice(0, 1).map((c, k) => (
+            <span key={k} className={`ml-2 text-[10px] font-medium ${c.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
+              {c.label}
             </span>
           ))}
           {recurringIn && recurringIn > 1 ? (
@@ -239,24 +239,32 @@ export function ActionsPage() {
 
       {who === "all" && bucket.length > 0 && (
         <div className="mb-6 rounded-xl border border-[var(--line)] bg-[var(--chipbg)] p-3">
-          <div className="mb-2 text-[10px] tracking-[2px] text-[var(--amber)]">⚑ NEEDS ATTENTION</div>
-          {bucket.map((r) => (
-            <div key={idKey(r.item)} className="mb-1.5 flex items-start gap-2 font-sans text-[12.5px]">
-              <button
-                onClick={() => r.cluster.forEach((a) => doToggle(a as ActionItem))}
-                title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
-                className="cursor-pointer text-[var(--cyan)]"
-              >☐</button>
-              <span className="min-w-0 flex-1">
-                <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "")}
-                <span className="ml-2 inline-flex flex-wrap gap-1">
-                  {r.chips.slice(0, 3).map((c, k) => (
-                    <span key={k} className={`rounded-full border px-[6px] text-[9px] ${CHIP_STYLE[c.kind] ?? "border-[var(--line)] text-[var(--dim)]"}`}>{c.label}</span>
-                  ))}
+          <div className="mb-2 text-[10px] tracking-[2px] text-[var(--amber)]">NEEDS ATTENTION</div>
+          {bucket.map((r) => {
+            const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+            const rest = r.chips.filter((c) => c !== urgent && c.kind !== "me").map((c) => c.label);
+            return (
+              <div key={idKey(r.item)} className="mb-1.5 flex items-start gap-2 font-sans text-[12.5px]">
+                <button
+                  onClick={() => r.cluster.forEach((a) => doToggle(a as ActionItem))}
+                  title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
+                  className="cursor-pointer text-[var(--cyan)]"
+                >☐</button>
+                <span className="min-w-0 flex-1">
+                  <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "")}
+                  <span className="ml-2 text-[10.5px] text-[var(--dim)]">
+                    {urgent && (
+                      <span className={`font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
+                        {urgent.label}
+                      </span>
+                    )}
+                    {urgent && rest.length > 0 && " · "}
+                    {rest.join(" · ")}
+                  </span>
                 </span>
-              </span>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
       {[...days.entries()].map(([day, calls]) => (

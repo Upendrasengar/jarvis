@@ -5,22 +5,14 @@ import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as S from "@jarvis/shared";
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Markdown } from "../../components/Markdown";
 import { idKey, shortDate } from "../../lib/actionClusters";
 import { attentionBucket, rankAttention, type Chip, type Ranked, type Triage } from "../../lib/attention";
 
-const CHIP_STYLE: Record<Chip["kind"], string> = {
-  overdue: "border-[rgba(255,92,122,.5)] text-[var(--red)]",
-  due: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
-  age: "border-[var(--line)] text-[var(--dim)]",
-  recur: "border-[rgba(57,215,255,.35)] text-[var(--cyan)]",
-  blocked: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
-  me: "border-[rgba(62,224,138,.45)] text-[var(--green)]",
-};
-
-// One attention row: canonical item, why-now chips, one checkbox that
-// completes every duplicate instance at once.
+// One attention row: the item text is the content; everything else is ONE
+// quiet line — a single colored urgency word, the why-now, and plain date
+// links. No pills, no emoji per fact.
 function AttentionRow({ r, onToggleAll }: { r: Ranked; onToggleAll: (items: Ranked["cluster"]) => Promise<boolean> }) {
   const [state, setState] = useState<"open" | "busy" | "done">("open");
   const click = async () => {
@@ -28,8 +20,20 @@ function AttentionRow({ r, onToggleAll }: { r: Ranked; onToggleAll: (items: Rank
     setState("busy");
     setState((await onToggleAll(r.cluster)) ? "done" : "open");
   };
+  const urgency = r.chips.find((c) => c.kind === "overdue") ?? r.chips.find((c) => c.kind === "due");
+  const blocked = r.chips.find((c) => c.kind === "blocked");
+  const age = r.chips.find((c) => c.kind === "age");
+  // one link per distinct source, deduped by date label
+  const seen = new Set<string>();
+  const sources = r.cluster
+    .map((a) => ({
+      to: a.callId.startsWith("note:") ? `/notes/${encodeURIComponent(a.callId.slice(5))}` : `/calls/${a.callId}`,
+      label: shortDate(a.callStarted),
+      title: a.callTitle,
+    }))
+    .filter((s) => (seen.has(s.label) ? false : (seen.add(s.label), true)));
   return (
-    <div className="mb-3 flex items-start gap-2">
+    <div className="mb-2.5 flex items-start gap-2">
       <button
         onClick={click}
         title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off in the source note"}
@@ -40,22 +44,25 @@ function AttentionRow({ r, onToggleAll }: { r: Ranked; onToggleAll: (items: Rank
       <span className={`min-w-0 flex-1 ${state === "done" ? "text-[var(--dim)] line-through" : ""}`}>
         <b className="text-[var(--bright)]">{r.item.owner}:</b>{" "}
         {r.item.text.replace(/\*\*/g, "")}
-        {r.reason && <span className="mt-[2px] block text-[11px] italic text-[var(--dim)]">{r.reason}</span>}
-        <span className="mt-1 flex flex-wrap items-center gap-1.5">
-          {r.chips.map((c, i) => (
-            <span key={i} className={`rounded-full border px-2 py-[1px] text-[9.5px] ${CHIP_STYLE[c.kind]}`}>
-              {c.kind === "overdue" ? "🔴 " : c.kind === "recur" ? "⟳ " : c.kind === "blocked" ? "🚧 " : ""}{c.label}
+        <span className="mt-[2px] block text-[11px] leading-snug text-[var(--dim)]">
+          {urgency && (
+            <span className={urgency.kind === "overdue" ? "font-medium text-[var(--red)]" : "font-medium text-[var(--amber)]"}>
+              {urgency.label}
             </span>
-          ))}
-          {r.cluster.map((a) => (
-            <Link
-              key={idKey(a)}
-              to={a.callId.startsWith("note:") ? `/notes/${encodeURIComponent(a.callId.slice(5))}` : `/calls/${a.callId}`}
-              title={a.callTitle}
-              className="rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-2 py-[1px] text-[10px] text-[var(--cyan)] no-underline hover:border-[var(--cyan)]"
-            >
-              {a.callId.startsWith("note:") ? "📝" : "📞"} {shortDate(a.callStarted)}
-            </Link>
+          )}
+          {urgency && (blocked || r.reason) && " — "}
+          {r.reason ?? blocked?.label}
+          {(urgency || r.reason || blocked) && " · "}
+          {r.cluster.length > 1 && `raised in ${r.cluster.length} calls · `}
+          {!urgency && age && `${age.label} · `}
+          {sources.map((src, i) => (
+            <Fragment key={i}>
+              {i > 0 && ", "}
+              <Link to={src.to} title={src.title}
+                className="text-[var(--cyan-dim,#5b9ec4)] underline decoration-dotted underline-offset-2 hover:text-[var(--cyan)]">
+                {src.label}
+              </Link>
+            </Fragment>
           ))}
         </span>
       </span>
@@ -71,15 +78,14 @@ function AttentionPanel({ bucket, generatedAt, onToggleAll }: {
   return (
     <div className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--chipbg)] p-3">
       <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-[10px] tracking-[2px] text-[var(--amber)]">⚑ NEEDS ATTENTION</span>
+        <span title="Ranked: overdue → yours → blocking → repeated → aging. Checking an item completes it in every source it appears in."
+          className="text-[10px] tracking-[2px] text-[var(--amber)]">NEEDS ATTENTION</span>
         {generatedAt && <span className="text-[9px] text-[var(--dim)]">triaged {generatedAt}</span>}
       </div>
       {bucket.map((r) => (
         <AttentionRow key={idKey(r.item)} r={r} onToggleAll={onToggleAll} />
       ))}
-      <div className="text-[9.5px] text-[var(--dim)]">
-        Ranked: overdue → yours → blocking → repeated → aging. Checking an item completes it in every source it appears in.
-      </div>
+
     </div>
   );
 }
