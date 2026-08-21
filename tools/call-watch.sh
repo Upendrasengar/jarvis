@@ -112,6 +112,34 @@ start_recording() {
     echo "started: $(date '+%Y-%m-%d %H:%M:%S')"
   } > "$session/meta.txt"
 
+  # Calendar HINT (optional adapter): stamp events overlapping this moment.
+  # A hint, never truth — the recording may be an ad-hoc call sitting on top
+  # of a scheduled block; the summarizer verifies against the transcript.
+  if [ -f "$JARVIS_DIR/data/calendar.json" ]; then
+    python3 - "$JARVIS_DIR/data/calendar.json" >> "$session/meta.txt" 2>/dev/null <<'CALPY' || true
+import json, sys
+from datetime import datetime, timedelta, timezone
+now = datetime.now(timezone.utc)
+try:
+    for e in json.load(open(sys.argv[1])).get("events", []):
+        try:
+            st = datetime.fromisoformat(e["start"].replace("Z", "+00:00"))
+            en = datetime.fromisoformat((e.get("end") or e["start"]).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if st - timedelta(minutes=10) <= now <= en + timedelta(minutes=10):
+            att = ", ".join(e.get("attendees", [])[:12])
+            line = f"calendar-hint: {e['subject']}"
+            if e.get("organizer"): line += f" | organizer: {e['organizer']}"
+            if att: line += f" | attendees: {att}"
+            print(line)
+            d = (e.get("description") or "").replace("\n", " ")[:300]
+            if d: print(f"calendar-hint-agenda: {d}")
+except Exception:
+    pass
+CALPY
+  fi
+
   "$BIN/audiocap" "$session/system.wav" 2>> "$session/capture.log" &
   audiocap_pid=$!
 
