@@ -56,6 +56,11 @@ Do not run the heaviest model on everything.
   owner's personal ones, so a mistake can't reach their real accounts.
 - The owner's data (`memory/`, `reports/`, `brain/`, `data/`, `secrets/`) is
   gitignored and must stay that way — never force-add it.
+- **Before any push to a public remote**, the pre-push audit must pass
+  (`tools/pre-push-audit.sh`, installed as a git hook): it blocks secret
+  values, user-data paths, private identifiers (from gitignored
+  `secrets/audit-patterns.txt`), and non-noreply commit emails. Never bypass
+  it with --no-verify; fix the finding instead.
 
 ## Tools
 
