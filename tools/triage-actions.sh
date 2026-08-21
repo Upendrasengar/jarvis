@@ -44,25 +44,30 @@ Rules:
 
 $ITEMS" 2>/dev/null)"
 
-python3 - "$OUT" "$TODAY" <<PYEOF
+TMPD="$(mktemp -d)"
+printf '%s' "$ITEMS" > "$TMPD/items.json"
+printf '%s' "$RAW" > "$TMPD/raw.txt"
+python3 - "$OUT" "$TODAY" "$TMPD/items.json" "$TMPD/raw.txt" <<'PYEOF'
 import json, re, sys
-raw = """$RAW"""
-raw = re.sub(r'^\s*\`\`\`(json)?|\`\`\`\s*$', '', raw.strip(), flags=re.M)
+out_path, today, items_path, raw_path = sys.argv[1:5]
+raw = open(raw_path).read().strip()
+raw = re.sub(r"^```(json)?\s*|\s*```$", "", raw, flags=re.M).strip()
 try:
     d = json.loads(raw)
 except Exception as e:
     print(f"[triage] LLM output unparseable ({e}) — keeping previous triage")
     sys.exit(0)
-valid = set(json.loads('''$ITEMS'''and '''$ITEMS''') and [i['id'] for i in json.loads('''$ITEMS''')])
+valid = {i["id"] for i in json.load(open(items_path))}
 out = {
-    "generatedAt": sys.argv[2],
+    "generatedAt": today,
     "clusters": [[i for i in c if i in valid] for c in d.get("clusters", []) if isinstance(c, list)],
     "deadlines": {k: v for k, v in d.get("deadlines", {}).items() if k in valid and re.match(r"^\d{4}-\d{2}-\d{2}$", str(v))},
     "blocked": {k: str(v)[:80] for k, v in d.get("blocked", {}).items() if k in valid},
     "reasons": {k: str(v)[:140] for k, v in d.get("reasons", {}).items() if k in valid},
 }
 out["clusters"] = [c for c in out["clusters"] if len(c) >= 2]
-with open(sys.argv[1], "w") as f:
+with open(out_path, "w") as f:
     json.dump(out, f, indent=1)
 print(f"[triage] {len(out['clusters'])} clusters · {len(out['deadlines'])} deadlines · {len(out['blocked'])} blocked · {len(out['reasons'])} reasons")
 PYEOF
+rm -rf "$TMPD"
