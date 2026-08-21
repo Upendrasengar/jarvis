@@ -96,7 +96,7 @@ export function OverviewPage() {
     ["Calls", todaysCalls.length, "today", "/calls"],
     ["Open Actions", openActions, "from calls", "/actions"],
     ["Brain Notes", s?.stats.notes ?? "…", `${s?.stats.links ?? "…"} links`, "/brain"],
-    ["MCP", 4, "published", "/projects"],
+    ["Overdue", bucket.filter((r) => r.chips.some((c) => c.kind === "overdue")).length, "needs action", "/actions"],
   ];
 
   return (
