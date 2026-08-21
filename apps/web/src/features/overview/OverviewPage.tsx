@@ -44,7 +44,7 @@ function Panel({ title, tag, children }: { title: string; tag?: string; children
 const Row = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
   <div
     onClick={onClick}
-    className={`truncate border-b border-dashed border-[rgba(60,140,220,.1)] py-[3px] text-[11px] text-[var(--dim)] ${onClick ? "cursor-pointer hover:text-[var(--cyan)]" : ""}`}
+    className={`truncate border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] font-sans text-[12.5px] leading-relaxed text-[var(--text)] ${onClick ? "cursor-pointer hover:text-[var(--cyan)]" : ""}`}
   >
     {children}
   </div>
@@ -143,7 +143,7 @@ export function OverviewPage() {
                 <Link
                   key={i}
                   to="/digest"
-                  className="block whitespace-normal border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] text-[11px] leading-normal text-[var(--dim)] no-underline hover:text-[var(--text)]"
+                  className="block whitespace-normal border-b border-dashed border-[rgba(60,140,220,.1)] py-[6px] font-sans text-[12.5px] leading-relaxed text-[var(--text)] no-underline hover:text-[var(--cyan)]"
                 >
                   <b className="mr-2 text-[var(--cyan)]">{i + 1}</b>{f}
                 </Link>
@@ -155,14 +155,14 @@ export function OverviewPage() {
             ? bucket.map((r) => {
                 const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
                 return (
-                  <div key={idKey(r.item)} className="flex items-start gap-2 border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] text-[11px] leading-normal text-[var(--dim)]">
+                  <div key={idKey(r.item)} className="flex items-start gap-2 border-b border-dashed border-[rgba(60,140,220,.1)] py-[6px] font-sans text-[12.5px] leading-relaxed text-[var(--text)]">
                     <button
                       onClick={() => toggleCluster(r.cluster)}
                       title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
                       className="cursor-pointer text-[var(--cyan)]"
                     >☐</button>
                     <span className="min-w-0 flex-1">
-                      <b className="text-[var(--text)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "").slice(0, 90)}
+                      <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "").slice(0, 110)}
                       {urgent && (
                         <span className={`ml-1 text-[10px] font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
                           {urgent.label}
