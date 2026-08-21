@@ -1,11 +1,14 @@
 // Command-center overview: daily-moving KPIs (each a door to its tab),
 // today's focus from the digest, git activity, live agents + recording,
-// today's calls, MCP servers — around the neural-core globe.
+// today's calls, git activity — around the neural-core globe.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import * as S from "@jarvis/shared";
 import { NeuralCore } from "./NeuralCore";
 import { useCalls, callTitle } from "../calls/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { attentionBucket, rankAttention, type Triage } from "../../lib/attention";
+import { idKey } from "../../lib/actionClusters";
 
 function useStats() {
   return useQuery({
@@ -61,6 +64,28 @@ export function OverviewPage() {
   const recording = calls.find((c) => c.status === "recording");
   const working = agents.filter((a) => a.status === "working" && !a.silent);
 
+  const qc = useQueryClient();
+  const { data: liveActions } = useQuery<any[]>({
+    queryKey: ["actions"],
+    queryFn: async () => (await fetch("/api/actions")).json(),
+    staleTime: 30_000,
+  });
+  const { data: triage } = useQuery<Triage>({
+    queryKey: ["triage"],
+    queryFn: async () => (await fetch("/api/triage")).json(),
+    staleTime: 60_000,
+  });
+  const bucket = attentionBucket(rankAttention(liveActions ?? [], triage).ranked, 5);
+  const toggleCluster = async (items: any[]) => {
+    for (const a of items)
+      await fetch("/api/actions/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callId: a.callId, index: a.index }),
+      }).catch(() => {});
+    qc.invalidateQueries({ queryKey: ["actions"] });
+  };
+
   const focus = ((dig?.md ?? "").split(/## Suggested focuses/i)[1] ?? "").split(/\n## /)[0]
     .split("\n").filter((l) => /^\s*(\d+\.|[-*])\s+/.test(l))
     .map((l) => l.replace(/^\s*(\d+\.|[-*])\s+/, "").replace(/\*\*/g, "").trim()).slice(0, 3);
@@ -104,9 +129,29 @@ export function OverviewPage() {
               ))
             : <Row>No digest yet — ask Jarvis for one.</Row>}
         </Panel>
-        <Panel title="A-02 · Recent Git Activity" tag="7D">
-          {(s?.activity.length ? s.activity : ["no commits in the last window — quiet repo day"])
-            .map((a, i) => <Row key={i}>{a.slice(0, 80)}</Row>)}
+        <Panel title="A-02 · Needs Attention" tag="LIVE">
+          {bucket.length
+            ? bucket.map((r) => {
+                const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+                return (
+                  <div key={idKey(r.item)} className="flex items-start gap-2 border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] text-[11px] leading-normal text-[var(--dim)]">
+                    <button
+                      onClick={() => toggleCluster(r.cluster)}
+                      title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
+                      className="cursor-pointer text-[var(--cyan)]"
+                    >☐</button>
+                    <span className="min-w-0 flex-1">
+                      <b className="text-[var(--text)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "").slice(0, 90)}
+                      {urgent && (
+                        <span className={`ml-1 text-[10px] font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
+                          {urgent.label}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })
+            : <Row>Nothing urgent — the ledger is calm.</Row>}
         </Panel>
       </div>
 
@@ -149,13 +194,9 @@ export function OverviewPage() {
               })
             : <Row>No calls captured today.</Row>}
         </Panel>
-        <Panel title="Z-03 · MCP Servers" tag="PUBLISHED">
-          {["adobe-target-mcp", "jira-dc-mcp", "confluence-dc-mcp", "bitbucket-server-mcp"].map((id) => (
-            <Row key={id}>
-              <b className="text-[var(--text)]">{id}</b>{" "}
-              <span className="rounded-full bg-[rgba(62,224,138,.14)] px-2 text-[9px] text-[var(--green)]">live</span>
-            </Row>
-          ))}
+        <Panel title="Z-03 · Recent Git Activity" tag="7D">
+          {(s?.activity.length ? s.activity : ["no commits in the last window — quiet repo day"])
+            .map((a, i) => <Row key={i}>{a.slice(0, 80)}</Row>)}
         </Panel>
       </div>
     </div>
