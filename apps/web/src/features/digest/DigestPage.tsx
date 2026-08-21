@@ -1,39 +1,36 @@
 // Digest history browser — date sidebar + reading pane, deep-linked at
 // /digest/:date.
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as S from "@jarvis/shared";
 import { Markdown } from "../../components/Markdown";
 
-// Check an item off WITHOUT leaving the digest: find the matching action in
-// the source call/note (same normalization the ledger used) and toggle it.
-// The digest file itself is a snapshot — tomorrow's ledger drops the item.
-async function ledgerToggle(source: string, line: string): Promise<boolean> {
-  try {
-    const actions = await (await fetch("/api/actions")).json();
-    const callId = source.startsWith("call-notes-")
-      ? source.replace(/^call-notes-/, "").replace(/\.md$/, "")
-      : "note:" + source.replace(/\.md$/, "");
-    const norm = (t: string) => t.replace(/\*\*/g, "").replace(/\s+/g, " ").trim().toLowerCase();
-    const L = norm(line);
-    const cands = actions.filter(
-      (a: any) => a.callId === callId && a.text && L.includes(norm(a.text)),
-    );
-    const hit =
-      cands.length === 1
-        ? cands[0]
-        : cands.find((a: any) => L === norm(`${a.owner}: ${a.text}`)) ?? cands[0];
-    if (!hit) return false;
-    const r = await fetch("/api/actions/toggle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ callId: hit.callId, index: hit.index }),
-    });
-    return r.ok;
-  } catch {
-    return false;
-  }
+// The digest file is a frozen snapshot; the actions API is the live truth.
+// matchAction maps a ledger line back to its source item — used both to
+// TOGGLE on click and to RENDER the real checked-state after a reload.
+function matchAction(actions: any[], source: string, line: string): any | null {
+  const callId = source.startsWith("call-notes-")
+    ? source.replace(/^call-notes-/, "").replace(/\.md$/, "")
+    : "note:" + source.replace(/\.md$/, "");
+  const norm = (t: string) => t.replace(/\*\*/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const L = norm(line);
+  const cands = actions.filter(
+    (a: any) => a.callId === callId && a.text && L.includes(norm(a.text)),
+  );
+  if (cands.length === 1) return cands[0];
+  return cands.find((a: any) => L === norm(`${a.owner}: ${a.text}`)) ?? cands[0] ?? null;
+}
+
+async function toggleMatched(actions: any[], source: string, line: string): Promise<boolean> {
+  const hit = matchAction(actions, source, line);
+  if (!hit) return false;
+  const r = await fetch("/api/actions/toggle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ callId: hit.callId, index: hit.index }),
+  });
+  return r.ok;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -55,6 +52,20 @@ function useDigest(date: string | null) {
 }
 
 export function DigestPage() {
+  const qc = useQueryClient();
+  const { data: liveActions } = useQuery({
+    queryKey: ["actions"],
+    queryFn: async () => (await fetch("/api/actions")).json(),
+    staleTime: 10_000,
+  });
+  const ledgerState = (source: string, line: string): boolean | undefined =>
+    liveActions ? matchAction(liveActions, source, line)?.done : undefined;
+  const ledgerToggle = async (source: string, line: string) => {
+    const ok = await toggleMatched(
+      liveActions ?? (await (await fetch("/api/actions")).json()), source, line);
+    if (ok) qc.invalidateQueries({ queryKey: ["actions"] });
+    return ok;
+  };
   const { data: list = [] } = useDigests();
   const { date } = useParams();
   const navigate = useNavigate();
@@ -101,7 +112,9 @@ export function DigestPage() {
         })}
       </aside>
       <section className="min-w-0 flex-1 overflow-auto px-10 py-8">
-        {digest ? <Markdown md={digest.md} onLedgerToggle={ledgerToggle} /> : (
+        {digest ? (
+          <Markdown md={digest.md} onLedgerToggle={ledgerToggle} ledgerState={ledgerState} />
+        ) : (
           <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>
         )}
       </section>

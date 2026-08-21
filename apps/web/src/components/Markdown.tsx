@@ -45,8 +45,11 @@ function ledgerLink(h3: string): string | null {
 }
 
 type LedgerToggle = (source: string, line: string) => Promise<boolean>;
+type LedgerState = (source: string, line: string) => boolean | undefined;
 
-export function Markdown({ md, onLedgerToggle }: { md: string; onLedgerToggle?: LedgerToggle }) {
+export function Markdown({ md, onLedgerToggle, ledgerState }: {
+  md: string; onLedgerToggle?: LedgerToggle; ledgerState?: LedgerState;
+}) {
   // optimistic check-state per line index; reverted if the toggle fails
   const [flips, setFlips] = useState<Record<number, boolean>>({});
   let section: string | null = null;   // current ### ledger source
@@ -81,7 +84,9 @@ export function Markdown({ md, onLedgerToggle }: { md: string; onLedgerToggle?: 
         }
         const box = line.match(/^\s*(?:\d+\.\s*)?- \[( |x)\] (.*)$/);
         if (box) {
-          const checked = flips[i] ?? box[1] === "x";
+          // precedence: this session's click > live source state > snapshot
+          const live = section ? ledgerState?.(section, box[2]) : undefined;
+          const checked = flips[i] ?? live ?? box[1] === "x";
           const src = section;
           const canToggle = !!onLedgerToggle && !!src;
           const toggle = async () => {
