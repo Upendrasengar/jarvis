@@ -36,7 +36,7 @@ function inline(text: string) {
 }
 
 // "### call-notes-2026-08-11-1035 (Aug 11)" → /calls/2026-08-11-1035
-// "### some-note-slug (undated)"   → /notes/some-note-slug
+// "### some-note-slug (undated)"            → /notes/some-note-slug
 function ledgerLink(h3: string): string | null {
   const m = h3.match(/^(\S+?)(?:\.md)?(\s*\(.*\))?$/);
   if (!m) return null;

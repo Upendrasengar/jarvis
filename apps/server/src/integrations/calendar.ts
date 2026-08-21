@@ -44,7 +44,7 @@ function bodyToDescription(html: string): string | undefined {
   return text.slice(0, 900);
 }
 
-// "jane.doe@example.com" → "Upendra Sengar"
+// "jane.doe@example.com" → "Jane Doe"
 function nameFromEmail(v: string): string {
   const local = v.trim().split("@")[0];
   if (!local) return v.trim();
