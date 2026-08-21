@@ -74,6 +74,8 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
   const [armed, setArmed] = useState(false);
   const [draft, setDraft] = useState<string | null>(null); // non-null = editing
   const [toast, setToast] = useState<null | "ok" | "err">(null);
+  const [reprocessing, setReprocessing] = useState(false);
+  const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [commentFor, setCommentFor] = useState<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -202,12 +204,30 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
         </p>
       )}
       {call.status === "failed" && (
-        <p className="mb-4 text-xs text-[var(--dim)]">
-          Processing failed or stalled — the audio is kept, so it can be rerun:{" "}
-          <code className="text-[var(--cyan)]">
-            bash tools/process-call.sh reports/calls/{call.id}
-          </code>
-        </p>
+        <div className="mb-4 flex items-center gap-3">
+          <button
+            onClick={async () => {
+              setReprocessing(true);
+              await fetch("/api/calls/reprocess", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: call.id }),
+              }).catch(() => {});
+              qc.invalidateQueries({ queryKey: ["calls"] });
+            }}
+            disabled={reprocessing}
+            className={`rounded-full border px-4 py-1.5 font-sans text-[12px] ${
+              reprocessing
+                ? "cursor-default border-[var(--line)] text-[var(--dim)]"
+                : "cursor-pointer border-[rgba(255,207,92,.5)] text-[var(--amber)] hover:bg-[rgba(255,207,92,.08)]"
+            }`}
+          >
+            {reprocessing ? "⟳ reprocessing… (watch the badge above)" : "⟳ Rerun processing"}
+          </button>
+          <span className="text-xs text-[var(--dim)]">
+            Processing failed or stalled — the audio was kept, so nothing is lost.
+          </span>
+        </div>
       )}
 
       {draft !== null ? (
