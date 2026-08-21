@@ -20,3 +20,20 @@ export function listProjects(): Project[] {
   } catch {}
   return out.sort((a, b) => (a.status === "active" ? -1 : 1) - (b.status === "active" ? -1 : 1));
 }
+
+// Flip a project's status in its vault page frontmatter — the single source
+// of truth that the Projects page, brain graph, and digest scan all respect.
+export function setProjectStatus(id: string, status: "active" | "inactive"): { ok: true } | { error: string } {
+  if (!/^(?!\.)[^/\\]+$/.test(id) || id.includes("..")) return { error: "bad id" };
+  const file = path.join(PROJECTS_VAULT, "projects", id + ".md");
+  try {
+    const txt = fs.readFileSync(file, "utf8");
+    const next = /^status:.*$/m.test(txt)
+      ? txt.replace(/^status:\s*.+$/m, `status: ${status}`)
+      : txt.replace(/^---\n/, `---\nstatus: ${status}\n`);
+    fs.writeFileSync(file, next);
+    return { ok: true };
+  } catch {
+    return { error: "project not found" };
+  }
+}

@@ -33,6 +33,11 @@ while IFS= read -r repo; do
   [[ "$repo" != /* ]] && repo="$HOME/Documents/Projects/$repo"
   [[ -d "$repo/.git" ]] || { echo "## $(basename "$repo")"; echo "_not a git repo — skipped_"; echo; continue; } >> "$OUT"
 
+  # paused from the Projects page? skip silently until reactivated
+  if [ -n "$INACTIVE_PATHS" ] && printf '%s\n' "$INACTIVE_PATHS" | grep -qxF "$(cd "$repo" && pwd -P)"; then
+    continue
+  fi
+
   name="$(basename "$repo")"
   branch="$(git -C "$repo" rev-parse --abbrev-ref HEAD 2>/dev/null)"
   # my commits across ALL branches since SINCE

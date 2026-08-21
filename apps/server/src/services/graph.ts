@@ -19,8 +19,11 @@ export function buildGraph(): Graph {
       if (e.isDirectory()) walk(p, group);
       else if (e.name.endsWith(".md")) {
         const title = path.basename(p, ".md");
-        if (!nodes.has(title)) nodes.set(title, { id: title, group, path: p, deg: 0 });
         const txt = fs.readFileSync(p, "utf8");
+        // status: inactive in frontmatter hides the page (and its links)
+        // from the graph until it's reactivated
+        if (/^status:\s*inactive\s*$/m.test(txt.slice(0, 400))) continue;
+        if (!nodes.has(title)) nodes.set(title, { id: title, group, path: p, deg: 0 });
         for (const raw of txt.match(/\[\[([^\]|]+)(\|[^\]]*)?\]\]/g) ?? []) {
           const target = raw.replace(/\[\[|\]\]/g, "").split("|")[0].trim();
           links.push({ source: title, target });
