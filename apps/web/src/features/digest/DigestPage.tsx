@@ -158,6 +158,9 @@ export function DigestPage() {
   const { date } = useParams();
   const navigate = useNavigate();
   const selected = list.find((d) => d.date === date)?.date ?? list[0]?.date ?? null;
+  // the Recurring panel reflects the CURRENT open-items state — it belongs
+  // only on the latest digest, not injected anachronistically into history
+  const viewingLatest = selected != null && selected === list[0]?.date;
   const { data: digest } = useDigest(selected);
 
   useEffect(() => {
@@ -206,11 +209,15 @@ export function DigestPage() {
             onLedgerToggle={ledgerToggle}
             ledgerState={ledgerState}
             ledgerTitle={ledgerTitle}
-            ledgerDupe={ledgerDupe}
-            afterH2={{
-              pattern: /open action items/i,
-              node: <RecurringPanel clusters={clusters} onToggleAll={toggleAll} />,
-            }}
+            ledgerDupe={viewingLatest ? ledgerDupe : undefined}
+            afterH2={
+              viewingLatest
+                ? {
+                    pattern: /open action items/i,
+                    node: <RecurringPanel clusters={clusters} onToggleAll={toggleAll} />,
+                  }
+                : undefined
+            }
           />
         ) : (
           <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>
