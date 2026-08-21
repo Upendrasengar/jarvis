@@ -24,11 +24,27 @@ done
 [[ -z "$CLAUDE" ]] && CLAUDE="$(ls -t "$HOME"/.nvm/versions/node/*/bin/claude 2>/dev/null | head -1)"
 [[ -x "$CLAUDE" ]] || { echo "[run-digest] claude binary not found" >&2; exit 3; }
 
+# Continuity anchor: the most recent previous digest. Each digest chains on
+# the last one (which distills everything before it) + all material since —
+# constant cost, week-long narrative, and self-healing across gaps.
+PREV="$(ls "$JARVIS_DIR"/reports/digest-*.md 2>/dev/null | grep -v "digest-$DATE.md" | sort | tail -1)"
+PREV_DATE=""
+[ -n "$PREV" ] && PREV_DATE="$(basename "$PREV" .md | sed 's/^digest-//')"
+[ -z "$PREV_DATE" ] && PREV_DATE="$YDATE"
+
+# call notes on/after the previous digest's date (it ran at ~8am, so its own
+# day's later calls are new material; cheap overlap beats a gap)
+RECENT_CALLS=""
+for f in "$JARVIS_DIR"/reports/call-notes-*.md; do
+  [ -f "$f" ] || continue
+  st="$(basename "$f" .md | sed 's/^call-notes-//')"
+  [[ "${st:0:10}" < "$PREV_DATE" ]] || RECENT_CALLS="$RECENT_CALLS reports/$(basename "$f")"
+done
+
 # 1. plain scan (no LLM) — always works, no deps beyond git.
-# Monday's scan reaches back to Friday so weekend digests don't hide the week.
-DEFAULT_SINCE="yesterday"
-[[ "$(date +%u)" == "1" ]] && DEFAULT_SINCE="3 days ago"
-bash "$JARVIS_DIR/tools/scan-projects.sh" "${1:-$DEFAULT_SINCE}" >/dev/null
+# Git activity also since the previous digest, so gaps (weekends, days off)
+# are covered without special-casing Mondays.
+bash "$JARVIS_DIR/tools/scan-projects.sh" "${1:-$PREV_DATE}" >/dev/null
 
 # 1.5 open-actions ledger (no LLM) — EVERY unchecked action item across all
 # call notes and vault notes, however old. This is what makes the digest a
@@ -49,13 +65,18 @@ bash "$JARVIS_DIR/tools/scan-projects.sh" "${1:-$DEFAULT_SINCE}" >/dev/null
 
 # 2. LLM step: write the digest from the raw data (Sonnet is plenty)
 cd "$JARVIS_DIR"
-"$CLAUDE" -p "Read CLAUDE.md, then reports/raw-$DATE.md. Also read any call \
-notes from the last day: files matching reports/call-notes-$YDATE-*.md and \
-reports/call-notes-$DATE-*.md (skip ones titled 'No speech detected' or \
-similar phantom/silent calls). Write reports/digest-$DATE.md following the \
-Daily Project Digest format: a 2-4 sentence momentum summary (flag \
-uncommitted work as at-risk), a per-project bullet line, then — only if there \
-were real calls — a 'Calls' section with one line per call (title + outcome), \
+"$CLAUDE" -p "Read CLAUDE.md, then reports/raw-$DATE.md. \
+CONTINUITY: read the previous digest reports/digest-$PREV_DATE.md — it \
+distills everything before it; treat it as narrative context, NOT as truth \
+for open items (the OPEN ACTION ITEMS ledger in the raw file is the \
+deterministic truth — always trust it over the previous digest). Then read \
+the call notes since that digest:$RECENT_CALLS (skip ones titled 'No speech \
+detected' or similar phantom/silent calls). Write reports/digest-$DATE.md \
+following the Daily Project Digest format: a 2-4 sentence momentum summary \
+written AGAINST the previous digest — what moved since it, what is STILL \
+stalled and for how long, what's new (flag uncommitted work as at-risk), \
+a per-project bullet line, then — only if there \
+were real calls since the previous digest — a 'Calls' section with one line per call (title + outcome), \
 then an 'Open action items' section built from the OPEN ACTION ITEMS ledger \
 in the raw file: EVERY unchecked item, grouped by source with its date, \
 oldest debts first. Never drop an unchecked item because its call is old — \
