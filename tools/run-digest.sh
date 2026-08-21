@@ -69,13 +69,18 @@ CAL="$JARVIS_DIR/data/calendar.json"
 if [ -f "$CAL" ] && [ -n "$(find "$CAL" -mmin -1440 2>/dev/null)" ]; then
   python3 - "$CAL" "$DATE" >> "$JARVIS_DIR/reports/raw-$DATE.md" <<'CPY'
 import json, sys
+from datetime import datetime
+def local(iso):
+    try: return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
+    except Exception: return None
 try:
     st = json.load(open(sys.argv[1]))
-    todays = [e for e in st.get("events", []) if e.get("start", "").startswith(sys.argv[2])]
+    todays = [e for e in st.get("events", [])
+              if (d := local(e.get("start", ""))) and d.strftime("%Y-%m-%d") == sys.argv[2]]
     if todays:
-        print("\n## TODAY'S MEETINGS (from calendar adapter)")
+        print("\n## TODAY'S MEETINGS (from calendar adapter, local time)")
         for e in todays:
-            t = e["start"][11:16]
+            t = local(e["start"]).strftime("%H:%M")
             att = ", ".join(e.get("attendees", [])[:8])
             print(f"- {t} — {e['subject']}" + (f" (with: {att})" if att else ""))
 except Exception:

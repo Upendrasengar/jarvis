@@ -84,12 +84,16 @@ export function OverviewPage() {
     refetchInterval: 5 * 60_000,
   });
   const todayISO = new Date().toLocaleDateString("sv-SE");
-  const meetings = (cal?.enabled ? cal.events : []).filter((e) => e.start?.startsWith(todayISO));
+  // feed timestamps are UTC — compare and display in LOCAL time
+  const localDay = (iso: string) => new Date(iso).toLocaleDateString("sv-SE");
+  const localTime = (iso: string) =>
+    new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const meetings = (cal?.enabled ? cal.events : []).filter((e) => e.start && localDay(e.start) === todayISO);
   const prepMe = (e: any) => {
     const att = (e.attendees ?? []).slice(0, 10).join(", ");
     sessionStorage.setItem("jarvis_pending", JSON.stringify({
       text:
-        `Prep me for my "${e.subject}" meeting at ${e.start.slice(11, 16)} today` +
+        `Prep me for my "${e.subject}" meeting at ${localTime(e.start)} today` +
         (att ? ` with ${att}` : "") +
         `. Search my calls, notes, and topic graph for previous meetings with this title or these people, ` +
         `list open action items involving them (flag anything overdue), and tell me what I should raise.`,
@@ -195,7 +199,7 @@ export function OverviewPage() {
                   return (
                     <Row key={i} onClick={() => prepMe(e)}>
                       <span className={past ? "opacity-50" : ""}>
-                        <b className="text-[var(--text)]">{e.start.slice(11, 16)}</b>{" "}
+                        <b className="text-[var(--text)]">{localTime(e.start)}</b>{" "}
                         {e.subject.slice(0, 40)}
                         {!past && <span className="ml-1 text-[9px] text-[var(--cyan)]">prep ↗</span>}
                       </span>
