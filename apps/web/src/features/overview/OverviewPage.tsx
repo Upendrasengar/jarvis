@@ -198,30 +198,45 @@ export function OverviewPage() {
               const now = Date.now();
               const phase = (e: any) =>
                 now > Date.parse(e.end || e.start) ? 2 : now >= Date.parse(e.start) ? 0 : 1;
-              // live first, then upcoming (soonest first), finished last
               const ordered = [...meetings].sort((a, b) =>
                 phase(a) - phase(b) || a.start.localeCompare(b.start));
               const nextUp = ordered.find((e) => phase(e) === 1);
+              const dur = (e: any) => {
+                const m = Math.round((Date.parse(e.end || e.start) - Date.parse(e.start)) / 60_000);
+                return m >= 60 ? `${+(m / 60).toFixed(1)}h`.replace(".0", "") : `${m}m`;
+              };
               const inLabel = (e: any) => {
                 const m = Math.round((Date.parse(e.start) - now) / 60_000);
                 return m < 60 ? `in ${m}m` : `in ${Math.round(m / 60)}h`;
               };
               return ordered.map((e, i) => {
                 const ph = phase(e);
+                const bar =
+                  ph === 0 ? "bg-[var(--red)]"
+                  : e === nextUp ? "bg-[var(--amber)]"
+                  : ph === 1 ? "bg-[var(--cyan-dim,#5b9ec4)]"
+                  : "bg-[var(--line)]";
                 return (
-                  <Row key={i} onClick={() => prepMe(e)}>
-                    <span className={ph === 2 ? "opacity-40" : ""}>
-                      {ph === 0 && <span className="blip mr-1 text-[var(--red)]">●</span>}
-                      <b className="text-[var(--text)]">{localTime(e.start)}</b>{" "}
-                      {e.subject.slice(0, 36)}
-                      {ph === 0 && <span className="ml-1 text-[9px] font-medium text-[var(--red)]">now</span>}
-                      {ph === 1 && e === nextUp && (
-                        <span className="ml-1 text-[9px] font-medium text-[var(--amber)]">{inLabel(e)} · prep ↗</span>
-                      )}
-                      {ph === 1 && e !== nextUp && <span className="ml-1 text-[9px] text-[var(--cyan)]">prep ↗</span>}
-                      {ph === 2 && <span className="ml-1 text-[9px]">over</span>}
+                  <div
+                    key={i}
+                    onClick={() => prepMe(e)}
+                    className={`flex cursor-pointer gap-2 border-b border-dashed border-[rgba(60,140,220,.1)] py-[6px] hover:bg-[rgba(57,215,255,.04)] ${ph === 2 ? "opacity-40" : ""}`}
+                  >
+                    <span className="w-[42px] shrink-0 text-right">
+                      <b className="block text-[11.5px] leading-tight text-[var(--text)]">{localTime(e.start)}</b>
+                      <span className="block text-[9.5px] text-[var(--dim)]">{dur(e)}</span>
                     </span>
-                  </Row>
+                    <span className={`w-[3px] shrink-0 self-stretch rounded-full ${bar}`} />
+                    <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-snug text-[var(--text)]">
+                      <span className="block truncate">{e.subject}</span>
+                      <span className="block text-[10px] text-[var(--dim)]">
+                        {ph === 0 && <span className="blip font-medium text-[var(--red)]">now</span>}
+                        {ph === 1 && e === nextUp && <span className="font-medium text-[var(--amber)]">{inLabel(e)}</span>}
+                        {(ph === 0 || (ph === 1 && e === nextUp)) && e.attendees?.length > 0 && " · "}
+                        {e.attendees?.length > 0 && `${e.attendees.length} people`}
+                      </span>
+                    </span>
+                  </div>
                 );
               });
             })()}
