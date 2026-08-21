@@ -193,20 +193,38 @@ export function OverviewPage() {
       <div className="flex min-h-0 flex-col gap-3">
         {cal?.enabled && (
           <Panel title="Z-00 · Today" tag={String(meetings.length || "—")}>
-            {meetings.length
-              ? meetings.map((e, i) => {
-                  const past = Date.parse(e.end || e.start) < Date.now();
-                  return (
-                    <Row key={i} onClick={() => prepMe(e)}>
-                      <span className={past ? "opacity-50" : ""}>
-                        <b className="text-[var(--text)]">{localTime(e.start)}</b>{" "}
-                        {e.subject.slice(0, 40)}
-                        {!past && <span className="ml-1 text-[9px] text-[var(--cyan)]">prep ↗</span>}
-                      </span>
-                    </Row>
-                  );
-                })
-              : <Row>No meetings today.</Row>}
+            {(() => {
+              if (!meetings.length) return <Row>No meetings today.</Row>;
+              const now = Date.now();
+              const phase = (e: any) =>
+                now > Date.parse(e.end || e.start) ? 2 : now >= Date.parse(e.start) ? 0 : 1;
+              // live first, then upcoming (soonest first), finished last
+              const ordered = [...meetings].sort((a, b) =>
+                phase(a) - phase(b) || a.start.localeCompare(b.start));
+              const nextUp = ordered.find((e) => phase(e) === 1);
+              const inLabel = (e: any) => {
+                const m = Math.round((Date.parse(e.start) - now) / 60_000);
+                return m < 60 ? `in ${m}m` : `in ${Math.round(m / 60)}h`;
+              };
+              return ordered.map((e, i) => {
+                const ph = phase(e);
+                return (
+                  <Row key={i} onClick={() => prepMe(e)}>
+                    <span className={ph === 2 ? "opacity-40" : ""}>
+                      {ph === 0 && <span className="blip mr-1 text-[var(--red)]">●</span>}
+                      <b className="text-[var(--text)]">{localTime(e.start)}</b>{" "}
+                      {e.subject.slice(0, 36)}
+                      {ph === 0 && <span className="ml-1 text-[9px] font-medium text-[var(--red)]">now</span>}
+                      {ph === 1 && e === nextUp && (
+                        <span className="ml-1 text-[9px] font-medium text-[var(--amber)]">{inLabel(e)} · prep ↗</span>
+                      )}
+                      {ph === 1 && e !== nextUp && <span className="ml-1 text-[9px] text-[var(--cyan)]">prep ↗</span>}
+                      {ph === 2 && <span className="ml-1 text-[9px]">over</span>}
+                    </span>
+                  </Row>
+                );
+              });
+            })()}
           </Panel>
         )}
         <Panel title="Z-01 · Live Now" tag={`${working.length}/${agents.length}`}>
