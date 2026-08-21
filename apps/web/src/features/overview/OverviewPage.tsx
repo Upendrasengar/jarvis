@@ -2,7 +2,7 @@
 // today's focus from the digest, git activity, live agents + recording,
 // today's calls, MCP servers — around the neural-core globe.
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import * as S from "@jarvis/shared";
 import { NeuralCore } from "./NeuralCore";
 import { useCalls, callTitle } from "../calls/hooks";
@@ -94,9 +94,13 @@ export function OverviewPage() {
         <Panel title="A-01 · Today's Focus" tag="FROM DIGEST">
           {focus.length
             ? focus.map((f, i) => (
-                <div key={i} className="whitespace-normal border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] text-[11px] leading-normal text-[var(--dim)]">
-                  <b className="mr-2 text-[var(--cyan)]">{i + 1}</b>{f.slice(0, 140)}
-                </div>
+                <Link
+                  key={i}
+                  to="/digest"
+                  className="block whitespace-normal border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] text-[11px] leading-normal text-[var(--dim)] no-underline hover:text-[var(--text)]"
+                >
+                  <b className="mr-2 text-[var(--cyan)]">{i + 1}</b>{f}
+                </Link>
               ))
             : <Row>No digest yet — ask Jarvis for one.</Row>}
         </Panel>
