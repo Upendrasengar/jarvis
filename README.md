@@ -50,12 +50,12 @@ Claude Code session.
 ```bash
 git clone https://github.com/<you>/jarvis && cd jarvis
 ./install.sh          # checks deps, builds audio helpers, downloads a whisper model
+./jarvis init         # a short interview: who you are, which repos to watch
 ./jarvis start        # server + call watcher → http://localhost:4321
 ```
 
-First run creates `memory/` from the shipped templates. Tell Jarvis who you
-are — edit `memory/about-me.md` and list your repos in
-`memory/active-projects.md`, or just open the dashboard and talk.
+`jarvis init` writes `memory/` from your answers (edit `memory/*.md` anytime
+— it's all plain markdown). Or skip it and just open the dashboard and talk.
 
 `./jarvis doctor` diagnoses a broken setup; `./jarvis` opens a terminal
 session; `./jarvis digest` runs the morning brief on demand.

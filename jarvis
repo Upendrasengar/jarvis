@@ -27,6 +27,8 @@ elif [[ "$1" == "doctor" ]]; then
   exec bash install.sh --check
 elif [[ "$1" == "telegram" ]]; then
   exec bash tools/setup-telegram.sh
+elif [[ "$1" == "init" ]]; then
+  exec bash tools/init.sh
 else
   exec claude -p "$*" --model sonnet
 fi
