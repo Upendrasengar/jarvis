@@ -20,7 +20,15 @@ export type CalEvent = {
   attendees: string[];
   location?: string;
   online?: boolean;
+  joinUrl?: string;     // Teams meeting link, when present in the invite body
 };
+
+// "jane.doe@example.com" → "Upendra Sengar"
+function nameFromEmail(v: string): string {
+  const local = v.trim().split("@")[0];
+  if (!local) return v.trim();
+  return local.split(/[._-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
 
 const FILE = path.join(JARVIS_DIR, "data", "calendar.json");
 const POLL_MS = 30 * 60_000;
@@ -70,28 +78,74 @@ function parseICS(text: string): CalEvent[] {
   return out;
 }
 
+function toISO(v: string): string {
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? "" : new Date(t).toISOString();
+}
+
 function normalizeJSON(data: any): CalEvent[] {
   const arr = Array.isArray(data) ? data : data?.value ?? data?.events ?? [];
-  return (arr as any[]).map((e) => ({
-    subject: String(e.subject ?? e.title ?? "(untitled)"),
-    start: String(e.start?.dateTime ?? e.start ?? ""),
-    end: String(e.end?.dateTime ?? e.end ?? e.start ?? ""),
-    organizer: e.organizer?.emailAddress?.name ?? e.organizer ?? undefined,
-    attendees: (e.attendees ?? []).map((a: any) =>
-      typeof a === "string" ? a : a.emailAddress?.name ?? a.name ?? a.email ?? "?"),
-    location: e.location?.displayName ?? e.location ?? undefined,
-    online: !!(e.isOnline ?? e.isOnlineMeeting ?? e.onlineMeeting),
-  })).filter((e) => e.subject && e.start);
+  return (arr as any[])
+    .filter((e) => e.responseType !== "declined")
+    .map((e) => {
+      // Outlook/Power Automate: attendees are ";"-joined emails
+      const paAttendees = [e.requiredAttendees, e.optionalAttendees]
+        .filter(Boolean).join(";").split(";").map((x: string) => x.trim()).filter(Boolean)
+        .map(nameFromEmail);
+      const attendees = paAttendees.length
+        ? paAttendees
+        : (e.attendees ?? []).map((a: any) =>
+            typeof a === "string" ? a : a.emailAddress?.name ?? a.name ?? a.email ?? "?");
+      const body = typeof e.body === "string" ? e.body : "";
+      const joinUrl = body.match(/https:\/\/teams\.microsoft\.com\/(?:meet|l\/meetup-join)[^"'\s<]+/)?.[0];
+      const organizerRaw = e.organizer?.emailAddress?.name ?? e.organizer ?? undefined;
+      return {
+        subject: String(e.subject ?? e.title ?? "(untitled)"),
+        start: toISO(String(e.startWithTimeZone ?? e.start?.dateTime ?? e.start ?? "")),
+        end: toISO(String(e.endWithTimeZone ?? e.end?.dateTime ?? e.end ?? e.start ?? "")),
+        organizer: organizerRaw?.includes("@") ? nameFromEmail(organizerRaw) : organizerRaw,
+        attendees,
+        location: e.location?.displayName ?? e.location ?? undefined,
+        online: !!(e.isOnline ?? e.isOnlineMeeting ?? e.onlineMeeting ?? joinUrl),
+        ...(joinUrl ? { joinUrl } : {}),
+      };
+    })
+    .filter((e) => e.subject && e.start);
+}
+
+function localDate(offsetDays: number): string {
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  return d.toLocaleDateString("sv-SE");
 }
 
 async function poll(url: string) {
+  const key = readSecrets().CALENDAR_FEED_KEY;
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json, text/calendar" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.text();
-    const events = body.trimStart().startsWith("BEGIN:VCALENDAR")
-      ? parseICS(body)
-      : normalizeJSON(JSON.parse(body));
+    let events: CalEvent[];
+    if (key) {
+      // Power Automate dialect: POST {date} with x-api-key, one call per day
+      const days = await Promise.all([localDate(0), localDate(1)].map(async (date) => {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": key },
+          body: JSON.stringify({ date }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${date}`);
+        return normalizeJSON(await res.json());
+      }));
+      const seen = new Set<string>();
+      events = days.flat().filter((e) => {
+        const k = `${e.subject}|${e.start}`;
+        return seen.has(k) ? false : (seen.add(k), true);
+      });
+    } else {
+      const res = await fetch(url, { headers: { Accept: "application/json, text/calendar" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.text();
+      events = body.trimStart().startsWith("BEGIN:VCALENDAR")
+        ? parseICS(body)
+        : normalizeJSON(JSON.parse(body));
+    }
     // keep a window: yesterday .. +7d, sorted
     const from = Date.now() - 86_400_000, to = Date.now() + 7 * 86_400_000;
     state = {
