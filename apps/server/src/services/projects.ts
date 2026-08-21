@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Project pages from the projects vault (one .md per project with
 // category/status frontmatter-ish fields).
 import fs from "node:fs";

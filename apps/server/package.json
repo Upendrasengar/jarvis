@@ -24,5 +24,12 @@
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
+  },
+  "author": "Upendra Sengar (https://github.com/Upendrasengar)",
+  "license": "MIT",
+  "homepage": "https://github.com/Upendrasengar/jarvis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Upendrasengar/jarvis.git"
   }
 }

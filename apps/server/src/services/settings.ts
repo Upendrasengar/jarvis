@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Settings service — one API over the scattered preference files the shell
 // pipeline already reads (kept as separate files on purpose: bash consumes
 // them directly, and each stays independently editable):

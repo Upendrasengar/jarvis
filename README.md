@@ -113,4 +113,4 @@ readable by both TypeScript and shell. See `memory.example/settings/README.md`.
 
 ## License
 
-MIT
+MIT · Built by [Upendra Sengar](https://github.com/Upendrasengar)

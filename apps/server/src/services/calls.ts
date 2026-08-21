@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Call sessions: list, action-item toggling, deletion, live recording state,
 // auto-record preference. 1:1 port of the legacy ui/server.js behavior —
 // the filesystem layout written by tools/call-watch.sh + process-call.sh is

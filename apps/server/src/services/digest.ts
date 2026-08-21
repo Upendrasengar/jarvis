@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Daily digest markdown, written by tools/run-digest.sh into reports/.
 import fs from "node:fs";
 import path from "node:path";

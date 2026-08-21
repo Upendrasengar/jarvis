@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // KRONOS second-brain graph — 3d-force-graph with Obsidian-style always-on
 // labels, plus an Obsidian-style control panel: filters (search, orphans),
 // display (node size, link width, labels, arrows), forces (repel, distance).

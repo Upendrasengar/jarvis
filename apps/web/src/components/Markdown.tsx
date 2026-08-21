@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Minimal markdown renderer for digests and simple notes — headings, bullets,
 // checkboxes (read-only), bold. React elements, never innerHTML.
 // Digest-aware links: ledger headers (### call-notes-… / ### note-slug) and

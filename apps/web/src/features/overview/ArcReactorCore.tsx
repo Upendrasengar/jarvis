@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // The arc-reactor core — the HUD-ring alternative to the particle sphere,
 // visually kin to the favicon (the "J" ring). Pure strokes, so it renders
 // crisply on both themes. Same living-status language as the particle core:

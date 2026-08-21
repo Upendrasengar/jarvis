@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Control channel to tools/call-watch.sh — the recorder daemon is owned by
 // the shell pipeline; the server only signals it (USR1 = stop the current
 // recording now, USR2 = start one now).

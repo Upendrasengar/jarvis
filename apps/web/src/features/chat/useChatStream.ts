@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Chat page state on top of the shared transport (lib/chatTransport).
 import { useCallback, useEffect, useRef, useState } from "react";
 import {

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # pre-push-audit.sh — blocks a push if outgoing commits contain secrets,
 # user-data paths, or private identifiers. Install as a git hook:
 #   ln -sf ../../tools/pre-push-audit.sh .git/hooks/pre-push

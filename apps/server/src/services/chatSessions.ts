@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Warm chat-session manager — one long-lived `claude` process per
 // conversation. First turn pays the cold start; every later turn is fast.
 // Faithful port of the legacy manager including: session-id persistence

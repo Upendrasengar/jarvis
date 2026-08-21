@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # call-watch.sh — Call Notes capability, stage 1: detect + record.
 # Polls browser tabs for an active meeting (Meet/Teams/Zoom/Webex/Whereby URL
 # + microphone in use), records BOTH sides (mic = you, system audio = them),

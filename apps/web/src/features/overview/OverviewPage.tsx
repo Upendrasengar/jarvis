@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Command-center overview: daily-moving KPIs (each a door to its tab),
 // today's focus from the digest, git activity, live agents + recording,
 // today's calls, git activity — around the neural-core globe.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # services.sh — one switch for Jarvis's long-running services:
 #   server      apps/server (Fastify API + built web app) on :${JARVIS_UI_PORT:-4321}
 #   call-watch  tools/call-watch.sh (Call Notes recorder)

@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Central path configuration. The server lives in apps/server inside the
 // jarvis repo; all data (reports, memory, vaults) stays where the shell
 // pipeline in tools/ writes it — the server is a reader/controller, never

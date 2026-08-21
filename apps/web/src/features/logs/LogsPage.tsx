@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Activity & Logs — live visibility into the pipelines. Status chips show
 // which processes are alive right now; the tail below follows the selected
 // log (watcher, server, or any call's processing log) refreshing every 2s.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # triage-actions.sh — nightly attention pass over open action items.
 # Sonnet ANNOTATES, never rewrites: items go in as data (stable ids), JSON
 # comes back with clusters (same real-world task, incl. paraphrases),

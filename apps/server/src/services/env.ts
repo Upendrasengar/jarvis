@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Shared environment helpers: locating the claude binary, reading gitignored
 // secrets, voice preferences, and the readable vault list. Ports of the
 // legacy ui/server.js helpers, unchanged in behavior.

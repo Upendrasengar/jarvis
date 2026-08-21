@@ -17,5 +17,12 @@
       "esbuild",
       "better-sqlite3"
     ]
+  },
+  "author": "Upendra Sengar (https://github.com/Upendrasengar)",
+  "license": "MIT",
+  "homepage": "https://github.com/Upendrasengar/jarvis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Upendrasengar/jarvis.git"
   }
 }

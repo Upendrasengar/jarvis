@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # run-digest.sh — one command to produce the daily digest headlessly.
 # Runs the plain scanner, then hands the raw data to Claude Code to write the
 # brief. Written to survive launchd's minimal environment (no nvm, sparse PATH).

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # install.sh — set up Jarvis on a fresh Mac.
 #   ./install.sh          full setup: check deps, build audio helpers,
 #                         download a whisper model, install JS deps, build UI

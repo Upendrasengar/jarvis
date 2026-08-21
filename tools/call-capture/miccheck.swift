@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // miccheck [excludePid ...] — prints "1" if ANY process is currently capturing
 // audio input (any microphone — built-in, AirPods, USB headset), "0" if not.
 // PIDs passed as arguments are ignored, so call-watch can exclude its OWN

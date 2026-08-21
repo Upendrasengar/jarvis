@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Unified Actions inbox: every "- [ ] Owner: task" across all call notes.
 // The index is rebuilt from the markdown whenever the notes' mtime signature
 // changes — cheap (dozens of small files) and always consistent with the

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # vault-search.sh — plain grep search across your Obsidian vaults.
 # No LLM, no external deps (grep is always present). Finds the most relevant
 # vault pages for a query and prints them with match counts + snippets, so

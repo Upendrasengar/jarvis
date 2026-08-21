@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 
 // The particle neural core — now a LIVING status body, not decoration:
 //   recording   → red ring pulses around the sphere

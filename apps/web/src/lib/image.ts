@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Clipboard/drop image processing for chat. Two renditions per image:
 //   full  — max 1400px JPEG, what Jarvis actually sees (keeps tokens sane)
 //   thumb — max 280px JPEG, what the transcript stores (localStorage-safe)

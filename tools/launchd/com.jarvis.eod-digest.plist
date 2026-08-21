@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Sends a daily end-of-day action-item digest to Telegram at 7 PM ET.
+
+  Install (from the homebrew-jarvis tap root):
+    sed -e "s|__JARVIS_DIR__|/Users/upesenga/Documents/Projects/Upen/upen-git/jarvis|g" \
+        -e "s|__TAP_DIR__|$PWD|g" \
+        tools/launchd/com.jarvis.eod-digest.plist \
+      > ~/Library/LaunchAgents/com.jarvis.eod-digest.plist
+    launchctl load ~/Library/LaunchAgents/com.jarvis.eod-digest.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.jarvis.eod-digest.plist
+
+  Note: StartCalendarInterval uses local time. Set your Mac's timezone to
+  America/New_York for the 7 PM ET schedule to be exact.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.jarvis.eod-digest</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__TAP_DIR__/tools/eod-digest.sh</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>19</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>__JARVIS_DIR__</string>
+
+  <key>StandardOutPath</key>
+  <string>__JARVIS_DIR__/reports/eod-digest.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>__JARVIS_DIR__/reports/eod-digest.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>TZ</key>
+    <string>America/New_York</string>
+    <key>JARVIS_DIR</key>
+    <string>__JARVIS_DIR__</string>
+  </dict>
+</dict>
+</plist>

@@ -5,7 +5,9 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
@@ -14,5 +16,12 @@
   },
   "devDependencies": {
     "typescript": "^5.7.0"
+  },
+  "author": "Upendra Sengar (https://github.com/Upendrasengar)",
+  "license": "MIT",
+  "homepage": "https://github.com/Upendrasengar/jarvis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Upendrasengar/jarvis.git"
   }
 }

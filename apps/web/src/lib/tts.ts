@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Spoken replies — one shared player so chat and background voice never talk
 // over each other. Broadcasts jarvis:speaking / jarvis:spoken for the header
 // voice bar's status + waveform.

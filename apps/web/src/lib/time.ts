@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Time helpers — relative "ago" strings and parsing the [YYYY-MM-DD HH:MM]
 // stamps the server prefixes onto action-item comments.
 export function ago(ms: number): string {

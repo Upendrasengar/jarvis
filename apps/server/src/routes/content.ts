@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { z } from "zod";
 // Read-only content routes: digests, projects, graph, stats, health.
 import type { FastifyInstance } from "fastify";

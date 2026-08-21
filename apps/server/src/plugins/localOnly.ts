@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // CSRF guard for state-changing routes on this localhost-only server:
 // block requests with a non-local Origin, and block browser requests that
 // omit Origin but self-identify as cross-site via Sec-Fetch-Site.

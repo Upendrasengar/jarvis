@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # init.sh — first-run interview: Jarvis learns who it works for.
 # Writes memory/ from the memory.example templates plus your answers.
 # Safe to re-run: existing files are only touched if you say so.

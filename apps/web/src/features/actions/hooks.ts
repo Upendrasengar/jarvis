@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
 

@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { NavLink, Outlet } from "react-router-dom";
 import { RecordingPill } from "../features/calls/RecordingPill";
 import { HeaderVoice } from "../features/voice/HeaderVoice";

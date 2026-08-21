@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Freeform notes — markdown files in the brain vault's Notes/ folder, so
 // they're simultaneously: visible to Jarvis's note/ask workers, indexed by
 // vault-search recall, browsable in Obsidian, and editable from the UI.

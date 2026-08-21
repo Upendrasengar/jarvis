@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // @jarvis/shared — the API contract. Server routes validate against these
 // schemas; the web app imports the inferred types. One source of truth so
 // frontend and backend cannot drift.

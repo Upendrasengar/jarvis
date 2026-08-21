@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Recurring-item detection: the same real-world task raised in multiple
 // calls produces near-duplicate action items. Deterministic clustering —
 // normalized token overlap + union-find — so the grouping is identical on

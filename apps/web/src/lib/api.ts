@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Typed API client — every response is validated against the shared zod
 // contract, so a server drift fails here loudly instead of rendering garbage.
 import * as S from "@jarvis/shared";

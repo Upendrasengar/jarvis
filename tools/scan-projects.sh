@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # scan-projects.sh — plain git-activity scanner for the Daily Project Digest.
 # No network, no LLM. Reads memory/active-projects.md, writes reports/raw-<date>.md.
 # Usage: bash tools/scan-projects.sh [SINCE]   (SINCE defaults to "yesterday")

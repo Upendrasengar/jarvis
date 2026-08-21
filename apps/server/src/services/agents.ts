@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Worker agents — Jarvis (the chat) is a tool-less dispatcher; real work runs
 // in separate autonomous `claude` processes. Three kinds:
 //   code — branches inside a project, never pushes/merges (safety rules in prompt)

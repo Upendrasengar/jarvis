@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Daily digest scheduler — lives in the server instead of launchd.
 // Why: launchd agents can't read scripts under ~/Documents (macOS TCC)
 // without Full Disk Access, which broke the 8am digest the moment the repo

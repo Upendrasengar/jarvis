@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // SQLite index — NOT a source of truth. Markdown in reports/ and the vault
 // stays canonical (it feeds Obsidian recall); this database is a queryable
 // index rebuilt from those files whenever they change. Losing it costs

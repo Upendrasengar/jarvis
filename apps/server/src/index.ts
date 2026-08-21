@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Jarvis API server (Fastify). Phase 1 of the platform migration: file-based
 // endpoints ported 1:1 from the legacy ui/server.js. Chat/agents/TTS (the
 // warm claude-session manager) stay on the legacy server until Phase 4.

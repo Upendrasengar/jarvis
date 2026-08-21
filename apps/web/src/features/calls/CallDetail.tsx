@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { useEffect, useRef, useState } from "react";
 import type { Call } from "@jarvis/shared";
 import { NotesView } from "./NotesView";

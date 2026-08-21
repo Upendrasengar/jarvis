@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // ⚙ Settings — voice listening modes, call recording, transcription, speech
 // voice. Non-secret preferences only; changes auto-save with a saved tick.
 import { useRef, useState } from "react";

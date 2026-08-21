@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Copy call notes to the clipboard in two flavors simultaneously:
 //   text/html  — rich formatting for Teams / Outlook / Word / Gmail pastes
 //   text/plain — the markdown itself for Slack / editors / plain targets

@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // API tests against the running Jarvis server (post-cutover: API + web on
 // :4321). Every response must validate against the shared zod contract, and
 // state-changing routes must enforce the CSRF guard.

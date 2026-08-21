@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Activity & logs — visibility into the pipelines so "transcribing…" is
 // never a mystery. Log ids map to a fixed set of known files (never arbitrary
 // paths): the watcher log, the server log, and each call session's

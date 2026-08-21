@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Calendar adapter — fully OPTIONAL and detachable.
 // The single switch is CALENDAR_FEED_URL in gitignored secrets/.env:
 //   absent  → no polling, no API data, no UI, no digest section. Zero footprint.

@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // The overview centerpiece: a swappable "core" visual (particles / arc
 // reactor / oculus — localStorage-selected, styles added never replaced)
 // with capability satellites styled after the HUD mockup: circled line

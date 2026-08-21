@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Live channel client: one WebSocket; any "fs" message invalidates the
 // file-backed queries. Auto-reconnects; polling in the hooks remains only as
 // a slow fallback for when the socket is down.

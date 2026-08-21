@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Digest history browser — date sidebar + reading pane, deep-linked at
 // /digest/:date.
 import { useQuery, useQueryClient } from "@tanstack/react-query";

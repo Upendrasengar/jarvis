@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Knowledge graph built from wikilinks across all configured vaults + brain.
 // Faithful port of the legacy builder, including its group labels.
 import fs from "node:fs";

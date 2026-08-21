@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Notes — freeform markdown in the brain vault (Notes/), bound to calls via
 // frontmatter and to the Actions inbox via "- [ ]" lines. Same interaction
 // language as calls: sidebar/detail, click-any-line editing, raw EDIT, COPY,

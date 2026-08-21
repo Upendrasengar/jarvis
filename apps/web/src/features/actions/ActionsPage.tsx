@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // The Actions ledger — every open action item, grouped under the call where
 // it was incurred. Same transmission-node language as the chat log: each call
 // group is a log entry; its outstanding items hang off the rail beneath it.

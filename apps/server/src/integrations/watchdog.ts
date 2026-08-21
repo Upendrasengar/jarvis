@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Watcher watchdog — the server supervises tools/call-watch.sh. Two failure
 // modes, both auto-healed:
 //   dead   — process gone (crash, kill): restart it

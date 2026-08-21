@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # process-call.sh — Call Notes capability, stage 2: transcribe + summarize.
 # Takes a session dir produced by call-watch.sh (mic.wav + system.wav),
 # transcribes both sides locally with whisper.cpp, merges them into a

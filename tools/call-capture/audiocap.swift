@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // audiocap — record system audio (everything the Mac plays) to a WAV file
 // using ScreenCaptureKit. This is how Jarvis hears the OTHER side of a call.
 //

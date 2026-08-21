@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Styled replacement for window.prompt — JARVIS-themed modal with backdrop,
 // Enter to submit, Escape to cancel.
 import { useEffect, useRef, useState } from "react";

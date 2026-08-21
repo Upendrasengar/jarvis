@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Attention ranking — deterministic scoring over open action items, fed by
 // two signal sources: code-computed facts (age, comment recency, token-level
 // duplicate clusters) and the nightly Sonnet triage annotations (paraphrase

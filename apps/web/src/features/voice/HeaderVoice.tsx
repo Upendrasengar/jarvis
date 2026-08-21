@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Header voice bar — talk to Jarvis from ANY tab without leaving it.
 // Three modes (⚙ settings):
 //   on-demand    click → one utterance → stops (classic)

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # Talk to Jarvis. Usage:
 #   jarvis            -> open an interactive Jarvis session (type or /voice)
 #   jarvis start      -> start everything: UI + call-notes watcher

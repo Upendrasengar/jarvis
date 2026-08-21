@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./Layout";
 import { CallsPage } from "../features/calls/CallsPage";

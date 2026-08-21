@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CallDetail } from "./CallDetail";

@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Global header pill: pulsing REC + elapsed time whenever a call is being
 // captured. Click → open the call; hover reveals ■ stop.
 import { useEffect, useState } from "react";

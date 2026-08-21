@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Telegram surface — talk to Jarvis from your phone.
 // Long-polling (getUpdates), so it works from a laptop behind NAT with no
 // public URL, no webhook, no tunnel. Bound to exactly ONE owner chat id:

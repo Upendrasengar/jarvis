@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # setup-telegram.sh — interactive wizard: connect Jarvis to a Telegram bot.
 # Writes TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID into gitignored secrets/.env
 # and binds the bot to YOUR chat only (anyone can message any bot — Jarvis

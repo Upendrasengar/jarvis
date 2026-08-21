@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import fs from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";

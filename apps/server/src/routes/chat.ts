@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Chat (SSE via warm sessions), delegation, agents, warmup, and TTS.
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";

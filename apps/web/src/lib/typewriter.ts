@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Typewriter reveal — the network stream arrives in big chunks (fast model,
 // concise replies), so raw rendering looks like one-shot paste. This animates
 // the reveal at ~120+ chars/sec, accelerating when the backlog grows so it

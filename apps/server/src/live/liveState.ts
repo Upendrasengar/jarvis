@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Live channel: one WebSocket that tells clients "something changed on disk —
 // refetch". Replaces the old per-tab polling loops. Watches the session dirs
 // and the notes files; debounced so a burst of writes is one message.

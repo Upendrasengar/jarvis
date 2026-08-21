@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // The operator comms log — port of the legacy chat design: Jarvis speaks as
 // the system (node + mono eyebrow, no bubble), you transmit in capsules.
 // Voice: 🎙 fills the composer via speech recognition; 🔈 reads replies aloud.

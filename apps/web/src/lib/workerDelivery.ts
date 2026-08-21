@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Worker-result delivery — closes the "it never told me" gap. When a worker
 // finishes, the server pushes worker-result over the live channel; this hook
 // (mounted once in Layout) runs a hidden chat turn so Jarvis DELIVERS the

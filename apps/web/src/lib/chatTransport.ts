@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Shared chat transport — used by the chat page (visible conversation) and
 // the header voice bar (background conversation from any tab). Handles the
 // SSE stream and the ACTION:DELEGATE protocol in one place.

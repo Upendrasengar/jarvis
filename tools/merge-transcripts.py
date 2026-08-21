@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 """merge-transcripts.py — interleave two whisper.cpp JSON transcripts
 (mic = "Me", system audio = "Them") into one speaker-labeled markdown
 transcript ordered by time. Deterministic; no LLM.

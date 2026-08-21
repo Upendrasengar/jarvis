@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Renders call-notes markdown as React elements (no innerHTML, no XSS
 // surface) — and every text line is contentEditable in place. Because each
 // rendered element corresponds to exactly one markdown source line, an edit

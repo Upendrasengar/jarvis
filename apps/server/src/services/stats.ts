@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Aggregated stats for the overview. Port of the legacy buildStats.
 import fs from "node:fs";
 import path from "node:path";
