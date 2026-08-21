@@ -162,8 +162,9 @@ export function DigestPage() {
   const ledgerDupe = (source: string, line: string): boolean => {
     if (!liveActions) return false;
     const a = matchAction(liveActions, source, line);
-    // dim anything grouped into the panel above (dupes AND bucketed items)
-    return a ? attention.dupeIds.has(idKey(a)) || bucketIds.has(idKey(a)) : false;
+    // dim ONLY items that actually have a row in the attention panel above —
+    // a clustered item that didn't make the capped bucket keeps its checkbox
+    return a ? bucketIds.has(idKey(a)) : false;
   };
   const toggleAll = async (items: any[]): Promise<boolean> => {
     let allOk = true;
