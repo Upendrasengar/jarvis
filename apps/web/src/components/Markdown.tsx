@@ -4,6 +4,7 @@
 // inline call-notes-<stamp> references navigate to the call/note pages.
 import { Fragment, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { ago, parseStamp } from "../lib/time";
 
 function callRefs(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -58,10 +59,13 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
   // optimistic check-state per line index; reverted if the toggle fails
   const [flips, setFlips] = useState<Record<number, boolean>>({});
   let section: string | null = null;   // current ### ledger source
+  // ↳-comment styling applies only to indented bullets directly under a
+  // checkbox (an item's comment trail), not to ordinary nested lists
+  let inCheckboxBlock = false;
   return (
     <div className="max-w-[760px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
       {md.split("\n").map((line, i) => {
-        if (line.trim() === "") return null;
+        if (line.trim() === "") { inCheckboxBlock = false; return null; }
         const h1 = line.match(/^# (.+)$/);
         if (h1) return <h1 key={i} className="mb-3 mt-2 text-xl text-[var(--bright)]">{h1[1]}</h1>;
         const h2 = line.match(/^## (.+)$/);
@@ -101,6 +105,7 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
           );
         }
         const box = line.match(/^\s*(?:\d+\.\s*)?- \[( |x)\] (.*)$/);
+        if (box) inCheckboxBlock = true;
         if (box) {
           // precedence: this session's click > live source state > snapshot
           const live = section ? ledgerState?.(section, box[2]) : undefined;
@@ -134,8 +139,24 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
             </div>
           );
         }
+        const sub = line.match(/^\s{2,}[-*]\s+(.*)$/);
+        if (sub && inCheckboxBlock) {
+          const { when, text } = parseStamp(sub[1]);
+          return (
+            <div key={i} className="mb-[2px] ml-9 text-[12px] leading-snug text-[var(--dim)]">
+              <span className="mr-1 text-[var(--cyan-dim,#5b9ec4)]">↳</span>
+              {inline(text)}
+              {when && (
+                <span className="ml-2 text-[9.5px] opacity-70" title={new Date(when).toLocaleString()}>
+                  · {ago(when)}
+                </span>
+              )}
+            </div>
+          );
+        }
         const li = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)$/);
-        if (li) return <li key={i} className="ml-5 mb-1">{inline(li[1])}</li>;
+        if (li) { inCheckboxBlock = false; return <li key={i} className="ml-5 mb-1">{inline(li[1])}</li>; }
+        inCheckboxBlock = false;
         return <p key={i} className="mb-2">{inline(line)}</p>;
       })}
     </div>
