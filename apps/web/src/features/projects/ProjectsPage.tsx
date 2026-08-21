@@ -11,6 +11,7 @@ export function ProjectsPage() {
     queryFn: async () => S.Project.array().parse(await (await fetch("/api/projects")).json()),
   });
   const [filter, setFilter] = useState<Filter>("all");
+  const [q, setQ] = useState("");
   const counts = useMemo(
     () => ({
       all: projects.length,
@@ -19,8 +20,15 @@ export function ProjectsPage() {
     }),
     [projects],
   );
-  const visible = projects.filter((p) =>
-    filter === "all" ? true : filter === "active" ? p.status === "active" : p.status !== "active");
+  const needle = q.trim().toLowerCase();
+  const visible = projects
+    .filter((p) =>
+      filter === "all" ? true : filter === "active" ? p.status === "active" : p.status !== "active")
+    .filter((p) =>
+      !needle ||
+      p.id.toLowerCase().includes(needle) ||
+      p.category.toLowerCase().includes(needle) ||
+      p.what.toLowerCase().includes(needle));
 
   const toggle = async (p: S.Project) => {
     const status = p.status === "active" ? "inactive" : "active";
@@ -35,7 +43,13 @@ export function ProjectsPage() {
 
   return (
     <div className="h-full overflow-auto p-5">
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex items-center gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search projects…"
+          className="w-[220px] rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1 font-sans text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+        />
         {(["all", "active", "inactive"] as Filter[]).map((f) => (
           <button
             key={f}
@@ -50,7 +64,7 @@ export function ProjectsPage() {
           </button>
         ))}
         <span className="ml-auto self-center font-sans text-[10.5px] text-[var(--dim)]">
-          Inactive projects are hidden from the brain graph and skipped by the digest scan.
+          {needle ? `${visible.length} match${visible.length === 1 ? "" : "es"}` : "Inactive projects are hidden from the brain graph and skipped by the digest scan."}
         </span>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
