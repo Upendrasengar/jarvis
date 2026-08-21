@@ -21,7 +21,28 @@ export type CalEvent = {
   location?: string;
   online?: boolean;
   joinUrl?: string;     // Teams meeting link, when present in the invite body
+  description?: string; // human part of the invite body (agenda, context)
 };
+
+// Invite bodies are ~90% Teams boilerplate. Outlook fences that block behind
+// a "________" divider — strip HTML, cut at the divider, keep the human part.
+function bodyToDescription(html: string): string | undefined {
+  if (!html) return undefined;
+  let text = html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>(?=.)/gi, "\n")
+    .replace(/<\/(p|div|tr)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"');
+  text = text.split(/_{20,}/)[0];                      // drop Teams block
+  text = text
+    .split("\n").map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean).join("\n")
+    .trim();
+  if (text.length < 20) return undefined;             // divider-only bodies
+  return text.slice(0, 900);
+}
 
 // "jane.doe@example.com" → "Upendra Sengar"
 function nameFromEmail(v: string): string {
@@ -98,6 +119,7 @@ function normalizeJSON(data: any): CalEvent[] {
             typeof a === "string" ? a : a.emailAddress?.name ?? a.name ?? a.email ?? "?");
       const body = typeof e.body === "string" ? e.body : "";
       const joinUrl = body.match(/https:\/\/teams\.microsoft\.com\/(?:meet|l\/meetup-join)[^"'\s<]+/)?.[0];
+      const description = bodyToDescription(body);
       const organizerRaw = e.organizer?.emailAddress?.name ?? e.organizer ?? undefined;
       return {
         subject: String(e.subject ?? e.title ?? "(untitled)"),
@@ -108,6 +130,7 @@ function normalizeJSON(data: any): CalEvent[] {
         location: e.location?.displayName ?? e.location ?? undefined,
         online: !!(e.isOnline ?? e.isOnlineMeeting ?? e.onlineMeeting ?? joinUrl),
         ...(joinUrl ? { joinUrl } : {}),
+        ...(description ? { description } : {}),
       };
     })
     .filter((e) => e.subject && e.start);

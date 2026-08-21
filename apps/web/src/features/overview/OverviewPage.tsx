@@ -95,6 +95,7 @@ export function OverviewPage() {
       text:
         `Prep me for my "${e.subject}" meeting at ${localTime(e.start)} today` +
         (att ? ` with ${att}` : "") +
+        (e.description ? `. The invite says: "${String(e.description).slice(0, 500)}"` : "") +
         `. Search my calls, notes, and topic graph for previous meetings with this title or these people, ` +
         `list open action items involving them (flag anything overdue), and tell me what I should raise.`,
       voice: false,
