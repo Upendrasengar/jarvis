@@ -43,7 +43,7 @@ command -v python3 >/dev/null 2>&1 && ok "python3" || bad "python3"
 echo "── audio helpers (built from source in tools/call-capture) ──"
 for b in audiocap miccheck; do
   if [[ -x "tools/call-capture/bin/$b" ]]; then ok "$b"
-  elif [[ $CHECK_ONLY == 1 ]]; then bad "$b not built — run ./install.sh"
+  elif [[ $CHECK_ONLY == 1 ]]; then bad "$b not built — run: jarvis setup"
   else
     mkdir -p tools/call-capture/bin
     echo "  building $b..."
@@ -57,7 +57,7 @@ echo "── whisper model ──"
 WANT="$(head -1 memory/settings/whisper-model.txt 2>/dev/null || head -1 memory.example/settings/whisper-model.txt)"
 WANT="${WANT:-base}"
 if ls models/ggml-*.bin >/dev/null 2>&1; then ok "model present: $(ls models/ggml-*.bin | xargs -n1 basename | tr '\n' ' ')"
-elif [[ $CHECK_ONLY == 1 ]]; then bad "no whisper model in models/ — run ./install.sh"
+elif [[ $CHECK_ONLY == 1 ]]; then bad "no whisper model in models/ — run: jarvis setup"
 else
   mkdir -p models
   echo "  downloading ggml-$WANT.bin (this can take a while)..."
@@ -75,8 +75,8 @@ echo "── JS workspace ──"
 if [[ -L node_modules ]]; then
   ok "managed by Homebrew (engine in $(readlink node_modules | sed 's|/node_modules$||'))"
 elif [[ $CHECK_ONLY == 1 ]]; then
-  [[ -d node_modules ]] && ok "dependencies installed" || bad "dependencies — run ./install.sh"
-  [[ -d apps/web/dist ]] && ok "web app built" || bad "web app not built — run ./install.sh"
+  [[ -d node_modules ]] && ok "dependencies installed" || bad "dependencies — run: jarvis setup"
+  [[ -d apps/web/dist ]] && ok "web app built" || bad "web app not built — run: jarvis setup"
 else
   pnpm install --silent && ok "dependencies installed" || bad "pnpm install failed"
   (cd apps/web && pnpm exec vite build >/dev/null 2>&1) && ok "web app built" || bad "web build failed"
