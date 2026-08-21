@@ -48,8 +48,12 @@ type LedgerToggle = (source: string, line: string) => Promise<boolean>;
 type LedgerState = (source: string, line: string) => boolean | undefined;
 type LedgerTitle = (source: string) => string | undefined;
 
-export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle }: {
+export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2, ledgerDupe }: {
   md: string; onLedgerToggle?: LedgerToggle; ledgerState?: LedgerState; ledgerTitle?: LedgerTitle;
+  // inject a node right below a matching ## heading (the Recurring panel)
+  afterH2?: { pattern: RegExp; node: ReactNode };
+  // lines grouped into a recurring cluster render dimmed with a ⟳ marker
+  ledgerDupe?: (source: string, line: string) => boolean;
 }) {
   // optimistic check-state per line index; reverted if the toggle fails
   const [flips, setFlips] = useState<Record<number, boolean>>({});
@@ -63,9 +67,12 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle }: {
         const h2 = line.match(/^## (.+)$/);
         if (h2)
           return (
-            <h2 key={i} className="mb-2 mt-5 text-[11px] uppercase tracking-[1.5px] text-[var(--cyan)]">
-              {h2[1]}
-            </h2>
+            <Fragment key={i}>
+              <h2 className="mb-2 mt-5 text-[11px] uppercase tracking-[1.5px] text-[var(--cyan)]">
+                {h2[1]}
+              </h2>
+              {afterH2?.pattern.test(h2[1]) ? afterH2.node : null}
+            </Fragment>
           );
         const h3 = line.match(/^### (.+)$/);
         if (h3) {
@@ -98,6 +105,13 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle }: {
           // precedence: this session's click > live source state > snapshot
           const live = section ? ledgerState?.(section, box[2]) : undefined;
           const checked = flips[i] ?? live ?? box[1] === "x";
+          if (!checked && section && ledgerDupe?.(section, box[2]))
+            return (
+              <div key={i} className="ml-2 mb-1 flex gap-2 opacity-45" title="Grouped in Recurring above — check it off there">
+                <span className="text-[var(--cyan)]">⟳</span>
+                <span>{inline(box[2])}</span>
+              </div>
+            );
           const src = section;
           const canToggle = !!onLedgerToggle && !!src;
           const toggle = async () => {

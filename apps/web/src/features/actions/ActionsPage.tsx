@@ -9,6 +9,7 @@ import type { ActionItem } from "@jarvis/shared";
 import { useActions, useToggleAction } from "./hooks";
 import { PromptDialog } from "../../components/PromptDialog";
 import { ago, parseStamp } from "../../lib/time";
+import { buildClusters, idKey } from "../../lib/actionClusters";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Who = "all" | "me" | "others";
@@ -43,7 +44,7 @@ function OwnerLane({ owner }: { owner: string }) {
   );
 }
 
-function ItemRow({ item, onToggle, onComment }: { item: ActionItem; onToggle: () => void; onComment: () => void }) {
+function ItemRow({ item, onToggle, onComment, recurringIn }: { item: ActionItem; onToggle: () => void; onComment: () => void; recurringIn?: number }) {
   const age = ageDays(item.callStarted);
   return (
     <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[7px] pl-6 pr-3 font-sans text-[13px] leading-snug hover:bg-[rgba(57,215,255,.05)]">
@@ -57,6 +58,14 @@ function ItemRow({ item, onToggle, onComment }: { item: ActionItem; onToggle: ()
       <span className="min-w-0 flex-1">
         <span className={item.done ? "text-[var(--dim)] line-through" : "text-[var(--text)]"}>
           {inline(item.text)}
+          {recurringIn && recurringIn > 1 ? (
+            <span
+              title="This item was raised in multiple calls"
+              className="ml-2 rounded-full border border-[rgba(255,207,92,.4)] px-[7px] py-[1px] text-[9.5px] text-[var(--amber)]"
+            >
+              ⟳ {recurringIn} calls
+            </span>
+          ) : null}
         </span>
         {item.comments.map((c, i) => {
           const { when, text } = parseStamp(c);
@@ -88,7 +97,7 @@ function ItemRow({ item, onToggle, onComment }: { item: ActionItem; onToggle: ()
   );
 }
 
-function CallGroup({ items, onToggle, onComment }: { items: ActionItem[]; onToggle: (i: ActionItem) => void; onComment: (i: ActionItem) => void }) {
+function CallGroup({ items, onToggle, onComment, clusterOf }: { items: ActionItem[]; onToggle: (i: ActionItem) => void; onComment: (i: ActionItem) => void; clusterOf?: (i: ActionItem) => number | undefined }) {
   const head = items[0];
   return (
     <div className="relative mb-4 pl-6">
@@ -107,7 +116,7 @@ function CallGroup({ items, onToggle, onComment }: { items: ActionItem[]; onTogg
         </span>
       </div>
       {items.map((i) => (
-        <ItemRow key={`${i.callId}:${i.index}`} item={i} onToggle={() => onToggle(i)} onComment={() => onComment(i)} />
+        <ItemRow recurringIn={clusterOf?.(i)} key={`${i.callId}:${i.index}`} item={i} onToggle={() => onToggle(i)} onComment={() => onComment(i)} />
       ))}
     </div>
   );
@@ -115,6 +124,7 @@ function CallGroup({ items, onToggle, onComment }: { items: ActionItem[]; onTogg
 
 export function ActionsPage() {
   const { data: items = [], isLoading } = useActions();
+  const clusterById = useMemo(() => buildClusters(items).byId, [items]);
   const toggle = useToggleAction();
   const [who, setWho] = useState<Who>("all");
   const [showDone, setShowDone] = useState(false);
@@ -203,7 +213,7 @@ export function ActionsPage() {
         <section key={day} className="mb-6">
           <div className="mb-2 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">{day}</div>
           {[...calls.values()].map((group) => (
-            <CallGroup key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
+            <CallGroup clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
           ))}
         </section>
       ))}
