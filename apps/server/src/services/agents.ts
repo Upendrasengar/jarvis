@@ -54,6 +54,7 @@ function baseRecord(partial: Partial<AgentRecord> & Pick<AgentRecord, "kind" | "
 }
 
 function attach(rec: AgentRecord, child: ChildProcess, maxLog = 400) {
+  child.on("error", (e) => { rec.status = "failed"; rec.log.push(`spawn error: ${String(e).slice(0, 100)}`); });
   rec.child = child;
   const push = (line: string) => { rec.log.push(line); if (rec.log.length > maxLog) rec.log.shift(); };
   child.stdout?.on("data", (d) => String(d).split("\n").forEach((l) => l.trim() && push(l)));

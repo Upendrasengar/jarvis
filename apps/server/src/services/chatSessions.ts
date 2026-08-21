@@ -116,6 +116,16 @@ function spawnWarm(sessionId: string): Session {
   // version) the user must see WHY, not "(no reply)"
   let errTail = "";
   child.stderr.on("data", (d: Buffer) => { errTail = (errTail + d.toString()).slice(-1500); });
+  child.on("error", (e) => {
+    // spawn failure (ENOENT etc) — without this handler the whole server dies
+    if (s.active) {
+      const a = s.active;
+      s.active = null;
+      a.onText(`⚠️ Could not start the claude CLI (${String(e).slice(0, 80)}). Run \`jarvis doctor\`.`);
+      a.onDone();
+    }
+    sessions.delete(sessionId);
+  });
   child.on("close", (code) => {
     // a resume that dies within 3s means the on-disk session is gone
     if (usedResume && Date.now() - spawnedAt < 3000) { known.delete(sessionId); persist(); }

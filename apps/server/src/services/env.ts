@@ -7,19 +7,36 @@ import os from "node:os";
 import path from "node:path";
 import { JARVIS_DIR, MEMORY_DIR } from "../config.js";
 
+import { execFileSync } from "node:child_process";
+
+// Find a claude binary that actually WORKS — a stale shim in ~/.local/bin or
+// an old nvm dir (pointing at a deleted node) must not shadow the healthy one
+// on PATH. Every candidate is validated with --version; the choice is logged
+// so `jarvis logs` shows exactly which binary the server runs.
 export function findClaude(): string {
-  const cands = [
+  const cands: string[] = [
+    "claude",                                          // PATH first — what the user's terminal uses
     path.join(os.homedir(), ".local/bin/claude"),
-    path.join(os.homedir(), ".nvm/versions/node/v22.12.0/bin/claude"),
   ];
-  for (const c of cands) if (fs.existsSync(c)) return c;
   try {
     const base = path.join(os.homedir(), ".nvm/versions/node");
-    for (const d of fs.readdirSync(base).sort().reverse()) {
-      const c = path.join(base, d, "bin/claude");
-      if (fs.existsSync(c)) return c;
-    }
+    for (const d of fs.readdirSync(base).sort().reverse())
+      cands.push(path.join(base, d, "bin/claude"));
   } catch {}
+  const PATHENV = `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH ?? ""}`;
+  for (const c of cands) {
+    try {
+      if (c !== "claude" && !fs.existsSync(c)) continue;
+      const v = execFileSync(c, ["--version"], {
+        timeout: 8000, env: { ...process.env, PATH: PATHENV },
+      }).toString().trim();
+      console.log(`[claude] using ${c} (${v})`);
+      return c;
+    } catch (e) {
+      console.log(`[claude] candidate failed, skipping: ${c} (${String(e).slice(0, 60)})`);
+    }
+  }
+  console.log("[claude] NO working binary found — chat and workers will fail. Install Claude Code and log in.");
   return "claude";
 }
 export const CLAUDE = findClaude();
