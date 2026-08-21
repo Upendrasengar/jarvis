@@ -2,7 +2,7 @@
 // checkboxes (read-only), bold. React elements, never innerHTML.
 // Digest-aware links: ledger headers (### call-notes-… / ### note-slug) and
 // inline call-notes-<stamp> references navigate to the call/note pages.
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 function callRefs(text: string): ReactNode[] {
@@ -44,7 +44,12 @@ function ledgerLink(h3: string): string | null {
   return `/notes/${encodeURIComponent(name)}`;
 }
 
-export function Markdown({ md }: { md: string }) {
+type LedgerToggle = (source: string, line: string) => Promise<boolean>;
+
+export function Markdown({ md, onLedgerToggle }: { md: string; onLedgerToggle?: LedgerToggle }) {
+  // optimistic check-state per line index; reverted if the toggle fails
+  const [flips, setFlips] = useState<Record<number, boolean>>({});
+  let section: string | null = null;   // current ### ledger source
   return (
     <div className="max-w-[760px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
       {md.split("\n").map((line, i) => {
@@ -60,6 +65,7 @@ export function Markdown({ md }: { md: string }) {
           );
         const h3 = line.match(/^### (.+)$/);
         if (h3) {
+          section = h3[1].match(/^(\S+?)(?:\.md)?(?:\s|$)/)?.[1] ?? null;
           const to = ledgerLink(h3[1]);
           return (
             <h3 key={i} className="mb-1 mt-4 text-[12.5px] font-semibold text-[var(--bright)]">
@@ -74,13 +80,30 @@ export function Markdown({ md }: { md: string }) {
           );
         }
         const box = line.match(/^\s*(?:\d+\.\s*)?- \[( |x)\] (.*)$/);
-        if (box)
+        if (box) {
+          const checked = flips[i] ?? box[1] === "x";
+          const src = section;
+          const canToggle = !!onLedgerToggle && !!src;
+          const toggle = async () => {
+            if (!canToggle) return;
+            setFlips((f) => ({ ...f, [i]: !checked }));       // optimistic
+            const ok = await onLedgerToggle!(src!, box[2]);
+            if (!ok) setFlips((f) => ({ ...f, [i]: checked })); // revert
+          };
           return (
             <div key={i} className="ml-2 mb-1 flex gap-2">
-              <span className="text-[var(--cyan)]">{box[1] === "x" ? "☑" : "☐"}</span>
-              <span className={box[1] === "x" ? "text-[var(--dim)] line-through" : ""}>{inline(box[2])}</span>
+              <button
+                onClick={toggle}
+                disabled={!canToggle}
+                title={canToggle ? "Check off in the source note — no need to leave the digest" : undefined}
+                className={`text-[var(--cyan)] ${canToggle ? "cursor-pointer hover:drop-shadow-[0_0_6px_var(--cyan)]" : "cursor-default"}`}
+              >
+                {checked ? "☑" : "☐"}
+              </button>
+              <span className={checked ? "text-[var(--dim)] line-through" : ""}>{inline(box[2])}</span>
             </div>
           );
+        }
         const li = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)$/);
         if (li) return <li key={i} className="ml-5 mb-1">{inline(li[1])}</li>;
         return <p key={i} className="mb-2">{inline(line)}</p>;

@@ -89,7 +89,9 @@ export const ActionItem = z.object({
 export type ActionItem = z.infer<typeof ActionItem>;
 
 export const ToggleActionBody = z.object({
-  callId: z.string().regex(/^(note:)?[\w-]+$/),
+  // note ids may be Obsidian filenames ("Current Action Items") — allow any
+  // single path segment, block traversal
+  callId: z.string().regex(/^(note:)?(?!\.)[^/\\]+$/).refine((v) => !v.includes("..")),
   index: z.number().int().min(0),
 });
 export const CommentActionBody = z.object({

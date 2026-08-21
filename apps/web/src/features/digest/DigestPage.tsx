@@ -6,6 +6,36 @@ import { useNavigate, useParams } from "react-router-dom";
 import * as S from "@jarvis/shared";
 import { Markdown } from "../../components/Markdown";
 
+// Check an item off WITHOUT leaving the digest: find the matching action in
+// the source call/note (same normalization the ledger used) and toggle it.
+// The digest file itself is a snapshot — tomorrow's ledger drops the item.
+async function ledgerToggle(source: string, line: string): Promise<boolean> {
+  try {
+    const actions = await (await fetch("/api/actions")).json();
+    const callId = source.startsWith("call-notes-")
+      ? source.replace(/^call-notes-/, "").replace(/\.md$/, "")
+      : "note:" + source.replace(/\.md$/, "");
+    const norm = (t: string) => t.replace(/\*\*/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+    const L = norm(line);
+    const cands = actions.filter(
+      (a: any) => a.callId === callId && a.text && L.includes(norm(a.text)),
+    );
+    const hit =
+      cands.length === 1
+        ? cands[0]
+        : cands.find((a: any) => L === norm(`${a.owner}: ${a.text}`)) ?? cands[0];
+    if (!hit) return false;
+    const r = await fetch("/api/actions/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callId: hit.callId, index: hit.index }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function useDigests() {
@@ -71,7 +101,7 @@ export function DigestPage() {
         })}
       </aside>
       <section className="min-w-0 flex-1 overflow-auto px-10 py-8">
-        {digest ? <Markdown md={digest.md} /> : (
+        {digest ? <Markdown md={digest.md} onLedgerToggle={ledgerToggle} /> : (
           <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>
         )}
       </section>
