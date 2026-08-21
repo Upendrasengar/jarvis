@@ -41,7 +41,10 @@ cd "$SESSION"
 # Loud failures: any error writes FAILED.txt (the UI shows the session as
 # "failed" with a rerun hint) instead of dying silently mid-pipeline.
 rm -f FAILED.txt
-trap 'code=$?; [ $code -ne 0 ] && echo "failed at line $LINENO (exit $code) — rerun: bash tools/process-call.sh reports/calls/$STAMP" > FAILED.txt' ERR
+trap 'code=$?; if [ $code -ne 0 ]; then
+  echo "failed at line $LINENO (exit $code) — rerun: bash tools/process-call.sh reports/calls/$STAMP" > FAILED.txt
+  osascript -e "display notification \"Call processing failed — open the Calls tab to rerun\" with title \"Jarvis\"" >/dev/null 2>&1 || true
+fi' ERR
 
 # One processor per session. A stale lock (crash, kill -9) is reclaimed if no
 # processor for this session is actually alive.
@@ -126,11 +129,12 @@ fi
 # Known-people roster from the owner's memory: whisper spells names
 # phonetically ("Harsh preet", "Insheeta"), and the prompt forbids inventing
 # names — without the roster it faithfully preserves the misspelling.
-ROSTER="$(head -c 6000 "$JARVIS_DIR/memory/about-me.md" 2>/dev/null)"
+ROSTER="$(head -c 6000 "$JARVIS_DIR/memory/about-me.md" 2>/dev/null || true)"
 # Controlled topic vocabulary — the brain's Topics/ pages. Feeding the list
 # into the prompt keeps one [[Claims]] hub instead of three near-duplicates.
 TOPICS_DIR="$BRAIN_DIR/Topics"
-TOPICS_LIST="$(ls "$TOPICS_DIR" 2>/dev/null | sed 's/\.md$//' | paste -sd ', ' -)"
+mkdir -p "$TOPICS_DIR" 2>/dev/null || true
+TOPICS_LIST="$(ls "$TOPICS_DIR" 2>/dev/null | sed 's/\.md$//' | paste -sd ', ' - || true)"
 
 {
   cat meta.txt
