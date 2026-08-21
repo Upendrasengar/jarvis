@@ -37,8 +37,10 @@ start() {
   if ui_up; then
     echo "server:     already running → http://localhost:$PORT"
   else
+    # JARVIS_NODE (set by the Homebrew wrapper) pins the exact node the
+    # native modules were built against — PATH order must never decide this
     (cd "$JARVIS_DIR/apps/server" && \
-      JARVIS_API_PORT="$PORT" nohup node_modules/.bin/tsx src/index.ts \
+      JARVIS_API_PORT="$PORT" nohup "${JARVIS_NODE:-node}" node_modules/.bin/tsx src/index.ts \
         >> "$JARVIS_DIR/reports/api.log" 2>&1 &)
     for _ in $(seq 1 15); do ui_up && break; sleep 1; done
     if ui_up; then
