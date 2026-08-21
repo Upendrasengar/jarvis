@@ -112,11 +112,23 @@ function spawnWarm(sessionId: string): Session {
       }
     }
   });
-  child.stderr.on("data", () => {});
-  child.on("close", () => {
+  // keep a stderr tail: when the CLI dies (not logged in, bad flag, old
+  // version) the user must see WHY, not "(no reply)"
+  let errTail = "";
+  child.stderr.on("data", (d: Buffer) => { errTail = (errTail + d.toString()).slice(-1500); });
+  child.on("close", (code) => {
     // a resume that dies within 3s means the on-disk session is gone
     if (usedResume && Date.now() - spawnedAt < 3000) { known.delete(sessionId); persist(); }
-    s.active?.onDone();
+    if (s.active) {
+      const a = s.active;
+      s.active = null;
+      const hint = /log ?in|unauthoriz|authent|api key|billing|credential/i.test(errTail)
+        ? "Claude Code isn't logged in on this machine — open a terminal, run `claude`, and complete the login, then try again."
+        : `The claude CLI exited unexpectedly (code ${code}).`;
+      const detail = errTail.trim() ? `\n\n${errTail.trim().split("\n").slice(-3).join("\n")}` : "";
+      a.onText(`⚠️ ${hint}${detail}`);
+      a.onDone();
+    }
     sessions.delete(sessionId);
   });
   sessions.set(sessionId, s);

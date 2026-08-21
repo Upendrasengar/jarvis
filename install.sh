@@ -20,7 +20,16 @@ echo "── platform ──"
 [[ "$(uname)" == "Darwin" ]] && ok "macOS" || bad "macOS required (call recording uses ScreenCaptureKit/CoreAudio)"
 
 echo "── core dependencies ──"
-if command -v claude >/dev/null 2>&1; then ok "claude CLI ($(claude --version 2>/dev/null | head -1))"
+if command -v claude >/dev/null 2>&1; then
+  ok "claude CLI ($(claude --version 2>/dev/null | head -1))"
+  # is it actually logged in? a dead CLI is the #1 cause of silent chat failure
+  PROBE_OUT="$(mktemp)"
+  ( claude -p --model haiku "Reply with exactly: OK" > "$PROBE_OUT" 2>&1 ) & PROBE_PID=$!
+  for _ in $(seq 1 30); do kill -0 $PROBE_PID 2>/dev/null || break; sleep 1; done
+  if kill -0 $PROBE_PID 2>/dev/null; then kill -9 $PROBE_PID 2>/dev/null; bad "claude CLI unresponsive after 30s — check your login: run \`claude\` in a terminal"
+  elif grep -qi "OK" "$PROBE_OUT"; then ok "claude CLI logged in and responding"
+  else bad "claude CLI present but NOT working — run \`claude\` in a terminal to log in ($(tail -1 "$PROBE_OUT" | cut -c1-60))"; fi
+  rm -f "$PROBE_OUT"
 else bad "claude CLI — install Claude Code (https://claude.com/claude-code) and log in"; fi
 if command -v node >/dev/null 2>&1; then
   v="$(node -e 'console.log(process.versions.node.split(".")[0])')"
