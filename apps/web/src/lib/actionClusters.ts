@@ -5,6 +5,7 @@
 export type ActionLike = {
   callId: string; index: number; owner: string; text: string;
   done: boolean; callTitle: string; callStarted: string;
+  comments: string[];
 };
 export type Cluster = { key: string; canonical: ActionLike; items: ActionLike[] };
 

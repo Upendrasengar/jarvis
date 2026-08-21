@@ -63,6 +63,11 @@ bash "$JARVIS_DIR/tools/scan-projects.sh" "${1:-$PREV_DATE}" >/dev/null
   done
 } >> "$JARVIS_DIR/reports/raw-$DATE.md"
 
+# 1.6 attention triage (one Sonnet call) — annotates open items with
+# clusters/deadlines/blocked flags into data/triage.json; the digest and the
+# dashboard's attention bucket both read it.
+bash "$JARVIS_DIR/tools/triage-actions.sh" || true
+
 # 2. LLM step: write the digest from the raw data (Sonnet is plenty)
 cd "$JARVIS_DIR"
 "$CLAUDE" -p "Read CLAUDE.md, then reports/raw-$DATE.md. \
@@ -82,7 +87,9 @@ in the raw file: EVERY unchecked item, grouped by source with its date, \
 oldest debts first. Never drop an unchecked item because its call is old — \
 it stays in every digest until someone checks it off. If the ledger is \
 empty, say 'All clear.' Then a calendar line (say 'not checked in headless \
-mode'), and 1-3 suggested focuses that lead with the oldest or most blocking \
+mode'), and 1-3 suggested focuses — read data/triage.json (attention annotations: \
+deadlines, blocked flags, duplicate clusters) and lead with overdue items, \
+then items I own that block others, then the oldest or most blocking \
 open items. Keep it scannable. Then print the digest file path." \
   --model sonnet --allowedTools "Read,Write" 2>&1 | tail -3
 

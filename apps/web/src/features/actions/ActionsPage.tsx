@@ -10,6 +10,14 @@ import { useActions, useToggleAction } from "./hooks";
 import { PromptDialog } from "../../components/PromptDialog";
 import { ago, parseStamp } from "../../lib/time";
 import { buildClusters, idKey } from "../../lib/actionClusters";
+import { attentionBucket, rankAttention, type Chip, type Triage } from "../../lib/attention";
+import { useQuery } from "@tanstack/react-query";
+
+const CHIP_STYLE: Record<string, string> = {
+  overdue: "border-[rgba(255,92,122,.5)] text-[var(--red)]",
+  due: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
+  blocked: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
+};
 import { useQueryClient } from "@tanstack/react-query";
 
 type Who = "all" | "me" | "others";
@@ -44,7 +52,7 @@ function OwnerLane({ owner }: { owner: string }) {
   );
 }
 
-function ItemRow({ item, onToggle, onComment, recurringIn }: { item: ActionItem; onToggle: () => void; onComment: () => void; recurringIn?: number }) {
+function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: ActionItem; onToggle: () => void; onComment: () => void; recurringIn?: number; chips?: Chip[] }) {
   const age = ageDays(item.callStarted);
   return (
     <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[7px] pl-6 pr-3 font-sans text-[13px] leading-snug hover:bg-[rgba(57,215,255,.05)]">
@@ -58,6 +66,11 @@ function ItemRow({ item, onToggle, onComment, recurringIn }: { item: ActionItem;
       <span className="min-w-0 flex-1">
         <span className={item.done ? "text-[var(--dim)] line-through" : "text-[var(--text)]"}>
           {inline(item.text)}
+          {chips?.map((c, k) => (
+            <span key={k} className={`ml-2 rounded-full border px-[7px] py-[1px] text-[9.5px] ${CHIP_STYLE[c.kind] ?? ""}`}>
+              {c.kind === "overdue" ? "🔴 " : c.kind === "blocked" ? "🚧 " : "⏰ "}{c.label}
+            </span>
+          ))}
           {recurringIn && recurringIn > 1 ? (
             <span
               title="This item was raised in multiple calls"
@@ -97,7 +110,7 @@ function ItemRow({ item, onToggle, onComment, recurringIn }: { item: ActionItem;
   );
 }
 
-function CallGroup({ items, onToggle, onComment, clusterOf }: { items: ActionItem[]; onToggle: (i: ActionItem) => void; onComment: (i: ActionItem) => void; clusterOf?: (i: ActionItem) => number | undefined }) {
+function CallGroup({ items, onToggle, onComment, clusterOf, chipsOf }: { items: ActionItem[]; onToggle: (i: ActionItem) => void; onComment: (i: ActionItem) => void; clusterOf?: (i: ActionItem) => number | undefined; chipsOf?: (i: ActionItem) => Chip[] | undefined }) {
   const head = items[0];
   return (
     <div className="relative mb-4 pl-6">
@@ -116,7 +129,7 @@ function CallGroup({ items, onToggle, onComment, clusterOf }: { items: ActionIte
         </span>
       </div>
       {items.map((i) => (
-        <ItemRow recurringIn={clusterOf?.(i)} key={`${i.callId}:${i.index}`} item={i} onToggle={() => onToggle(i)} onComment={() => onComment(i)} />
+        <ItemRow recurringIn={clusterOf?.(i)} chips={chipsOf?.(i)} key={`${i.callId}:${i.index}`} item={i} onToggle={() => onToggle(i)} onComment={() => onComment(i)} />
       ))}
     </div>
   );
@@ -125,6 +138,21 @@ function CallGroup({ items, onToggle, onComment, clusterOf }: { items: ActionIte
 export function ActionsPage() {
   const { data: items = [], isLoading } = useActions();
   const clusterById = useMemo(() => buildClusters(items).byId, [items]);
+  const { data: triage } = useQuery<Triage>({
+    queryKey: ["triage"],
+    queryFn: async () => (await fetch("/api/triage")).json(),
+    staleTime: 60_000,
+  });
+  const attention = useMemo(() => rankAttention(items, triage), [items, triage]);
+  const bucket = useMemo(() => attentionBucket(attention.ranked, 5), [attention]);
+  const chipsById = useMemo(() => {
+    const m = new Map<string, Chip[]>();
+    for (const r of attention.ranked) {
+      const urgent = r.chips.filter((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+      if (urgent.length) for (const a of r.cluster) m.set(idKey(a), urgent);
+    }
+    return m;
+  }, [attention]);
   const toggle = useToggleAction();
   const [who, setWho] = useState<Who>("all");
   const [showDone, setShowDone] = useState(false);
@@ -209,11 +237,33 @@ export function ActionsPage() {
         </div>
       )}
 
+      {who === "all" && bucket.length > 0 && (
+        <div className="mb-6 rounded-xl border border-[var(--line)] bg-[var(--chipbg)] p-3">
+          <div className="mb-2 text-[10px] tracking-[2px] text-[var(--amber)]">⚑ NEEDS ATTENTION</div>
+          {bucket.map((r) => (
+            <div key={idKey(r.item)} className="mb-1.5 flex items-start gap-2 font-sans text-[12.5px]">
+              <button
+                onClick={() => r.cluster.forEach((a) => doToggle(a as ActionItem))}
+                title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
+                className="cursor-pointer text-[var(--cyan)]"
+              >☐</button>
+              <span className="min-w-0 flex-1">
+                <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "")}
+                <span className="ml-2 inline-flex flex-wrap gap-1">
+                  {r.chips.slice(0, 3).map((c, k) => (
+                    <span key={k} className={`rounded-full border px-[6px] text-[9px] ${CHIP_STYLE[c.kind] ?? "border-[var(--line)] text-[var(--dim)]"}`}>{c.label}</span>
+                  ))}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       {[...days.entries()].map(([day, calls]) => (
         <section key={day} className="mb-6">
           <div className="mb-2 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">{day}</div>
           {[...calls.values()].map((group) => (
-            <CallGroup clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
+            <CallGroup chipsOf={(a) => chipsById.get(idKey(a))} clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
           ))}
         </section>
       ))}
