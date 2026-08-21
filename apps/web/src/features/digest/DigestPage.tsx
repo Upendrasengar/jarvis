@@ -60,6 +60,13 @@ export function DigestPage() {
   });
   const ledgerState = (source: string, line: string): boolean | undefined =>
     liveActions ? matchAction(liveActions, source, line)?.done : undefined;
+  const ledgerTitle = (source: string): string | undefined => {
+    if (!liveActions) return undefined;
+    const callId = source.startsWith("call-notes-")
+      ? source.replace(/^call-notes-/, "").replace(/\.md$/, "")
+      : "note:" + source.replace(/\.md$/, "");
+    return liveActions.find((a: any) => a.callId === callId)?.callTitle || undefined;
+  };
   const ledgerToggle = async (source: string, line: string) => {
     const ok = await toggleMatched(
       liveActions ?? (await (await fetch("/api/actions")).json()), source, line);
@@ -113,7 +120,7 @@ export function DigestPage() {
       </aside>
       <section className="min-w-0 flex-1 overflow-auto px-10 py-8">
         {digest ? (
-          <Markdown md={digest.md} onLedgerToggle={ledgerToggle} ledgerState={ledgerState} />
+          <Markdown md={digest.md} onLedgerToggle={ledgerToggle} ledgerState={ledgerState} ledgerTitle={ledgerTitle} />
         ) : (
           <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>
         )}

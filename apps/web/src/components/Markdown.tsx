@@ -46,9 +46,10 @@ function ledgerLink(h3: string): string | null {
 
 type LedgerToggle = (source: string, line: string) => Promise<boolean>;
 type LedgerState = (source: string, line: string) => boolean | undefined;
+type LedgerTitle = (source: string) => string | undefined;
 
-export function Markdown({ md, onLedgerToggle, ledgerState }: {
-  md: string; onLedgerToggle?: LedgerToggle; ledgerState?: LedgerState;
+export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle }: {
+  md: string; onLedgerToggle?: LedgerToggle; ledgerState?: LedgerState; ledgerTitle?: LedgerTitle;
 }) {
   // optimistic check-state per line index; reverted if the toggle fails
   const [flips, setFlips] = useState<Record<number, boolean>>({});
@@ -70,11 +71,21 @@ export function Markdown({ md, onLedgerToggle, ledgerState }: {
         if (h3) {
           section = h3[1].match(/^(\S+?)(?:\.md)?(?:\s|$)/)?.[1] ?? null;
           const to = ledgerLink(h3[1]);
+          // resolve "call-notes-2026-08-11-1035" to the real meeting title
+          const title = section ? ledgerTitle?.(section) : undefined;
           return (
             <h3 key={i} className="mb-1 mt-4 text-[12.5px] font-semibold text-[var(--bright)]">
               {to ? (
                 <Link to={to} className="no-underline hover:text-[var(--cyan)]">
-                  {h3[1]} <span className="text-[10px] text-[var(--cyan)]">↗</span>
+                  {title ? (
+                    <>
+                      {title}{" "}
+                      <span className="font-normal text-[10px] text-[var(--dim)]">{h3[1]}</span>{" "}
+                      <span className="text-[10px] text-[var(--cyan)]">↗</span>
+                    </>
+                  ) : (
+                    <>{h3[1]} <span className="text-[10px] text-[var(--cyan)]">↗</span></>
+                  )}
                 </Link>
               ) : (
                 h3[1]
