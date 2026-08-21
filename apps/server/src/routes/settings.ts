@@ -4,6 +4,7 @@ import { SettingsPatch } from "@jarvis/shared";
 import { patchSettings, readSettings, setVoiceListening, voicesInfo } from "../services/settings.js";
 import { localOnly } from "../plugins/localOnly.js";
 import { voiceActive } from "../live/liveState.js";
+import { calendarState } from "../integrations/calendar.js";
 
 export function settingsRoutes(app: FastifyInstance) {
   app.get("/api/settings", async () => readSettings());
@@ -18,6 +19,9 @@ export function settingsRoutes(app: FastifyInstance) {
 
   // the call watcher polls this: live socket presence OR recent heartbeat
   app.get("/api/voicestate", async () => ({ listening: voiceActive() }));
+
+  // optional calendar adapter — { enabled:false } when not configured
+  app.get("/api/calendar", async () => calendarState());
 
   app.post("/api/voicestate", { preHandler: localOnly }, async (req, reply) => {
     const body = z.object({ listening: z.boolean() }).safeParse(req.body);

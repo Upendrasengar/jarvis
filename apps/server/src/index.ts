@@ -19,6 +19,7 @@ import { addClient, startWatching } from "./live/liveState.js";
 import { startWatchdog } from "./integrations/watchdog.js";
 import { startTelegram } from "./integrations/telegram.js";
 import { startDigestCron } from "./integrations/digestCron.js";
+import { startCalendar } from "./integrations/calendar.js";
 
 // bodyLimit raised for pasted screenshots (4 × ~7MB data URLs)
 const app = Fastify({ logger: { level: "warn" }, bodyLimit: 32 * 1024 * 1024 });
@@ -34,6 +35,7 @@ startWatching();
 startWatchdog();
 startTelegram();
 startDigestCron();
+startCalendar();
 
 callRoutes(app);
 contentRoutes(app);

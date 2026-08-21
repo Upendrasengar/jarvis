@@ -63,6 +63,26 @@ bash "$JARVIS_DIR/tools/scan-projects.sh" "${1:-$PREV_DATE}" >/dev/null
   done
 } >> "$JARVIS_DIR/reports/raw-$DATE.md"
 
+# 1.55 optional calendar adapter: if data/calendar.json exists and is fresh
+# (<24h), append today's meetings to the raw file. Absent adapter = no-op.
+CAL="$JARVIS_DIR/data/calendar.json"
+if [ -f "$CAL" ] && [ -n "$(find "$CAL" -mmin -1440 2>/dev/null)" ]; then
+  python3 - "$CAL" "$DATE" >> "$JARVIS_DIR/reports/raw-$DATE.md" <<'CPY'
+import json, sys
+try:
+    st = json.load(open(sys.argv[1]))
+    todays = [e for e in st.get("events", []) if e.get("start", "").startswith(sys.argv[2])]
+    if todays:
+        print("\n## TODAY'S MEETINGS (from calendar adapter)")
+        for e in todays:
+            t = e["start"][11:16]
+            att = ", ".join(e.get("attendees", [])[:8])
+            print(f"- {t} — {e['subject']}" + (f" (with: {att})" if att else ""))
+except Exception:
+    pass
+CPY
+fi
+
 # 1.6 attention triage (one Sonnet call) — annotates open items with
 # clusters/deadlines/blocked flags into data/triage.json; the digest and the
 # dashboard's attention bucket both read it.
@@ -82,6 +102,9 @@ written AGAINST the previous digest — what moved since it, what is STILL \
 stalled and for how long, what's new (flag uncommitted work as at-risk), \
 a per-project bullet line, then — only if there \
 were real calls since the previous digest — a 'Calls' section with one line per call (title + outcome), \
+then — ONLY if the raw file has a TODAY'S MEETINGS section — a 'Today' \
+section listing those meetings, cross-referencing open action items that \
+involve the same people or topics, \
 then an 'Open action items' section built from the OPEN ACTION ITEMS ledger \
 in the raw file: EVERY unchecked item, grouped by source with its date, \
 oldest debts first. Never drop an unchecked item because its call is old — \

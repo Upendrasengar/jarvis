@@ -76,6 +76,27 @@ export function OverviewPage() {
     staleTime: 60_000,
   });
   const bucket = attentionBucket(rankAttention(liveActions ?? [], triage).ranked, 5);
+  // optional calendar adapter — card renders only when configured
+  const { data: cal } = useQuery<{ enabled: boolean; events: any[] }>({
+    queryKey: ["calendar"],
+    queryFn: async () => (await fetch("/api/calendar")).json(),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  const todayISO = new Date().toLocaleDateString("sv-SE");
+  const meetings = (cal?.enabled ? cal.events : []).filter((e) => e.start?.startsWith(todayISO));
+  const prepMe = (e: any) => {
+    const att = (e.attendees ?? []).slice(0, 10).join(", ");
+    sessionStorage.setItem("jarvis_pending", JSON.stringify({
+      text:
+        `Prep me for my "${e.subject}" meeting at ${e.start.slice(11, 16)} today` +
+        (att ? ` with ${att}` : "") +
+        `. Search my calls, notes, and topic graph for previous meetings with this title or these people, ` +
+        `list open action items involving them (flag anything overdue), and tell me what I should raise.`,
+      voice: false,
+    }));
+    navigate("/chat");
+  };
   const toggleCluster = async (items: any[]) => {
     for (const a of items)
       await fetch("/api/actions/toggle", {
@@ -166,6 +187,24 @@ export function OverviewPage() {
       </div>
 
       <div className="flex min-h-0 flex-col gap-3">
+        {cal?.enabled && (
+          <Panel title="Z-00 · Today" tag={String(meetings.length || "—")}>
+            {meetings.length
+              ? meetings.map((e, i) => {
+                  const past = Date.parse(e.end || e.start) < Date.now();
+                  return (
+                    <Row key={i} onClick={() => prepMe(e)}>
+                      <span className={past ? "opacity-50" : ""}>
+                        <b className="text-[var(--text)]">{e.start.slice(11, 16)}</b>{" "}
+                        {e.subject.slice(0, 40)}
+                        {!past && <span className="ml-1 text-[9px] text-[var(--cyan)]">prep ↗</span>}
+                      </span>
+                    </Row>
+                  );
+                })
+              : <Row>No meetings today.</Row>}
+          </Panel>
+        )}
         <Panel title="Z-01 · Live Now" tag={`${working.length}/${agents.length}`}>
           {recording && (
             <div

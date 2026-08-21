@@ -30,6 +30,11 @@ Claude Code session.
   background Claude agents and delivers results back into the conversation.
 - **Telegram** — `jarvis telegram` connects a bot bound to your chat only:
   message Jarvis from your phone, get worker results pushed back.
+- **Calendar (optional adapter)** — set `CALENDAR_FEED_URL` in
+  `secrets/.env` to any ICS feed (Google/Outlook secret address) or a JSON
+  endpoint (e.g. a Power Automate flow), and Jarvis gains a Today board
+  with one-click meeting prep, plus meetings in the daily digest. Unset =
+  the feature doesn't exist. No other functionality depends on it.
 
 ## Requirements
 
