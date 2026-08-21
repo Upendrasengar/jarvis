@@ -15,15 +15,30 @@ Claude Code session.
 
 - **Daily Project Digest** — every morning: what moved across your repos,
   what's uncommitted and at risk, and a carry-forward ledger of every open
-  action item from your calls — items persist until you check them off.
+  action item — items persist until checked off, with live checkboxes right
+  in the digest. Each digest chains on the previous one, so it knows what's
+  *still* stalled and for how long.
+- **Needs-Attention triage** — a nightly pass annotates open items with
+  resolved deadlines ("by Thursday" → a date), blocked/blocking flags, and
+  duplicate clusters across meetings; the digest and dashboard lead with a
+  ranked bucket (overdue → yours → blocking → repeated → aging), and one
+  checkbox completes an item in every call it was raised in.
 - **Call Notes** — detects meetings (Google Meet, Teams desktop/web, Zoom,
   Webex in browser tabs), records both sides, transcribes locally
   (multilingual), and writes Copilot-style minutes with named speaker
-  attribution and action items.
+  attribution and action items. Your team roster (from memory) fixes
+  phonetically mangled names; with the calendar adapter, the matching
+  event's attendee list is offered as an attribution hint.
+- **Knowledge graph** — every call and note is tagged with [[topic]]
+  wikilinks into a controlled vocabulary; a 3D Obsidian-style graph (with
+  search, filters, forces, per-vault toggles) shows how your meetings and
+  themes connect, and clicking a node briefs you from its whole cluster.
 - **Second-Brain Recall** — ask "what do I know about X?" and it answers from
-  your own Obsidian vaults and its growing knowledge base.
+  your own Obsidian vaults and its growing knowledge base, with source
+  chips linking every answer back to the calls and notes it used.
 - **Actions inbox** — one unified list of every open action item across all
-  calls and notes, with comments and one-click completion.
+  calls and notes, with comments, recurrence badges, and one-click
+  completion.
 - **Voice** — wake-word ("Jarvis"), conversation mode, or push-to-talk, from
   any page of the dashboard.
 - **Chat with workers** — delegate coding or research tasks; Jarvis spawns
@@ -32,9 +47,13 @@ Claude Code session.
   message Jarvis from your phone, get worker results pushed back.
 - **Calendar (optional adapter)** — set `CALENDAR_FEED_URL` in
   `secrets/.env` to any ICS feed (Google/Outlook secret address) or a JSON
-  endpoint (e.g. a Power Automate flow), and Jarvis gains a Today board
-  with one-click meeting prep, plus meetings in the daily digest. Unset =
-  the feature doesn't exist. No other functionality depends on it.
+  endpoint (e.g. a Power Automate flow), and Jarvis gains an agenda-style
+  Today board with one-click meeting prep (previous related calls, open
+  items, the invite's stated agenda), meetings in the daily digest, and
+  calendar hints for call attribution. Unset = the feature doesn't exist.
+- **Projects** — a card per project (from your projects vault) with search
+  and an active/inactive toggle: paused projects leave the graph and the
+  digest scan until you flip them back.
 
 ## Requirements
 
@@ -47,8 +66,18 @@ Claude Code session.
 
 ## Quickstart
 
+Homebrew (recommended):
+
 ```bash
-git clone https://github.com/<you>/jarvis && cd jarvis
+brew tap upendrasengar/jarvis
+brew install jarvis
+jarvis init && jarvis start     # → http://localhost:4321 · data in ~/.jarvis
+```
+
+From source:
+
+```bash
+git clone https://github.com/upendrasengar/jarvis && cd jarvis
 ./install.sh          # checks deps, builds audio helpers, downloads a whisper model
 ./jarvis init         # a short interview: who you are, which repos to watch
 ./jarvis start        # server + call watcher → http://localhost:4321
