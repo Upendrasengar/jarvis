@@ -2,9 +2,30 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { createNote, deleteNote, listNotes, readNote, updateNote } from "../services/notes.js";
+import { createTopic, deleteTopic, listTopics, renameTopic } from "../services/topics.js";
 import { localOnly } from "../plugins/localOnly.js";
 
 export function noteRoutes(app: FastifyInstance) {
+  app.get("/api/topics", async () => listTopics());
+  app.post("/api/topics", { preHandler: localOnly }, async (req, reply) => {
+    const b = z.object({ name: z.string().min(1).max(60) }).safeParse(req.body);
+    if (!b.success) return reply.code(400).send({ error: "bad request" });
+    const r = createTopic(b.data.name);
+    return "error" in r ? reply.code(400).send(r) : r;
+  });
+  app.post("/api/topics/rename", { preHandler: localOnly }, async (req, reply) => {
+    const b = z.object({ from: z.string().min(1), to: z.string().min(1).max(60) }).safeParse(req.body);
+    if (!b.success) return reply.code(400).send({ error: "bad request" });
+    const r = renameTopic(b.data.from, b.data.to);
+    return "error" in r ? reply.code(400).send(r) : r;
+  });
+  app.post("/api/topics/delete", { preHandler: localOnly }, async (req, reply) => {
+    const b = z.object({ name: z.string().min(1) }).safeParse(req.body);
+    if (!b.success) return reply.code(400).send({ error: "bad request" });
+    const r = deleteTopic(b.data.name);
+    return "error" in r ? reply.code(400).send(r) : r;
+  });
+
   app.get("/api/notes", async () => listNotes());
 
   app.get("/api/notes/:id", async (req, reply) => {

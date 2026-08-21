@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
 import { useSettings } from "../voice/HeaderVoice";
+import { PromptDialog } from "../../components/PromptDialog";
 
 function useVoices() {
   return useQuery({
@@ -40,6 +41,76 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </h2>
       {children}
     </section>
+  );
+}
+
+function TopicsSection() {
+  const qc = useQueryClient();
+  const { data: topics = [] } = useQuery<{ name: string; created: string }[]>({
+    queryKey: ["topics"],
+    queryFn: async () => (await fetch("/api/topics")).json(),
+  });
+  // usage counts from the same graph the Brain page renders
+  const { data: graph } = useQuery<any>({
+    queryKey: ["graph"],
+    queryFn: async () => (await fetch("/api/graph")).json(),
+    staleTime: 60_000,
+  });
+  const counts = new Map<string, number>();
+  for (const l of graph?.links ?? []) {
+    const t = typeof l.target === "object" ? l.target?.id : l.target;
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  const [newName, setNewName] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const post = async (url: string, body: object) => {
+    await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+    qc.invalidateQueries({ queryKey: ["topics"] });
+    qc.invalidateQueries({ queryKey: ["graph"] });
+  };
+  const sorted = [...topics].sort((a, b) => (counts.get(b.name) ?? 0) - (counts.get(a.name) ?? 0));
+  return (
+    <Section title="Topics — the knowledge-graph vocabulary">
+      <p className="mb-3 font-sans text-[11.5px] text-[var(--dim)]">
+        Calls and notes are tagged with these topics ([[wikilinks]] in your brain vault). The
+        summarizer strongly prefers this list, so curating it keeps the graph tidy. Renaming a
+        topic MERGES it — every link across your calls and notes is rewritten.
+      </p>
+      <div className="mb-3 flex gap-2">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
+          placeholder="New topic (Title Case, 1-3 words)…"
+          className="w-[260px] rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+        />
+        <button
+          onClick={() => { if (newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
+          className="rounded-full border border-[rgba(57,215,255,.4)] px-3 py-1 font-sans text-[12px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.08)]"
+        >＋ Add</button>
+      </div>
+      <div className="flex max-w-[680px] flex-wrap gap-1.5">
+        {sorted.map((t) => (
+          <span key={t.name} className="group flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-2.5 py-[3px] font-sans text-[11.5px] text-[var(--text)]">
+            {t.name}
+            <span className="text-[10px] text-[var(--dim)]">{counts.get(t.name) ?? 0}</span>
+            <button title="Rename / merge into another topic" onClick={() => setRenaming(t.name)}
+              className="invisible cursor-pointer text-[10px] text-[var(--dim)] hover:text-[var(--cyan)] group-hover:visible">✎</button>
+            <button title="Delete the hub page (links elsewhere become plain references)"
+              onClick={() => post("/api/topics/delete", { name: t.name })}
+              className="invisible cursor-pointer text-[10px] text-[var(--dim)] hover:text-[var(--red)] group-hover:visible">✕</button>
+          </span>
+        ))}
+        {!sorted.length && <span className="font-sans text-[11.5px] text-[var(--dim)]">No topics yet — they appear as calls are processed, or add one above.</span>}
+      </div>
+      <PromptDialog
+        open={renaming !== null}
+        title={`Rename "${renaming}" — merges every [[${renaming}]] link`}
+        placeholder="New name (existing topic name = merge into it)"
+        onSubmit={(v: string) => { if (renaming && v.trim()) post("/api/topics/rename", { from: renaming, to: v.trim() }); setRenaming(null); }}
+        onClose={() => setRenaming(null)}
+      />
+    </Section>
   );
 }
 
@@ -222,6 +293,8 @@ export function SettingsPage() {
           </span>
         </a>
       </Section>
+
+      <TopicsSection />
 
       <p className="text-[11px] text-[var(--dim)]">
         Model provider settings (OpenAI / Google for summarization) are planned — API keys will
