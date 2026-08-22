@@ -11,14 +11,9 @@ import { useActions, useToggleAction } from "./hooks";
 import { PromptDialog } from "../../components/PromptDialog";
 import { ago, parseStamp } from "../../lib/time";
 import { buildClusters, idKey } from "../../lib/actionClusters";
-import { attentionBucket, rankAttention, type Chip, type Triage } from "../../lib/attention";
+import { attentionBucket, rankAttention, type Chip, type Ranked, type Triage } from "../../lib/attention";
 import { useQuery } from "@tanstack/react-query";
 
-const CHIP_STYLE: Record<string, string> = {
-  overdue: "border-[rgba(255,107,132,.5)] text-[var(--red)]",
-  due: "border-[rgba(255,201,92,.5)] text-[var(--amber)]",
-  blocked: "border-[rgba(255,201,92,.5)] text-[var(--amber)]",
-};
 import { useQueryClient } from "@tanstack/react-query";
 
 type Who = "all" | "me" | "others";
@@ -136,6 +131,56 @@ function CallGroup({ items, onToggle, onComment, clusterOf, chipsOf }: { items: 
   );
 }
 
+
+// One flagged item as a full card — the design's "Needs attention" ledger.
+// Title is the item text; the LLM triage reason (when present) is the
+// description; the source line links back to the call/note it came from.
+function AttentionCard({ r, onToggle }: { r: Ranked; onToggle: () => void }) {
+  const it = r.item as ActionItem;
+  const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+  const hot = urgent && urgent.kind !== "blocked";
+  const rest = r.chips.filter((c) => c !== urgent && c.kind !== "me").map((c) => c.label);
+  const desc = r.reason || [it.owner && it.owner !== "Me" ? it.owner : "", ...rest].filter(Boolean).join(" · ");
+  const chipLabel = urgent
+    ? urgent.kind === "blocked" ? "BLOCKED" : urgent.label.split(" (")[0].toUpperCase()
+    : "NO DATE";
+  const isNote = it.callId.startsWith("note:");
+  return (
+    <div className={`mb-3 rounded-2xl border bg-[var(--surf)] p-4 [box-shadow:var(--shadow)] ${
+      hot ? "border-[rgba(255,107,132,.45)]" : "border-[var(--line)]"}`}>
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={false}
+          onChange={onToggle}
+          title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
+          className="mt-[3px] cursor-pointer accent-[var(--cyan)]"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="font-sans text-[13.5px] font-semibold leading-snug text-[var(--bright)]">
+            {it.text.replace(/\*\*/g, "")}
+          </div>
+          {desc && <div className="mt-1 font-sans text-[12px] leading-snug text-[var(--dim)]">{desc}</div>}
+          <Link
+            to={isNote ? `/notes/${it.callId.slice(5)}` : `/calls/${it.callId}`}
+            className="mt-2 block truncate text-[10.5px] text-[var(--cyan)] hover:underline"
+          >
+            ↳ {isNote ? "note" : "call"} {it.callStarted.slice(0, 10)}{it.callTitle ? ` · ${it.callTitle}` : ""}
+          </Link>
+        </div>
+        <span className={`shrink-0 rounded px-2 py-[2px] text-[9px] tracking-[1.5px] ${
+          hot
+            ? "border border-[rgba(255,107,132,.5)] text-[var(--red)]"
+            : urgent
+              ? "border border-[var(--line)] text-[var(--amber)]"
+              : "border border-[var(--line)] text-[var(--dim)]"}`}>
+          {chipLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function ActionsPage() {
   const { data: items = [], isLoading } = useActions();
   const clusterById = useMemo(() => buildClusters(items).byId, [items]);
@@ -198,105 +243,136 @@ export function ActionsPage() {
   if (isLoading)
     return <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>;
 
-  const filters: Array<{ key: Who; label: string }> = [
-    { key: "all", label: `All ${open.length}` },
-    { key: "me", label: `You owe ${mineCount}` },
-    { key: "others", label: `Others owe ${open.length - mineCount}` },
+  const filters: Array<{ key: Who; name: string; count: number }> = [
+    { key: "all", name: "All", count: open.length },
+    { key: "me", name: "You owe", count: mineCount },
+    { key: "others", name: "Others owe", count: open.length - mineCount },
   ];
 
+  const srcCalls = new Set(open.filter((i) => !i.callId.startsWith("note:")).map((i) => i.callId)).size;
+  const srcNotes = new Set(open.filter((i) => i.callId.startsWith("note:")).map((i) => i.callId)).size;
+  const critical = bucket.filter((r) =>
+    r.chips.some((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked")).length;
+  const over7 = open.filter((i) => ageDays(i.callStarted) > 7).length;
+  const mid = open.filter((i) => { const a = ageDays(i.callStarted); return a >= 3 && a <= 7; }).length;
+  const under3 = open.filter((i) => ageDays(i.callStarted) < 3).length;
+  const clearedWeek = done.filter((i) => ageDays(i.callStarted) <= 7).length;
+
   return (
-    <div className="mx-auto h-full max-w-[860px] overflow-auto px-6 py-8">
-      <div className="mb-1 flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold text-[var(--bright)] [font-family:var(--display)]">Actions</h1>
-        <span className="text-[10px] uppercase tracking-[2px] text-[var(--dim)]">
-          from {new Set(open.map((i) => i.callId)).size} calls
-        </span>
-      </div>
-      <p className="mb-5 font-sans text-xs text-[var(--dim)]">
-        Every open item from your recorded calls. Checking one updates the call's notes and your vault.
-      </p>
-
-      <div className="mb-7 flex gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setWho(f.key)}
-            className={`rounded-full border px-3 py-1 font-sans text-[11px] ${
-              who === f.key
-                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
-                : "border-[var(--line)] text-[var(--dim)] hover:text-[var(--bright)]"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {visible.length === 0 && (
-        <div className="mt-16 text-center font-sans text-sm text-[var(--dim)]">
-          {who === "me" ? "You owe nothing. Enjoy it while it lasts." : "Ledger clear — nothing outstanding."}
-        </div>
-      )}
-
-      {who === "all" && bucket.length > 0 && (
-        <div className="mb-6 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
-          <div className="mb-2 text-[10px] tracking-[2px] text-[var(--amber)]">NEEDS ATTENTION</div>
-          {bucket.map((r) => {
-            const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
-            const rest = r.chips.filter((c) => c !== urgent && c.kind !== "me").map((c) => c.label);
-            return (
-              <div key={idKey(r.item)} className="mb-1.5 flex items-start gap-2 font-sans text-[12.5px]">
-                <button
-                  onClick={() => r.cluster.forEach((a) => doToggle(a as ActionItem))}
-                  title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
-                  className="cursor-pointer text-[var(--cyan)]"
-                >☐</button>
-                <span className="min-w-0 flex-1">
-                  {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}{r.item.text.replace(/\*\*/g, "")}
-                  <span className="ml-2 text-[10.5px] text-[var(--dim)]">
-                    {urgent && (
-                      <span className={`font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
-                        {urgent.label}
-                      </span>
-                    )}
-                    {urgent && rest.length > 0 && " · "}
-                    {rest.join(" · ")}
-                  </span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {[...days.entries()].map(([day, calls]) => (
-        <section key={day} className="mb-6">
-          <div className="mb-2 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">{day}</div>
-          {[...calls.values()].map((group) => (
-            <CallGroup chipsOf={(a) => chipsById.get(idKey(a))} clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
+    <div className="flex h-full overflow-hidden">
+      {/* ledger rail — filters live here now, one accent for the active one */}
+      <aside className="w-[200px] shrink-0 space-y-7 overflow-auto border-r border-[var(--line)] px-4 py-8">
+        <div>
+          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">LEDGER</div>
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setWho(f.key)}
+              className={`mb-1 flex w-full items-center justify-between rounded-lg border px-3 py-[7px] font-sans text-[12px] ${
+                who === f.key
+                  ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
+                  : "border-transparent text-[var(--dim)] hover:bg-[var(--surf-2)] hover:text-[var(--bright)]"}`}
+            >
+              <span>{f.name}</span>
+              <span className="text-[10.5px] opacity-80">{f.count}</span>
+            </button>
           ))}
-        </section>
-      ))}
-
-      {done.length > 0 && (
-        <details
-          className="mt-10 border-t border-[var(--line)] pt-3"
-          open={showDone}
-          onToggle={(e) => setShowDone((e.target as HTMLDetailsElement).open)}
-        >
-          <summary className="cursor-pointer text-[10px] uppercase tracking-[1.5px] text-[var(--dim)]">
-            settled · {done.length}
-          </summary>
-          <div className="mt-2 opacity-60">
-            {done.map((i) => (
-              <ItemRow key={`${i.callId}:${i.index}`} item={i} onToggle={() => doToggle(i)} onComment={() => setCommentFor(i)} />
-            ))}
+        </div>
+        <div>
+          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">SOURCE</div>
+          <div className="space-y-[5px] font-sans text-[11.5px] text-[var(--dim)]">
+            <div>Calls · {srcCalls}</div>
+            <div>Notes · {srcNotes}</div>
+            <div>Digest triage · {bucket.length}</div>
           </div>
-        </details>
-      )}
+        </div>
+      </aside>
+
+      {/* the ledger itself */}
+      <div className="min-w-0 flex-1 overflow-auto px-8 py-8">
+        <div className="mx-auto max-w-[760px]">
+          <h1 className="text-2xl font-semibold text-[var(--bright)] [font-family:var(--display)]">Actions</h1>
+          <p className="mb-6 mt-1 font-sans text-xs text-[var(--dim)]">
+            Every open item from your recorded calls. Checking one updates the call's notes and your vault.
+          </p>
+
+          {visible.length === 0 && (
+            <div className="mt-16 text-center font-sans text-sm text-[var(--dim)]">
+              {who === "me" ? "You owe nothing. Enjoy it while it lasts." : "Ledger clear — nothing outstanding."}
+            </div>
+          )}
+
+          {who === "all" && bucket.length > 0 && (
+            <>
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="font-sans text-[15px] font-semibold text-[var(--bright)]">Needs attention</h2>
+                {critical > 0 && (
+                  <span className="rounded border border-[rgba(255,107,132,.5)] px-2 py-[2px] text-[9px] tracking-[2px] text-[var(--red)]">
+                    {critical} CRITICAL
+                  </span>
+                )}
+              </div>
+              <div className="mb-8">
+                {bucket.map((r) => (
+                  <AttentionCard key={idKey(r.item)} r={r} onToggle={() => r.cluster.forEach((a) => doToggle(a as ActionItem))} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {[...days.entries()].map(([day, calls]) => (
+            <section key={day} className="mb-6">
+              <div className="mb-2 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">{day}</div>
+              {[...calls.values()].map((group) => (
+                <CallGroup chipsOf={(a) => chipsById.get(idKey(a))} clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
+              ))}
+            </section>
+          ))}
+
+          {done.length > 0 && (
+            <details
+              className="mt-10 border-t border-[var(--line)] pt-3"
+              open={showDone}
+              onToggle={(e) => setShowDone((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="cursor-pointer text-[10px] uppercase tracking-[1.5px] text-[var(--dim)]">
+                settled · {done.length}
+              </summary>
+              <div className="mt-2 opacity-60">
+                {done.map((i) => (
+                  <ItemRow key={`${i.callId}:${i.index}`} item={i} onToggle={() => doToggle(i)} onComment={() => setCommentFor(i)} />
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      </div>
+
+      {/* insight column — everything here is computed from the ledger itself */}
+      <aside className="hidden w-[250px] shrink-0 overflow-auto px-4 py-8 xl:block">
+        <div className="mb-3 text-[9px] tracking-[2px] text-[var(--dim)]">LEDGER INSIGHT</div>
+        <div className="mb-4 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+          <div className="text-[9px] tracking-[2px] text-[var(--dim)]">CLEARED THIS WEEK</div>
+          <div className="mt-1 text-[26px] font-semibold text-[var(--green)] [font-family:var(--display)]">+{clearedWeek}</div>
+          <p className="mt-1 font-sans text-[11.5px] leading-relaxed text-[var(--dim)]">
+            {open.length - mineCount} open items are owed by other people.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">AGEING</div>
+          {([["Over 7 days", over7], ["3\u20137 days", mid], ["Under 3 days", under3]] as const).map(([l, n]) => (
+            <div key={l} className="flex justify-between py-[2px] font-sans text-[11.5px] text-[var(--text)]">
+              <span>{l}</span>
+              <span className="text-[var(--dim)]">{n}</span>
+            </div>
+          ))}
+        </div>
+      </aside>
+
       <PromptDialog
         open={!!commentFor}
         title="Add comment"
-        placeholder="Context, resolution, reference…"
+        placeholder="Context, resolution, reference\u2026"
         submitLabel="ADD"
         onSubmit={(text) => commentFor && addComment(commentFor, text)}
         onClose={() => setCommentFor(null)}
