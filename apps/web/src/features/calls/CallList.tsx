@@ -13,17 +13,6 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   empty: { label: "NO AUDIO", cls: "border-[var(--line)] text-[var(--dim)]" },
 };
 
-// first real sentence under ## Summary — the card's two-line description
-function snippet(notes: string): string {
-  const lines = notes.split("\n");
-  const at = lines.findIndex((l) => /^## Summary/i.test(l));
-  if (at < 0) return "";
-  const line = lines.slice(at + 1).find((l) => l.trim());
-  if (!line) return "";
-  const s = line.replace(/\*\*/g, "").trim();
-  return s.length > 120 ? s.slice(0, 120).trimEnd() + "…" : s;
-}
-
 function minutes(c: Call): number | null {
   if (!c.ended) return null;
   const ms = new Date(c.ended.replace(" ", "T")).getTime() - new Date(c.started.replace(" ", "T")).getTime();
@@ -102,12 +91,11 @@ export function CallList({
           const day = c.started.slice(0, 10);
           const header = day !== lastDay ? (lastDay = day) : null;
           const chip = CHIP[c.status];
-          const desc = snippet(c.notes);
           const mins = minutes(c);
           return (
             <div key={c.id}>
               {header && (
-                <div className="mx-1 mb-1 mt-3 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">
+                <div className="mb-2 mt-3 rounded-md bg-[var(--surf-2)] px-3 py-[6px] text-[9.5px] font-semibold uppercase tracking-[2px] text-[var(--text)]">
                   {header}
                 </div>
               )}
@@ -130,11 +118,6 @@ export function CallList({
                 <div className="mt-[6px] font-sans text-[12.5px] font-semibold leading-snug text-[var(--bright)]">
                   {callTitle(c)}
                 </div>
-                {desc && (
-                  <div className="mt-[2px] line-clamp-2 font-sans text-[11px] leading-snug text-[var(--dim)]">
-                    {desc}
-                  </div>
-                )}
                 <div className="mt-[6px] text-[9.5px] text-[var(--dim)]">
                   {callHost(c.url)}
                   {mins ? ` · ${mins}m` : ""}
