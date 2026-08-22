@@ -76,14 +76,14 @@ function Rail({ call }: { call: Call }) {
   ).length;
   const topics = [...new Set([...call.notes.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]))];
   return (
-    <aside className="w-full shrink-0 xl:w-[240px]">
+    <aside className="hidden w-[260px] shrink-0 overflow-auto border-l border-[var(--line)] bg-[var(--surf)] px-5 py-8 xl:block">
       <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">OPEN ITEMS RAISED</div>
       <div className="mb-6 grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--surf)] p-3 text-center [box-shadow:var(--shadow)]">
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--bg)] p-3 text-center">
           <div className="text-[22px] font-semibold text-[var(--cyan)] [font-family:var(--display)]">{openCount}</div>
           <div className="mt-[2px] text-[8.5px] tracking-[1.5px] text-[var(--dim)]">THIS CALL</div>
         </div>
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--surf)] p-3 text-center [box-shadow:var(--shadow)]">
+        <div className="rounded-xl border border-[var(--line)] bg-[var(--bg)] p-3 text-center">
           <div className={`text-[22px] font-semibold [font-family:var(--display)] ${overdue ? "text-[var(--amber)]" : "text-[var(--dim)]"}`}>{overdue}</div>
           <div className="mt-[2px] text-[8.5px] tracking-[1.5px] text-[var(--dim)]">OVERDUE</div>
         </div>
@@ -154,9 +154,9 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
   const st = STATE[call.status];
 
   return (
-    <div className="h-full overflow-auto px-10 py-8 font-sans">
-      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-10 xl:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="min-w-0">
+    <div className="flex h-full font-sans">
+      <div className="min-w-0 flex-1 overflow-auto px-10 py-8">
+        <div className="mx-auto max-w-[980px]">
           <div className="mb-1 text-[10px] tracking-[1.5px] text-[var(--dim)]">
             RECORDED {call.started.slice(0, 10)} · {call.started.slice(11, 16)}
             {call.url ? ` · ${callHost(call.url).toUpperCase()}` : ""}
@@ -320,9 +320,9 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
             </details>
           )}
         </div>
-
-        {call.status !== "recording" && <Rail call={call} />}
       </div>
+
+      {call.status !== "recording" && <Rail call={call} />}
 
       <PromptDialog
         open={commentFor !== null}
