@@ -53,7 +53,7 @@
   --node-glow-h: rgba(34, 211, 238, 0.5);
 }
 html.light {
-  --bg: #f6f8fa;
+  --bg: #ffffff;
   --surf: #ffffff;
   --surf-2: #f6f9fc;
   --surf-hi: rgba(255, 255, 255, 0.9);
@@ -91,9 +91,7 @@ body {
   font: 13px/1.5 "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 html.light body {
-  background:
-    radial-gradient(1400px 800px at 50% -20%, rgba(90, 160, 230, 0.07), transparent 60%),
-    var(--bg);
+  background: var(--bg); /* flat white — no wash, per owner */
 }
 
 /* one hairline scrollbar everywhere */
