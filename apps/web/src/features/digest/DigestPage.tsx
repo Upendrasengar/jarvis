@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { Fragment, useMemo, useState } from "react";
 import { Markdown } from "../../components/Markdown";
 import { idKey, shortDate } from "../../lib/actionClusters";
+import { ago, parseStamp } from "../../lib/time";
 import { attentionBucket, rankAttention, type Chip, type Ranked, type Triage } from "../../lib/attention";
 
 // One attention row: the item text is the content; everything else is ONE
@@ -136,6 +137,104 @@ function useDigest(date: string | null) {
   });
 }
 
+// D3 — the latest digest's ledger renders as LIVE age buckets computed from
+// the actions API (exact ids — no text matching needed), replacing the
+// snapshot's per-source sections. History keeps the faithful markdown.
+function splitLedger(md: string): { before: string; after: string; hasLedger: boolean } {
+  const lines = md.split("\n");
+  const start = lines.findIndex((l) => /^## open action items/i.test(l));
+  if (start < 0) return { before: md, after: "", hasLedger: false };
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++)
+    if (/^## /.test(lines[i])) { end = i; break; }
+  return { before: lines.slice(0, start).join("\n"), after: lines.slice(end).join("\n"), hasLedger: true };
+}
+
+const DAY_MS = 86_400_000;
+
+function LedgerBuckets({ actions, triage, onToggle }: {
+  actions: any[]; triage?: Triage; onToggle: (a: any) => void;
+}) {
+  const todayISO = new Date().toLocaleDateString("sv-SE");
+  const now = Date.now();
+  const dl = (a: any) => triage?.deadlines?.[idKey(a)];
+  const ageDays = (a: any) =>
+    Math.max(0, Math.floor((now - Date.parse(a.callStarted.slice(0, 10) + "T12:00:00")) / DAY_MS));
+  const open = actions.filter((a) => !a.done && a.text);
+  const overdue = open.filter((a) => dl(a) && dl(a)! < todayISO)
+    .sort((x, y) => (dl(x)! < dl(y)! ? -1 : 1));
+  const ageing = open.filter((a) => !overdue.includes(a) && ageDays(a) >= 4)
+    .sort((x, y) => ageDays(y) - ageDays(x));
+  const rest = open.filter((a) => !overdue.includes(a) && !ageing.includes(a))
+    .sort((x, y) => y.callStarted.localeCompare(x.callStarted));
+  const cleared = actions.filter((a) => a.done && a.text && ageDays(a) <= 7);
+
+  const srcLink = (a: any) =>
+    a.callId.startsWith("note:") ? `/notes/${encodeURIComponent(a.callId.slice(5))}` : `/calls/${a.callId}`;
+
+  const Item = ({ a, done = false }: { a: any; done?: boolean }) => {
+    const d = dl(a);
+    return (
+      <div className={`mb-2 flex items-start gap-2 rounded-lg bg-[var(--surf-2)] px-3 py-[8px] ${done ? "opacity-45" : ""}`}>
+        <button onClick={() => onToggle(a)} className="cursor-pointer text-[var(--cyan)]">
+          {done ? "☑" : "☐"}
+        </button>
+        <span className="min-w-0 flex-1 font-sans text-[13px] leading-relaxed text-[var(--text)]">
+          <span className={done ? "line-through" : ""}>
+            {a.owner && <b className="text-[var(--bright)]">{a.owner}: </b>}
+            {a.text.replace(/\*\*/g, "")}
+          </span>
+          <span className="mt-[3px] flex flex-wrap items-center gap-x-2 text-[10px] tracking-[0.5px] text-[var(--dim)]">
+            {d && !done && (
+              <span className={`font-medium ${d < todayISO ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
+                DUE {d.slice(5)}
+              </span>
+            )}
+            {!d && !done && ageDays(a) >= 2 && <span>open {ageDays(a)}d</span>}
+            <Link to={srcLink(a)} title={a.callTitle}
+              className="text-[var(--cyan-dim)] no-underline hover:text-[var(--cyan)]">
+              {a.callTitle ? a.callTitle.slice(0, 44) : a.callId} ↗
+            </Link>
+          </span>
+          {(a.comments ?? []).slice(-2).map((c: string, i: number) => {
+            const { when, text } = parseStamp(c);
+            return (
+              <span key={i} className="mt-[2px] block text-[11.5px] leading-snug text-[var(--dim)]">
+                <span className="mr-1 text-[var(--cyan-dim)]">↳</span>{text}
+                {when && <span className="ml-1 text-[9.5px] opacity-70">· {ago(when)}</span>}
+              </span>
+            );
+          })}
+        </span>
+      </div>
+    );
+  };
+
+  const Section = ({ label, tone, items, done = false }: {
+    label: string; tone: string; items: any[]; done?: boolean;
+  }) =>
+    items.length ? (
+      <div className="mb-5">
+        <div className={`mb-2 text-[10px] uppercase tracking-[2px] ${tone}`}>
+          {label} <span className="text-[var(--dim)]">· {items.length}</span>
+        </div>
+        {items.map((a) => <Item key={idKey(a)} a={a} done={done} />)}
+      </div>
+    ) : null;
+
+  return (
+    <div className="mb-6">
+      <Section label="Likely overdue" tone="text-[var(--red)]" items={overdue} />
+      <Section label="Ageing" tone="text-[var(--amber)]" items={ageing} />
+      <Section label="Open" tone="text-[var(--dim)]" items={rest} />
+      <Section label="Cleared this week" tone="text-[var(--green)]" items={cleared} done />
+      {!open.length && !cleared.length && (
+        <div className="font-sans text-[12.5px] text-[var(--dim)]">All clear.</div>
+      )}
+    </div>
+  );
+}
+
 export function DigestPage() {
   const qc = useQueryClient();
   const { data: liveActions } = useQuery({
@@ -208,7 +307,7 @@ export function DigestPage() {
   let lastMonth = "";
   return (
     <div className="flex h-full">
-      <aside className="w-[280px] min-w-[280px] overflow-auto border-r border-[var(--line)] bg-[var(--chipbg)] p-3 backdrop-blur-lg">
+      <aside className="w-[280px] min-w-[280px] overflow-auto border-r border-[var(--line)] bg-[var(--surf)] p-3">
         {list.map((d) => {
           const month = d.date.slice(0, 7);
           const header = month !== lastMonth ? (lastMonth = month) : null;
@@ -222,10 +321,10 @@ export function DigestPage() {
               )}
               <button
                 onClick={() => navigate(`/digest/${d.date}`)}
-                className={`mb-[3px] w-full rounded-lg border px-3 py-2 text-left transition ${
+                className={`mb-[3px] w-full rounded-xl border px-3 py-2 text-left transition ${
                   d.date === selected
-                    ? "border-[rgba(57,215,255,.35)] bg-[rgba(57,215,255,.08)]"
-                    : "border-transparent hover:bg-[rgba(57,215,255,.05)]"
+                    ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                    : "border-transparent hover:bg-[var(--surf-2)]"
                 }`}
               >
                 <div className="font-sans text-xs font-semibold text-[var(--bright)]">
@@ -242,21 +341,31 @@ export function DigestPage() {
       </aside>
       <section className="min-w-0 flex-1 overflow-auto px-10 py-8">
         {digest ? (
-          <Markdown
-            md={digest.md}
-            onLedgerToggle={ledgerToggle}
-            ledgerState={ledgerState}
-            ledgerTitle={ledgerTitle}
-            ledgerDupe={viewingLatest ? ledgerDupe : undefined}
-            afterH2={
-              viewingLatest
-                ? {
-                    pattern: /open action items/i,
-                    node: <AttentionPanel bucket={bucket} generatedAt={triage?.generatedAt ?? null} onToggleAll={toggleAll} />,
-                  }
-                : undefined
-            }
-          />
+          viewingLatest && splitLedger(digest.md).hasLedger ? (
+            (() => {
+              const { before, after } = splitLedger(digest.md);
+              return (
+                <>
+                  <Markdown md={before} ledgerState={ledgerState} ledgerTitle={ledgerTitle} />
+                  <h2 className="mb-2 mt-5 max-w-[760px] text-[11px] uppercase tracking-[1.5px] text-[var(--cyan)]">
+                    Open action items <span className="ml-2 text-[9px] text-[var(--dim)]">LIVE LEDGER</span>
+                  </h2>
+                  <div className="max-w-[760px]">
+                    <AttentionPanel bucket={bucket} generatedAt={triage?.generatedAt ?? null} onToggleAll={toggleAll} />
+                    <LedgerBuckets actions={liveActions ?? []} triage={triage} onToggle={(a) => toggleAll([a])} />
+                  </div>
+                  <Markdown md={after} ledgerState={ledgerState} ledgerTitle={ledgerTitle} />
+                </>
+              );
+            })()
+          ) : (
+            <Markdown
+              md={digest.md}
+              onLedgerToggle={ledgerToggle}
+              ledgerState={ledgerState}
+              ledgerTitle={ledgerTitle}
+            />
+          )
         ) : (
           <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>
         )}

@@ -55,8 +55,8 @@ mockup go to the backlog at the bottom.
 ## Status log
 
 - [x] 0 Foundation (644dac1)
-- [x] 1 Overview + rail shell — AWAITING OWNER REVIEW
-- [ ] 2 Digest
+- [x] 1 Overview + rail shell — APPROVED (58223c2)
+- [x] 2 Digest — AWAITING OWNER REVIEW
 - [ ] 3 Calls
 - [ ] 4 Chat
 - [ ] 5 Brain
