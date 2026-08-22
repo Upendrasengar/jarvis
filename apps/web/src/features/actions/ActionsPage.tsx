@@ -15,9 +15,9 @@ import { attentionBucket, rankAttention, type Chip, type Triage } from "../../li
 import { useQuery } from "@tanstack/react-query";
 
 const CHIP_STYLE: Record<string, string> = {
-  overdue: "border-[rgba(255,92,122,.5)] text-[var(--red)]",
-  due: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
-  blocked: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
+  overdue: "border-[rgba(255,107,132,.5)] text-[var(--red)]",
+  due: "border-[rgba(255,201,92,.5)] text-[var(--amber)]",
+  blocked: "border-[rgba(255,201,92,.5)] text-[var(--amber)]",
 };
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -41,7 +41,7 @@ function OwnerLane({ owner }: { owner: string }) {
     <span
       className={`w-[86px] shrink-0 truncate rounded-full border px-2 py-[2px] text-center text-[9px] tracking-wider ${
         mine
-          ? "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.07)] text-[var(--cyan)]"
+          ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
           : owner
             ? "border-[var(--line)] text-[var(--dim)]"
             : "border-transparent text-[var(--dim)]"
@@ -56,7 +56,7 @@ function OwnerLane({ owner }: { owner: string }) {
 function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: ActionItem; onToggle: () => void; onComment: () => void; recurringIn?: number; chips?: Chip[] }) {
   const age = ageDays(item.callStarted);
   return (
-    <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[7px] pl-6 pr-3 font-sans text-[13px] leading-snug hover:bg-[rgba(57,215,255,.05)]">
+    <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[7px] pl-6 pr-3 font-sans text-[13px] leading-snug hover:bg-[var(--surf-2)]">
       <input
         type="checkbox"
         checked={item.done}
@@ -75,7 +75,7 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
           {recurringIn && recurringIn > 1 ? (
             <span
               title="This item was raised in multiple calls"
-              className="ml-2 rounded-full border border-[rgba(255,207,92,.4)] px-[7px] py-[1px] text-[9.5px] text-[var(--amber)]"
+              className="ml-2 rounded-full border border-[rgba(255,201,92,.4)] px-[7px] py-[1px] text-[9.5px] text-[var(--amber)]"
             >
               ⟳ {recurringIn} calls
             </span>
@@ -103,7 +103,7 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
         ＋
       </button>
       {!item.done && age >= 1 && (
-        <span className="shrink-0 rounded-full border border-[rgba(255,207,92,.35)] px-[7px] py-[1px] text-[9px] text-[var(--amber)]">
+        <span className="shrink-0 rounded-full border border-[rgba(255,201,92,.35)] px-[7px] py-[1px] text-[9px] text-[var(--amber)]">
           {age}d
         </span>
       )}
@@ -117,7 +117,7 @@ function CallGroup({ items, onToggle, onComment, clusterOf, chipsOf }: { items: 
     <div className="relative mb-4 pl-6">
       {/* transmission node + rail — this group came in over the channel */}
       <span className="absolute left-[7px] top-[6px] h-[7px] w-[7px] rounded-full bg-[var(--cyan)] shadow-[0_0_10px_var(--cyan)]" />
-      <span className="absolute bottom-1 left-[10px] top-[18px] w-px bg-[rgba(57,215,255,.12)]" />
+      <span className="absolute bottom-1 left-[10px] top-[18px] w-px bg-[var(--cyan-3)]" />
       <div className="mb-1 flex items-baseline gap-3">
         <Link
           to={head.callId.startsWith("note:") ? `/notes/${head.callId.slice(5)}` : `/calls/${head.callId}`}
@@ -207,7 +207,7 @@ export function ActionsPage() {
   return (
     <div className="mx-auto h-full max-w-[860px] overflow-auto px-6 py-8">
       <div className="mb-1 flex items-baseline justify-between">
-        <h1 className="font-sans text-2xl text-[var(--bright)]">Actions</h1>
+        <h1 className="text-2xl font-semibold text-[var(--bright)] [font-family:var(--display)]">Actions</h1>
         <span className="text-[10px] uppercase tracking-[2px] text-[var(--dim)]">
           from {new Set(open.map((i) => i.callId)).size} calls
         </span>
@@ -223,7 +223,7 @@ export function ActionsPage() {
             onClick={() => setWho(f.key)}
             className={`rounded-full border px-3 py-1 font-sans text-[11px] ${
               who === f.key
-                ? "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.08)] text-[var(--cyan)]"
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
                 : "border-[var(--line)] text-[var(--dim)] hover:text-[var(--bright)]"
             }`}
           >
@@ -239,7 +239,7 @@ export function ActionsPage() {
       )}
 
       {who === "all" && bucket.length > 0 && (
-        <div className="mb-6 rounded-xl border border-[var(--line)] bg-[var(--chipbg)] p-3">
+        <div className="mb-6 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
           <div className="mb-2 text-[10px] tracking-[2px] text-[var(--amber)]">NEEDS ATTENTION</div>
           {bucket.map((r) => {
             const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
@@ -252,7 +252,7 @@ export function ActionsPage() {
                   className="cursor-pointer text-[var(--cyan)]"
                 >☐</button>
                 <span className="min-w-0 flex-1">
-                  <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "")}
+                  {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}{r.item.text.replace(/\*\*/g, "")}
                   <span className="ml-2 text-[10.5px] text-[var(--dim)]">
                     {urgent && (
                       <span className={`font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>

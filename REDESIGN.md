@@ -59,8 +59,8 @@ mockup go to the backlog at the bottom.
 - [x] 2 Digest — APPROVED (f128de8)
 - [x] 3 Calls — APPROVED (35fff81)
 - [x] 4 Chat — APPROVED (514fc41)
-- [x] 5 Brain — AWAITING OWNER REVIEW
-- [ ] 6 Actions
+- [x] 5 Brain — APPROVED (2e1c352)
+- [x] 6 Actions — AWAITING OWNER REVIEW
 - [ ] 7 Notes
 - [ ] 8 Projects
 - [ ] 9 Settings
