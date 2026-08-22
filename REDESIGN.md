@@ -57,8 +57,8 @@ mockup go to the backlog at the bottom.
 - [x] 0 Foundation (644dac1)
 - [x] 1 Overview + rail shell — APPROVED (58223c2)
 - [x] 2 Digest — APPROVED (f128de8)
-- [x] 3 Calls — AWAITING OWNER REVIEW
-- [ ] 4 Chat
+- [x] 3 Calls — APPROVED (35fff81)
+- [x] 4 Chat — AWAITING OWNER REVIEW
 - [ ] 5 Brain
 - [ ] 6 Actions
 - [ ] 7 Notes
