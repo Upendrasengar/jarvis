@@ -38,24 +38,24 @@ export function CallList({
   let lastDay = "";
 
   return (
-    <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--chipbg)] p-3 backdrop-blur-lg">
+    <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] p-3">
       <input
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filter calls…"
-        className="w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-[11px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+        className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
       />
       <div
         title="When off, Jarvis never starts recording on its own — the Record button still works"
-        className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--chipbg)] px-3 py-2 text-[9px] tracking-[1.5px] text-[var(--dim)]"
+        className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surf-2)] px-3 py-2 text-[9px] tracking-[1.5px] text-[var(--dim)]"
       >
         <span>AUTO-RECORD CALLS</span>
         <button
           onClick={() => setAutorec.mutate(!autorec.data?.on)}
           className={`relative h-[18px] w-[34px] rounded-full border transition ${
             autorec.data?.on
-              ? "border-[rgba(57,215,255,.5)] bg-[rgba(57,215,255,.25)]"
-              : "border-[var(--line)] bg-[rgba(95,137,173,.2)]"
+              ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+              : "border-[var(--line)] bg-[var(--surf-2)]"
           }`}
         >
           <span
@@ -71,7 +71,7 @@ export function CallList({
         <button
           onClick={() => start.mutate()}
           disabled={start.isPending}
-          className="w-full rounded-lg border border-[rgba(255,92,122,.35)] bg-[rgba(255,92,122,.08)] py-2 text-[10px] tracking-[1.5px] text-[var(--red)] hover:bg-[rgba(255,92,122,.16)] disabled:opacity-50"
+          className="w-full rounded-xl border border-[rgba(255,107,132,.35)] bg-[rgba(255,107,132,.08)] py-2 text-[10px] tracking-[1.5px] text-[var(--red)] transition hover:bg-[rgba(255,107,132,.16)] disabled:opacity-50"
         >
           {start.isPending ? "STARTING…" : "● RECORD A CALL NOW"}
         </button>
@@ -97,10 +97,10 @@ export function CallList({
               )}
               <button
                 onClick={() => onSelect(c.id)}
-                className={`mb-[3px] w-full rounded-lg border px-3 py-2 text-left transition ${
+                className={`mb-[3px] w-full rounded-xl border px-3 py-2 text-left transition ${
                   c.id === selected
-                    ? "border-[rgba(57,215,255,.35)] bg-[rgba(57,215,255,.08)]"
-                    : "border-transparent hover:bg-[rgba(57,215,255,.05)]"
+                    ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                    : "border-transparent hover:bg-[var(--surf-2)]"
                 }`}
               >
                 <div className="truncate font-sans text-xs font-semibold text-[var(--bright)]">

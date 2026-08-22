@@ -52,7 +52,7 @@ export const NotesView = memo(
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
-          className={`${className} -mx-1 rounded px-1 outline-none focus:bg-[rgba(57,215,255,.07)] focus:ring-1 focus:ring-[rgba(57,215,255,.35)]`}
+          className={`${className} -mx-1 rounded px-1 outline-none focus:bg-[var(--cyan-2)] focus:ring-1 focus:ring-[var(--cyan-3)]`}
           onFocus={() => { editingNow = true; }}
           onBlur={(e) => {
             editingNow = false;
@@ -103,7 +103,7 @@ export const NotesView = memo(
             const idx = ++checkboxIndex;
             const checked = box[1] === "x";
             return (
-              <div key={i} className="group my-[3px] flex items-start gap-2 rounded-lg px-2 py-[6px] hover:bg-[rgba(57,215,255,.05)]">
+              <div key={i} className="group my-[3px] flex items-start gap-2 rounded-lg px-2 py-[6px] hover:bg-[var(--surf-2)]">
                 <input
                   type="checkbox"
                   checked={checked}

@@ -13,9 +13,9 @@ import * as SS from "@jarvis/shared";
 
 function Chip({ tone, children }: { tone?: "rec" | "ok" | "warn"; children: React.ReactNode }) {
   const tones = {
-    rec: "border-[rgba(255,92,122,.4)] text-[var(--red)] blip",
+    rec: "border-[rgba(255,107,132,.4)] text-[var(--red)] blip",
     ok: "border-[rgba(62,224,138,.3)] text-[var(--green)]",
-    warn: "border-[rgba(255,207,92,.3)] text-[var(--amber)]",
+    warn: "border-[rgba(255,201,92,.3)] text-[var(--amber)]",
     default: "border-[var(--line)] text-[var(--dim)]",
   };
   return (
@@ -50,7 +50,7 @@ function LinkedNotes({ callId }: { callId: string }) {
         <Link
           key={n.id}
           to={`/notes/${n.id}`}
-          className="rounded-full border border-[rgba(57,215,255,.4)] bg-[var(--chipbg)] px-[10px] py-[3px] text-[10px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.1)]"
+          className="rounded-full border border-[var(--cyan-3)] bg-[var(--chipbg)] px-[10px] py-[3px] text-[10px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.1)]"
         >
           ✎ {n.title.slice(0, 28)}
         </Link>
@@ -114,13 +114,13 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
   return (
     <div className="h-full overflow-auto px-10 py-8 font-sans">
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-2xl leading-tight text-[var(--bright)]">{callTitle(call)}</h1>
+        <h1 className="text-2xl leading-tight text-[var(--bright)] [font-family:var(--display)]">{callTitle(call)}</h1>
         <span className="flex shrink-0 gap-2">
           {call.status === "recording" ? (
             <button
               onClick={() => stop.mutate()}
               disabled={stop.isPending}
-              className="blip rounded-lg border border-[rgba(255,92,122,.5)] bg-[rgba(255,92,122,.08)] px-3 py-1 text-[10px] tracking-wider text-[var(--red)]"
+              className="blip rounded-lg border border-[rgba(255,107,132,.5)] bg-[rgba(255,107,132,.08)] px-3 py-1 text-[10px] tracking-wider text-[var(--red)]"
             >
               {stop.isPending ? "STOPPING…" : "■ STOP & SAVE"}
             </button>
@@ -219,7 +219,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
             className={`rounded-full border px-4 py-1.5 font-sans text-[12px] ${
               reprocessing
                 ? "cursor-default border-[var(--line)] text-[var(--dim)]"
-                : "cursor-pointer border-[rgba(255,207,92,.5)] text-[var(--amber)] hover:bg-[rgba(255,207,92,.08)]"
+                : "cursor-pointer border-[rgba(255,201,92,.5)] text-[var(--amber)] hover:bg-[rgba(255,201,92,.08)]"
             }`}
           >
             {reprocessing ? "⟳ reprocessing… (watch the badge above)" : "⟳ Rerun processing"}
@@ -236,7 +236,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             spellCheck={false}
-            className="h-[60vh] w-full resize-y rounded-xl border border-[rgba(57,215,255,.35)] bg-[var(--field)] p-4 font-mono text-[12.5px] leading-relaxed text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+            className="h-[60vh] w-full resize-y rounded-xl border border-[var(--cyan-3)] bg-[var(--field)] p-4 font-mono text-[12.5px] leading-relaxed text-[var(--text)] outline-none focus:border-[var(--cyan)]"
           />
           <div className="mt-1 text-[10px] text-[var(--dim)]">
             Markdown — headings, bullets, and <code>- [ ]</code> action items render back into the note.
@@ -286,7 +286,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border px-4 py-2 font-sans text-xs shadow-lg backdrop-blur ${
             toast === "ok"
               ? "border-[rgba(62,224,138,.45)] bg-[rgba(62,224,138,.12)] text-[var(--green)]"
-              : "border-[rgba(255,92,122,.45)] bg-[rgba(255,92,122,.12)] text-[var(--red)]"
+              : "border-[rgba(255,107,132,.45)] bg-[rgba(255,107,132,.12)] text-[var(--red)]"
           }`}
         >
           {toast === "ok" ? "✓ Auto-saved" : "✕ Save failed — edit again to retry"}
