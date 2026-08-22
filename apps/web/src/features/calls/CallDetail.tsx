@@ -265,7 +265,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
       <div className="min-w-0 flex-1 overflow-auto px-10 py-8">
         <div className="mx-auto max-w-[980px]">
           <div className="mb-1 text-[10px] tracking-[1.5px] text-[var(--dim)]">
-            RECORDED {call.started.slice(0, 10)} · {call.started.slice(11, 16)}
+            RECORDED {new Date(call.started.slice(0, 10) + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase()} · {call.started.slice(11, 16)}
             {call.url ? ` · ${callHost(call.url).toUpperCase()}` : ""}
             {st && (
               <>

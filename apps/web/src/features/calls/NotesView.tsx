@@ -12,9 +12,19 @@
 import { Fragment, memo, useRef } from "react";
 import { ago, parseStamp } from "../../lib/time";
 
+function em(text: string, key: number) {
+  return (
+    <Fragment key={key}>
+      {text.split(/\*([^*]+)\*/g).map((part, j) =>
+        j % 2 ? <i key={j} className="font-medium not-italic text-[var(--bright)]">{part}</i> : <Fragment key={j}>{part}</Fragment>,
+      )}
+    </Fragment>
+  );
+}
+
 function inline(text: string) {
   return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
-    i % 2 ? <b key={i} className="text-[var(--bright)]">{part}</b> : <Fragment key={i}>{part}</Fragment>,
+    i % 2 ? <b key={i} className="text-[var(--bright)]">{part}</b> : em(part, i),
   );
 }
 
@@ -25,7 +35,10 @@ function domToMd(el: HTMLElement): string {
     if (n.nodeType === Node.TEXT_NODE) out += n.textContent ?? "";
     else if (n instanceof HTMLElement) {
       const inner = domToMd(n);
-      out += n.tagName === "B" || n.tagName === "STRONG" ? `**${inner}**` : inner;
+      out +=
+        n.tagName === "B" || n.tagName === "STRONG" ? `**${inner}**`
+        : n.tagName === "I" || n.tagName === "EM" ? `*${inner}*`
+        : inner;
     }
   });
   return out.replace(/\n+/g, " ").trim();

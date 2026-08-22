@@ -13,6 +13,18 @@ const CHIP: Record<string, { label: string; cls: string }> = {
   empty: { label: "NO AUDIO", cls: "border-[var(--line)] text-[var(--dim)]" },
 };
 
+
+// "2026-08-21" → "AUG 21 · TODAY / YESTERDAY / N DAYS AGO"
+function dayLabel(day: string): string {
+  const d = new Date(day + "T00:00:00");
+  if (isNaN(d.getTime())) return day;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+  const md = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const rel = diff <= 0 ? "today" : diff === 1 ? "yesterday" : `${diff} days ago`;
+  return `${md} · ${rel}`;
+}
+
 function minutes(c: Call): number | null {
   if (!c.ended) return null;
   const ms = new Date(c.ended.replace(" ", "T")).getTime() - new Date(c.started.replace(" ", "T")).getTime();
@@ -96,7 +108,7 @@ export function CallList({
             <div key={c.id}>
               {header && (
                 <div className="mb-2 mt-3 rounded-md bg-[var(--surf-2)] px-3 py-[6px] text-[9.5px] font-semibold uppercase tracking-[2px] text-[var(--text)]">
-                  {header}
+                  {dayLabel(header)}
                 </div>
               )}
               <button
