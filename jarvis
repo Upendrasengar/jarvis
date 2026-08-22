@@ -8,6 +8,8 @@
 #   jarvis setup      -> full dependency setup (whisper model download etc.)
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
+#   jarvis upgrade    -> update to the latest release and restart
+#   jarvis uninstall  -> remove Jarvis completely (asks about your data)
 #   jarvis "what do I know about X"  -> one-shot question
 cd "$(dirname "$0")" || exit 1
 
@@ -45,6 +47,16 @@ elif [[ "$1" == "setup" ]]; then
 elif [[ "$1" == "service" ]]; then
   shift
   exec bash tools/service.sh "$@"
+elif [[ "$1" == "upgrade" ]]; then
+  if [[ -L node_modules ]]; then
+    brew update && brew upgrade jarvis
+    exec bash tools/services.sh restart
+  else
+    git pull --ff-only && pnpm install && (cd apps/web && pnpm exec vite build)
+    exec bash tools/services.sh restart
+  fi
+elif [[ "$1" == "uninstall" ]]; then
+  exec bash tools/uninstall.sh
 elif [[ "$1" == "logs" ]]; then
   echo "── server (reports/api.log) ──"; tail -20 reports/api.log 2>/dev/null || echo "(none yet)"
   echo; echo "── call watcher (reports/callwatch.log) ──"; tail -12 reports/callwatch.log 2>/dev/null || echo "(none yet)"

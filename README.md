@@ -89,6 +89,13 @@ git clone https://github.com/upendrasengar/jarvis && cd jarvis
 `./jarvis doctor` diagnoses a broken setup; `./jarvis` opens a terminal
 session; `./jarvis digest` runs the morning brief on demand.
 
+## Upgrading and uninstalling
+
+`jarvis upgrade` updates to the latest release and restarts (brew or git,
+it figures it out). `jarvis uninstall` removes everything honestly: stops
+services, removes the login agent, asks before touching your data, and
+finishes with the package itself.
+
 ## Consent, privacy, and recording laws
 
 Call recording is **off by default**. When you enable it, recording is *not*
