@@ -83,7 +83,8 @@ function TopicPicker({ linked, onPick }: { linked: string[]; onPick: (t: string)
   const names = all.map((t) => t.name);
   const query = q.trim();
   const opts = names.filter((n) => !linked.includes(n) && n.toLowerCase().includes(query.toLowerCase()));
-  const validName = query.length > 0 && query.length <= 60 && !/[/\\[\]#|]/.test(query);
+  const badChar = /[/\\[\]#|]/.test(query);
+  const validName = query.length > 0 && query.length <= 60 && !badChar;
   const canCreate = validName &&
     !names.some((n) => n.toLowerCase() === query.toLowerCase()) &&
     !linked.some((n) => n.toLowerCase() === query.toLowerCase());
@@ -131,7 +132,13 @@ function TopicPicker({ linked, onPick }: { linked: string[]; onPick: (t: string)
               </button>
             )}
             {!opts.length && !canCreate && (
-              <div className="px-2 py-1 text-[10.5px] text-[var(--dim)]">Type to create a topic</div>
+              <div className="px-2 py-1 text-[10.5px] text-[var(--dim)]">
+                {query && badChar
+                  ? <>Topic names can't contain <code className="text-[var(--amber)]">/ \ [ ] # |</code> — they become vault filenames. Try "UI-UX Internal".</>
+                  : query.length > 60
+                    ? "Topic names max out at 60 characters."
+                    : "Type to create a topic"}
+              </div>
             )}
           </div>
         </div>
