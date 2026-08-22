@@ -22,15 +22,12 @@ mockup go to the backlog at the bottom.
 
 ## Open decisions (owner)
 
-- [ ] **D1 · Core**: keep the photographic eye inside the new instrument
-      ring, or adopt the mockup's CSS-drawn iris? (Mockup = CSS iris with
-      "ledger load" count in center.)
-- [ ] **D2 · Navigation**: adopt the left icon rail, or keep top tabs with
-      new styling? (Rail is the mockup's biggest structural change.)
-- [ ] **D3 · Digest ledger grouping**: adopt the mockup's age buckets
-      (LIKELY OVERDUE / AGEING / NO DATE / CLEARED THIS WEEK) inside the
-      attention panel, or keep current per-source sections + attention
-      bucket and only restyle?
+- [x] **D1 · Core**: DECIDED — keep the photographic eye core EXACTLY as
+      is. New tokens may recolor its surroundings; the core component
+      itself is untouched.
+- [x] **D2 · Navigation**: DECIDED — adopt the left icon rail.
+- [x] **D3 · Digest ledger grouping**: DECIDED — adopt the age buckets
+      (render-time grouping; markdown files unchanged).
 
 ## Screen-by-screen matrix (recommendation → owner call)
 

@@ -5,6 +5,9 @@
 @import "@fontsource/roboto/400.css";
 @import "@fontsource/roboto/500.css";
 @import "@fontsource/roboto/700.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
 @import "@fontsource/roboto-mono/400.css";
 @import "@fontsource/roboto-mono/600.css";
 
@@ -17,43 +20,66 @@
    the light theme is a single class flip on <html>. Components reference them
    via arbitrary-value utilities (bg-[var(--panel)] etc.). */
 :root {
-  --bg: #04070f;
-  --panel: rgba(10, 22, 40, 0.55);
-  --line: rgba(60, 140, 220, 0.18);
-  --cyan: #39d7ff;
-  --cyan-dim: #1a7fa8;
-  --amber: #ffcf5c;
-  --text: #cfe8ff;
-  --dim: #5f89ad;
-  --green: #3ee08a;
-  --red: #ff5c7a;
-  --field: rgba(6, 12, 24, 0.75);
-  --chipbg: rgba(10, 22, 40, 0.5);
+  /* Redesign v2 tokens — two accents: cyan = live/interactive, indigo =
+     knowledge. Surfaces carry elevation (inset highlight + deep shadow). */
+  --display: "Space Grotesk", system-ui, sans-serif;
+  --bg: #060a11;
+  --surf: #0c121b;
+  --surf-2: #111a27;
+  --surf-hi: rgba(255, 255, 255, 0.045);
+  --panel: #0c121b;
+  --shadow: 0 1px 0 var(--surf-hi) inset, 0 20px 44px -26px rgba(0, 0, 0, 0.95);
+  --line: rgba(140, 175, 215, 0.13);
+  --line-2: rgba(140, 175, 215, 0.24);
+  --cyan: #22d3ee;
+  --cyan-2: rgba(34, 211, 238, 0.10);
+  --cyan-3: rgba(34, 211, 238, 0.34);
+  --cyan-dim: #58b7cf;
+  --indigo: #8b93ff;
+  --indigo-2: rgba(139, 147, 255, 0.12);
+  --indigo-3: rgba(139, 147, 255, 0.34);
+  --amber: #ffc95c;
+  --text: #d5e2f0;
+  --dim: #7d90a8;
+  --green: #35d99b;
+  --red: #ff6b84;
+  --field: rgba(4, 8, 14, 0.7);
+  --chipbg: rgba(17, 26, 39, 0.6);
   --bright: #ffffff;
   /* neural-core satellite nodes — alpha accents that must survive both themes */
-  --node-border: rgba(57, 215, 255, 0.45);
-  --node-line: rgba(57, 215, 255, 0.35);
-  --node-glow: rgba(57, 215, 255, 0.2);
-  --node-glow-h: rgba(57, 215, 255, 0.5);
+  --node-border: rgba(34, 211, 238, 0.45);
+  --node-line: rgba(34, 211, 238, 0.35);
+  --node-glow: rgba(34, 211, 238, 0.2);
+  --node-glow-h: rgba(34, 211, 238, 0.5);
 }
 html.light {
-  --bg: #eef3fa;
-  --panel: rgba(255, 255, 255, 0.78);
-  --line: rgba(20, 80, 150, 0.16);
-  --cyan: #0369a1;
-  --cyan-dim: #5b9ec4;
-  --amber: #9a6b00;
-  --text: #1d3348;
-  --dim: #4f677e;
+  --bg: #eef2f7;
+  --surf: #ffffff;
+  --surf-2: #f6f9fc;
+  --surf-hi: rgba(255, 255, 255, 0.9);
+  --panel: #ffffff;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 16px 36px -24px rgba(15, 40, 70, 0.35);
+  --line: rgba(20, 55, 95, 0.13);
+  --line-2: rgba(20, 55, 95, 0.24);
+  --cyan: #0e7490;
+  --cyan-2: rgba(14, 116, 144, 0.09);
+  --cyan-3: rgba(14, 116, 144, 0.32);
+  --cyan-dim: #48788f;
+  --indigo: #4f5bd5;
+  --indigo-2: rgba(79, 91, 213, 0.09);
+  --indigo-3: rgba(79, 91, 213, 0.30);
+  --amber: #8a5a00;
+  --text: #17222f;
+  --dim: #5d7085;
   --green: #0c7f4d;
-  --red: #c72e50;
-  --field: rgba(255, 255, 255, 0.85);
-  --chipbg: rgba(255, 255, 255, 0.6);
-  --bright: #12263a;
-  --node-border: rgba(3, 105, 161, 0.65);
-  --node-line: rgba(3, 105, 161, 0.5);
-  --node-glow: rgba(3, 105, 161, 0.15);
-  --node-glow-h: rgba(3, 105, 161, 0.35);
+  --red: #bd2f4d;
+  --field: rgba(255, 255, 255, 0.9);
+  --chipbg: #f6f9fc;
+  --bright: #08131f;
+  --node-border: rgba(14, 116, 144, 0.65);
+  --node-line: rgba(14, 116, 144, 0.5);
+  --node-glow: rgba(14, 116, 144, 0.15);
+  --node-glow-h: rgba(14, 116, 144, 0.35);
 }
 
 html, body, #root { height: 100%; }

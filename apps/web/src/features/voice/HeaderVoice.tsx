@@ -59,7 +59,7 @@ export function HeaderVoice() {
       const st = stateRef.current;
       let level = 0;
       if (st === "thinking") {
-        x.fillStyle = "#ffcf5c";
+        x.fillStyle = "#ffc95c";
         for (let i = 0; i < 24; i++) {
           const on = Math.floor(t / 6) % 24;
           x.globalAlpha = i === on ? 1 : 0.25;
@@ -69,7 +69,7 @@ export function HeaderVoice() {
       } else if (st === "listening" && analyserRef.current) {
         const data = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(data);
-        x.fillStyle = "#39d7ff";
+        x.fillStyle = "#22d3ee";
         const bars = 24;
         for (let i = 0; i < bars; i++) {
           const v = data[Math.floor((i / bars) * data.length)] / 255;
@@ -81,7 +81,7 @@ export function HeaderVoice() {
         // even while the recognition engine is mid-restart and deaf
         if (level > 0.25) lastVoiceRef.current = performance.now();
       } else if (st === "speaking") {
-        x.fillStyle = "#3ee08a";
+        x.fillStyle = "#35d99b";
         const bars = 24;
         level = 0.4 + 0.3 * Math.abs(Math.sin(t * 0.1));
         for (let i = 0; i < bars; i++) {
@@ -89,7 +89,7 @@ export function HeaderVoice() {
           x.fillRect((i / bars) * w, mid - bh / 2, w / bars - 2, bh);
         }
       } else {
-        x.fillStyle = "rgba(95,137,173,.5)";
+        x.fillStyle = "rgba(125,144,168,.5)";
         for (let i = 0; i < 24; i++) x.fillRect((i / 24) * w, mid - 1, 2, 2);
       }
       (window as any)._jarvisVoiceLevel = level;   // neural core breathes with this

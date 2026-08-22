@@ -18,20 +18,20 @@ const isLight = () => document.documentElement.classList.contains("light");
 const palette = () =>
   isLight()
     ? {
-        bg: "#eef3fa",
-        series: ["#0369a1", "#0c7f4d", "#7c3aed", "#9a6b00", "#c72e50"],
+        bg: "#eef2f7",
+        series: ["#0e7490", "#0c7f4d", "#4f5bd5", "#8a5a00", "#bd2f4d"],
         ref: "#8fa6b8",
-        label: "#22394f",
-        link: "rgba(3,105,161,0.28)",
-        particle: "#0369a1",
+        label: "#17222f",
+        link: "rgba(14,116,144,0.28)",
+        particle: "#0e7490",
       }
     : {
-        bg: "#04070f",
-        series: ["#39d7ff", "#3ee08a", "#c792ea", "#ffcf5c", "#ff8fa3"],
+        bg: "#060a11",
+        series: ["#22d3ee", "#35d99b", "#8b93ff", "#ffc95c", "#ff6b84"],
         ref: "#2a3a4a",
-        label: "#cfe8ff",
-        link: "rgba(57,215,255,0.22)",
-        particle: "#39d7ff",
+        label: "#d5e2f0",
+        link: "rgba(34,211,238,0.22)",
+        particle: "#22d3ee",
       };
 
 type Controls = {
