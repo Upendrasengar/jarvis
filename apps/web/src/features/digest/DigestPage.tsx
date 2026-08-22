@@ -44,7 +44,7 @@ function AttentionRow({ r, onToggleAll }: { r: Ranked; onToggleAll: (items: Rank
         {state === "done" ? "☑" : "☐"}
       </button>
       <span className={`min-w-0 flex-1 ${state === "done" ? "text-[var(--dim)] line-through" : ""}`}>
-        <b className="text-[var(--bright)]">{r.item.owner}:</b>{" "}
+        {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}
         {r.item.text.replace(/\*\*/g, "")}
         <span className="mt-[2px] block text-[11px] leading-snug text-[var(--dim)]">
           {urgency && (

@@ -117,10 +117,12 @@ export function OverviewPage() {
     .map((l) => l.replace(/^\s*(\d+\.|[-*])\s+/, "").replace(/\*\*/g, "").trim()).slice(0, 3);
 
   const overdueCount = bucket.filter((r) => r.chips.some((c) => c.kind === "overdue")).length;
-  const tiles: Array<[string, string | number, string, string]> = [
-    ["Active Projects", s?.stats.activeProjects ?? "…", `of ${s?.stats.totalProjects ?? "…"}`, "/projects"],
-    ["Open Actions", openActions, "from calls", "/actions"],
-    ["Overdue", overdueCount, overdueCount ? "needs action" : "all clear", "/actions"],
+  const tiles: Array<[string, string | number, string, string, string]> = [
+    ["Active Projects", s?.stats.activeProjects ?? "…", `of ${s?.stats.totalProjects ?? "…"}`, "/projects",
+      "M3 6h6l2 2h10v11H3z"],
+    ["Open Actions", openActions, "from calls", "/actions", "M13 2 6 14h5l-1 8 7-12h-5z"],
+    ["Overdue", overdueCount, overdueCount ? "needs action" : "all clear", "/actions",
+      "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z M12 8v4l3 2"],
   ];
 
   return (
@@ -141,17 +143,24 @@ export function OverviewPage() {
                 ))
               : <Quiet>No digest yet — ask Jarvis for one.</Quiet>}
           </Card>
-          {tiles.map(([lbl, val, sub, to]) => (
+          {tiles.map(([lbl, val, sub, to, icon]) => (
             <button
               key={lbl}
               onClick={() => navigate(to)}
-              className="shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 text-left transition [box-shadow:var(--shadow)] hover:border-[var(--line-2)]"
+              className="flex shrink-0 items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 text-left transition [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)]"
             >
-              <div className="text-[9.5px] uppercase tracking-[2px] text-[var(--dim)]">{lbl}</div>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold leading-none text-[var(--bright)] [font-family:var(--display)]">{val}</span>
-                <span className="font-sans text-[11px] text-[var(--dim)]">{sub}</span>
-              </div>
+              <span>
+                <span className="block text-[9.5px] uppercase tracking-[2px] text-[var(--dim)]">{lbl}</span>
+                <span className="mt-1 flex items-baseline gap-2">
+                  <span className="text-[28px] font-semibold leading-none text-[var(--bright)] [font-family:var(--display)]">{val}</span>
+                  <span className="font-sans text-[11px] text-[var(--dim)]">{sub}</span>
+                </span>
+              </span>
+              <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-[var(--indigo-2)] text-[var(--indigo)]">
+                <svg viewBox="0 0 24 24" className="h-[14px] w-[14px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+                  <path d={icon} />
+                </svg>
+              </span>
             </button>
           ))}
         </div>
@@ -206,7 +215,7 @@ export function OverviewPage() {
                         className="cursor-pointer text-[var(--cyan)]"
                       >☐</button>
                       <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-relaxed text-[var(--text)]">
-                        <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "").slice(0, 110)}
+                        {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}{r.item.text.replace(/\*\*/g, "").slice(0, 110)}
                         {urgent && (
                           <span className="mt-[2px] block text-[10px] uppercase tracking-[1px] text-[var(--dim)]">
                             <span className={urgent.kind === "overdue" ? "font-medium text-[var(--red)]" : "font-medium text-[var(--amber)]"}>{urgent.label}</span>
