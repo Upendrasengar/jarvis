@@ -53,7 +53,7 @@
   --node-glow-h: rgba(34, 211, 238, 0.5);
 }
 html.light {
-  --bg: #ffffff;
+  --bg: #eef2f7;
   --surf: #ffffff;
   --surf-2: #f6f9fc;
   --surf-hi: rgba(255, 255, 255, 0.9);

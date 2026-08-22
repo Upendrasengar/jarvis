@@ -127,7 +127,7 @@ function AttentionCard({ r, onToggle }: { r: Ranked; onToggle: () => void }) {
   const isNote = it.callId.startsWith("note:");
   return (
     <div className={`mb-3 rounded-2xl border bg-[var(--surf)] p-4 [box-shadow:var(--shadow)] ${
-      hot ? "border-[rgba(255,107,132,.45)]" : "border-[var(--line)]"}`}>
+      hot ? "border-[rgba(255,107,132,.45)] !bg-[rgba(255,107,132,.05)]" : "border-[var(--line)]"}`}>
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
@@ -150,7 +150,7 @@ function AttentionCard({ r, onToggle }: { r: Ranked; onToggle: () => void }) {
         </div>
         <span className={`shrink-0 rounded px-2 py-[2px] text-[9px] tracking-[1.5px] ${
           hot
-            ? "border border-[rgba(255,107,132,.5)] text-[var(--red)]"
+            ? "border border-[rgba(255,107,132,.5)] bg-[rgba(255,107,132,.12)] text-[var(--red)]"
             : urgent
               ? "border border-[var(--line)] text-[var(--amber)]"
               : "border border-[var(--line)] text-[var(--dim)]"}`}>
@@ -237,7 +237,7 @@ export function ActionsPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* ledger rail — filters live here now, one accent for the active one */}
-      <aside className="w-[200px] shrink-0 space-y-7 overflow-auto border-r border-[var(--line)] px-4 py-8">
+      <aside className="w-[200px] shrink-0 space-y-7 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] px-4 py-8">
         <div>
           <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">LEDGER</div>
           {filters.map((f) => (
