@@ -233,10 +233,6 @@ export function ActionsPage() {
   const srcNotes = new Set(open.filter((i) => i.callId.startsWith("note:")).map((i) => i.callId)).size;
   const critical = bucket.filter((r) =>
     r.chips.some((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked")).length;
-  const over7 = open.filter((i) => ageDays(i.callStarted) > 7).length;
-  const mid = open.filter((i) => { const a = ageDays(i.callStarted); return a >= 3 && a <= 7; }).length;
-  const under3 = open.filter((i) => ageDays(i.callStarted) < 3).length;
-  const clearedWeek = done.filter((i) => ageDays(i.callStarted) <= 7).length;
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -326,27 +322,6 @@ export function ActionsPage() {
           )}
         </div>
       </div>
-
-      {/* insight column — everything here is computed from the ledger itself */}
-      <aside className="hidden w-[250px] shrink-0 overflow-auto px-4 py-8 xl:block">
-        <div className="mb-3 text-[9px] tracking-[2px] text-[var(--dim)]">LEDGER INSIGHT</div>
-        <div className="mb-4 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
-          <div className="text-[9px] tracking-[2px] text-[var(--dim)]">CLEARED THIS WEEK</div>
-          <div className="mt-1 text-[26px] font-semibold text-[var(--green)] [font-family:var(--display)]">+{clearedWeek}</div>
-          <p className="mt-1 font-sans text-[11.5px] leading-relaxed text-[var(--dim)]">
-            {open.length - mineCount} open items are owed by other people.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
-          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">AGEING</div>
-          {([["Over 7 days", over7], ["3\u20137 days", mid], ["Under 3 days", under3]] as const).map(([l, n]) => (
-            <div key={l} className="flex justify-between py-[2px] font-sans text-[11.5px] text-[var(--text)]">
-              <span>{l}</span>
-              <span className="text-[var(--dim)]">{n}</span>
-            </div>
-          ))}
-        </div>
-      </aside>
 
       <PromptDialog
         open={!!commentFor}
