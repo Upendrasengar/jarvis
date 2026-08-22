@@ -19,6 +19,7 @@
 
 # built native helpers (compiled per-machine by install.sh)
 tools/call-capture/bin/
+tools/call-capture/JarvisAudio.app/
 
 # monorepo build artifacts
 node_modules/

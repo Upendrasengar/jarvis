@@ -52,6 +52,60 @@ for b in audiocap miccheck; do
     else bad "$b failed to build — see /tmp/jarvis-swift-err (Xcode CLT needed: xcode-select --install)"; fi
   fi
 done
+# JarvisAudio.app: recording with its own permission identity (System
+# Settings shows "Jarvis Audio", not your terminal)
+APPD="tools/call-capture/JarvisAudio.app/Contents"
+if [[ -x "$APPD/MacOS/audiocap" ]]; then ok "JarvisAudio.app"
+elif [[ $CHECK_ONLY == 1 ]]; then bad "JarvisAudio.app not built — run: jarvis setup"
+else
+  mkdir -p "$APPD/MacOS"
+  cat > "$APPD/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>com.jarvis.audio</string>
+  <key>CFBundleName</key><string>Jarvis Audio</string>
+  <key>CFBundleDisplayName</key><string>Jarvis Audio</string>
+  <key>CFBundleExecutable</key><string>audiocap</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Jarvis records your side of calls to transcribe them locally.</string>
+</dict>
+</plist>
+PLIST
+  if swiftc -O tools/call-capture/audiocap.swift -o "$APPD/MacOS/audiocap" 2>/tmp/jarvis-swift-err \
+     && codesign --force -s - tools/call-capture/JarvisAudio.app 2>>/tmp/jarvis-swift-err; then
+    ok "JarvisAudio.app built + signed"
+  else bad "JarvisAudio.app build failed — see /tmp/jarvis-swift-err"; fi
+fi
+
+echo "── recording permissions (attributed to Jarvis Audio) ──"
+check_perms() {
+  local rf; rf="$(mktemp)"
+  open -n -g -a "$PWD/tools/call-capture/JarvisAudio.app" --args --check "$rf" 2>/dev/null
+  local i=0; while [[ $i -lt 12 && ! -s "$rf" ]]; do sleep 0.25; i=$((i+1)); done
+  cat "$rf" 2>/dev/null; rm -f "$rf"
+}
+if [[ -x "$APPD/MacOS/audiocap" ]]; then
+  PERMS="$(check_perms)"
+  if grep -q "screen-recording: granted" <<<"$PERMS"; then ok "screen recording granted to Jarvis Audio"
+  elif [[ $CHECK_ONLY == 1 ]]; then bad "screen recording NOT granted — run: jarvis setup (or System Settings → Privacy → Screen Recording → enable Jarvis Audio)"
+  else
+    echo "  Requesting permissions now — grant BOTH prompts / toggles for \"Jarvis Audio\":"
+    echo "    · Screen Recording (how Jarvis hears the other side of calls)"
+    echo "    · Microphone (your side)"
+    rf="$(mktemp)"
+    open -n -g -W -a "$PWD/tools/call-capture/JarvisAudio.app" --args --request "$rf" 2>/dev/null
+    sleep 1; cat "$rf" 2>/dev/null | sed 's/^/  /'; rm -f "$rf"
+    PERMS="$(check_perms)"
+    if grep -q "screen-recording: granted" <<<"$PERMS"; then ok "screen recording granted"
+    else warn "not granted yet — System Settings → Privacy & Security → Screen Recording → enable Jarvis Audio (no restart needed; next recording uses it)"; fi
+  fi
+  grep -q "microphone: granted" <<<"$PERMS" && ok "microphone granted to Jarvis Audio" || warn "microphone not granted to Jarvis Audio yet (calls still record via the legacy path meanwhile)"
+fi
 
 echo "── whisper model ──"
 WANT="$(head -1 memory/settings/whisper-model.txt 2>/dev/null || head -1 memory.example/settings/whisper-model.txt)"
@@ -81,10 +135,6 @@ else
   pnpm install --silent && ok "dependencies installed" || bad "pnpm install failed"
   (cd apps/web && pnpm exec vite build >/dev/null 2>&1) && ok "web app built" || bad "web build failed"
 fi
-
-echo "── macOS permissions (grant on first real use) ──"
-warn "Microphone + Screen Recording: System Settings → Privacy & Security."
-warn "macOS will prompt when the first call is recorded; grant both to your terminal."
 
 echo
 if [[ $MISSING == 1 ]]; then

@@ -7,6 +7,7 @@
 #   jarvis digest     -> run today's digest and print it
 #   jarvis setup      -> full dependency setup (whisper model download etc.)
 #   jarvis logs       -> tail the server / watcher / cron logs
+#   jarvis service    -> install|uninstall|status: auto-start at login
 #   jarvis "what do I know about X"  -> one-shot question
 cd "$(dirname "$0")" || exit 1
 
@@ -33,7 +34,17 @@ elif [[ "$1" == "telegram" ]]; then
 elif [[ "$1" == "init" ]]; then
   exec bash tools/init.sh
 elif [[ "$1" == "setup" ]]; then
-  exec bash install.sh
+  bash install.sh || exit $?
+  # offer auto-start at login (skipped when non-interactive)
+  if [ -t 0 ]; then
+    printf "Start Jarvis automatically at login (runs as a background service)? [y/N] "
+    read -r yn
+    case "$yn" in [Yy]*) bash tools/service.sh install ;; esac
+  fi
+  exit 0
+elif [[ "$1" == "service" ]]; then
+  shift
+  exec bash tools/service.sh "$@"
 elif [[ "$1" == "logs" ]]; then
   echo "── server (reports/api.log) ──"; tail -20 reports/api.log 2>/dev/null || echo "(none yet)"
   echo; echo "── call watcher (reports/callwatch.log) ──"; tail -12 reports/callwatch.log 2>/dev/null || echo "(none yet)"

@@ -16,6 +16,20 @@ set -uo pipefail
 
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="$JARVIS_DIR/tools/call-capture/bin"
+APP="$JARVIS_DIR/tools/call-capture/JarvisAudio.app"
+
+# Prefer recording through JarvisAudio.app (own TCC identity — permissions
+# attribute to "Jarvis Audio", survive terminal restarts, work under launchd).
+# Falls back to the bare binary (terminal-attributed) when the app isn't
+# built or not yet granted, so existing setups never break mid-call.
+app_perms() {
+  [ -d "$APP" ] || return 1
+  local rf; rf="$(mktemp)"
+  open -n -g -a "$APP" --args --check "$rf" 2>/dev/null || { rm -f "$rf"; return 1; }
+  local i=0
+  while [ $i -lt 12 ] && [ ! -s "$rf" ]; do sleep 0.25; i=$((i+1)); done
+  cat "$rf" 2>/dev/null; rm -f "$rf"
+}
 CALLS_DIR="$JARVIS_DIR/reports/calls"
 POLL=15          # seconds between checks
 END_MISSES=2     # consecutive polls with no meeting tab before we stop
@@ -141,10 +155,27 @@ except Exception:
 CALPY
   fi
 
-  "$BIN/audiocap" "$session/system.wav" 2>> "$session/capture.log" &
-  audiocap_pid=$!
+  APP_PERMS="$(app_perms || true)"
+  if grep -q "screen-recording: granted" <<<"$APP_PERMS"; then
+    open -n -g -a "$APP" --args "$session/system.wav" "$session/capture.log" 2>> "$session/capture.log"
+    sleep 1
+    audiocap_pid="$(pgrep -nf "MacOS/audiocap [^-]" 2>/dev/null | head -1)"
+    echo "$(date '+%H:%M:%S') recorder: JarvisAudio.app (pid ${audiocap_pid:-?})"
+  else
+    "$BIN/audiocap" "$session/system.wav" 2>> "$session/capture.log" &
+    audiocap_pid=$!
+    echo "$(date '+%H:%M:%S') recorder: legacy binary (grant JarvisAudio in setup for terminal-free recording)"
+  fi
 
-  # Mic straight to whisper's preferred format (16 kHz mono).
+  # Mic straight to whisper's preferred format (16 kHz mono). Prefer the
+  # JarvisAudio.app identity (no ffmpeg/terminal attribution); ffmpeg remains
+  # the fallback until the app's mic grant exists.
+  if grep -q "microphone: granted" <<<"${APP_PERMS:-}"; then
+    open -n -g -a "$APP" --args --mic "$session/mic.wav" "$session/capture.log" 2>> "$session/capture.log"
+    sleep 1
+    ffmpeg_pid="$(pgrep -nf 'audiocap --mic' 2>/dev/null | head -1)"
+    echo "$(date '+%H:%M:%S') mic: JarvisAudio.app (pid ${ffmpeg_pid:-?})"
+  else
   ffmpeg -hide_banner -loglevel error -f avfoundation -i ":default" \
     -ac 1 -ar 16000 "$session/mic.wav" 2>> "$session/capture.log" &
   ffmpeg_pid=$!
@@ -154,6 +185,7 @@ CALPY
     ffmpeg -hide_banner -loglevel error -f avfoundation -i ":0" \
       -ac 1 -ar 16000 "$session/mic.wav" 2>> "$session/capture.log" &
     ffmpeg_pid=$!
+  fi
   fi
 
   recording=1
