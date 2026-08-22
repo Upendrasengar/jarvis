@@ -18,7 +18,7 @@ const isLight = () => document.documentElement.classList.contains("light");
 const palette = () =>
   isLight()
     ? {
-        bg: "#eef2f7",
+        bg: "#f6f8fa",
         series: ["#4f5bd5", "#0e7490", "#0c7f4d", "#8a5a00", "#bd2f4d"],
         ref: "#8fa6b8",
         label: "#17222f",

@@ -86,7 +86,7 @@ function CallGroup({ items, onToggle, onComment, clusterOf, chipsOf }: { items: 
   const isNote = head.callId.startsWith("note:");
   return (
     <div className="mb-5">
-      <div className="mb-1 flex items-center gap-2.5">
+      <div className="mb-1 flex items-center gap-2.5 border-b border-[var(--line)] pb-2">
         <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-[var(--indigo-2)] text-[var(--indigo)]">
           <svg viewBox="0 0 24 24" className="h-[12px] w-[12px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
             {isNote
