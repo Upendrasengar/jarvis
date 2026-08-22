@@ -134,7 +134,7 @@ function TopicPicker({ linked, onPick }: { linked: string[]; onPick: (t: string)
             {!opts.length && !canCreate && (
               <div className="px-2 py-1 text-[10.5px] text-[var(--dim)]">
                 {query && badChar
-                  ? <>Topic names can't contain <code className="text-[var(--amber)]">/ \ [ ] # |</code> — they become vault filenames. Try "UI-UX Internal".</>
+                  ? <>Topic names can't contain <code className="text-[var(--amber)]">/ \ [ ] # |</code> — they become vault filenames.</>
                   : query.length > 60
                     ? "Topic names max out at 60 characters."
                     : "Type to create a topic"}
