@@ -30,51 +30,21 @@ function ageDays(callStarted: string): number {
   return Math.max(0, Math.floor((Date.now() - d) / 86_400_000));
 }
 
-function OwnerLane({ owner }: { owner: string }) {
-  const mine = owner === "Me";
-  return (
-    <span
-      className={`w-[86px] shrink-0 truncate rounded-full border px-2 py-[2px] text-center text-[9px] tracking-wider ${
-        mine
-          ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
-          : owner
-            ? "border-[var(--line)] text-[var(--dim)]"
-            : "border-transparent text-[var(--dim)]"
-      }`}
-      title={owner || "no owner recorded"}
-    >
-      {owner || "—"}
-    </span>
-  );
-}
 
 function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: ActionItem; onToggle: () => void; onComment: () => void; recurringIn?: number; chips?: Chip[] }) {
   const age = ageDays(item.callStarted);
   return (
-    <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[7px] pl-6 pr-3 font-sans text-[13px] leading-snug hover:bg-[var(--surf-2)]">
-      <input
-        type="checkbox"
-        checked={item.done}
-        onChange={onToggle}
-        className="mt-[2px] cursor-pointer accent-[var(--cyan)]"
-      />
-      <OwnerLane owner={item.owner} />
+    <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[9px] pl-9 pr-3 font-sans text-[13px] leading-snug hover:bg-[var(--surf-2)]">
+      <input type="checkbox" checked={item.done} onChange={onToggle} className="chk mt-[1px]" />
       <span className="min-w-0 flex-1">
         <span className={item.done ? "text-[var(--dim)] line-through" : "text-[var(--text)]"}>
+          {item.owner ? `${item.owner}: ` : ""}
           {inline(item.text)}
           {chips?.slice(0, 1).map((c, k) => (
             <span key={k} className={`ml-2 text-[10px] font-medium ${c.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
               {c.label}
             </span>
           ))}
-          {recurringIn && recurringIn > 1 ? (
-            <span
-              title="This item was raised in multiple calls"
-              className="ml-2 rounded-full border border-[rgba(255,201,92,.4)] px-[7px] py-[1px] text-[9.5px] text-[var(--amber)]"
-            >
-              ⟳ {recurringIn} calls
-            </span>
-          ) : null}
         </span>
         {item.comments.map((c, i) => {
           const { when, text } = parseStamp(c);
@@ -97,9 +67,14 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
       >
         ＋
       </button>
+      {recurringIn && recurringIn > 1 ? (
+        <span title="This item was raised in multiple calls" className="mt-[2px] shrink-0 rounded-md border border-[var(--line)] px-[7px] py-[2px] text-[8.5px] tracking-[1px] text-[var(--dim)]">
+          {recurringIn} CALLS
+        </span>
+      ) : null}
       {!item.done && age >= 1 && (
-        <span className="shrink-0 rounded-full border border-[rgba(255,201,92,.35)] px-[7px] py-[1px] text-[9px] text-[var(--amber)]">
-          {age}d
+        <span className="mt-[2px] shrink-0 rounded-md border border-[var(--line)] px-[7px] py-[2px] text-[8.5px] tracking-[1px] text-[var(--dim)]">
+          OPEN {age}D
         </span>
       )}
     </label>
@@ -108,20 +83,25 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
 
 function CallGroup({ items, onToggle, onComment, clusterOf, chipsOf }: { items: ActionItem[]; onToggle: (i: ActionItem) => void; onComment: (i: ActionItem) => void; clusterOf?: (i: ActionItem) => number | undefined; chipsOf?: (i: ActionItem) => Chip[] | undefined }) {
   const head = items[0];
+  const isNote = head.callId.startsWith("note:");
   return (
-    <div className="relative mb-4 pl-6">
-      {/* transmission node + rail — this group came in over the channel */}
-      <span className="absolute left-[7px] top-[6px] h-[7px] w-[7px] rounded-full bg-[var(--cyan)] shadow-[0_0_10px_var(--cyan)]" />
-      <span className="absolute bottom-1 left-[10px] top-[18px] w-px bg-[var(--cyan-3)]" />
-      <div className="mb-1 flex items-baseline gap-3">
+    <div className="mb-5">
+      <div className="mb-1 flex items-center gap-2.5">
+        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-[var(--indigo-2)] text-[var(--indigo)]">
+          <svg viewBox="0 0 24 24" className="h-[12px] w-[12px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+            {isNote
+              ? <path d="M5 4h11l3 3v13H5z M8 10h8 M8 14h8" />
+              : <path d="M6 4c0 8 6 14 14 14l1-4-4-1.5-1.5 1.5c-3-1.2-5.3-3.5-6.5-6.5L10.5 6 9 2z" />}
+          </svg>
+        </span>
         <Link
-          to={head.callId.startsWith("note:") ? `/notes/${head.callId.slice(5)}` : `/calls/${head.callId}`}
+          to={isNote ? `/notes/${head.callId.slice(5)}` : `/calls/${head.callId}`}
           className="truncate font-sans text-[13px] font-semibold text-[var(--bright)] hover:text-[var(--cyan)]"
         >
           {head.callTitle || head.callId}
         </Link>
-        <span className="shrink-0 text-[10px] text-[var(--dim)]">
-          {head.callStarted.slice(11, 16)} · {items.length} open
+        <span className="ml-auto shrink-0 text-[10px] text-[var(--dim)]">
+          {head.callStarted.slice(0, 10)} · {items.length} open
         </span>
       </div>
       {items.map((i) => (
@@ -154,7 +134,7 @@ function AttentionCard({ r, onToggle }: { r: Ranked; onToggle: () => void }) {
           checked={false}
           onChange={onToggle}
           title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
-          className="mt-[3px] cursor-pointer accent-[var(--cyan)]"
+          className="chk mt-[2px]"
         />
         <div className="min-w-0 flex-1">
           <div className="font-sans text-[13.5px] font-semibold leading-snug text-[var(--bright)]">
@@ -321,8 +301,7 @@ export function ActionsPage() {
           )}
 
           {[...days.entries()].map(([day, calls]) => (
-            <section key={day} className="mb-6">
-              <div className="mb-2 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">{day}</div>
+            <section key={day} className="mb-2">
               {[...calls.values()].map((group) => (
                 <CallGroup chipsOf={(a) => chipsById.get(idKey(a))} clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
               ))}
