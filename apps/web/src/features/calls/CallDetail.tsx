@@ -60,6 +60,86 @@ function LinkedNotes({ callId }: { callId: string }) {
   );
 }
 
+// Dropdown + freeform input to assign an existing topic or mint a new one.
+// Assignment writes a [[wikilink]] into the note's **Topics:** line, so the
+// brain graph and topic hubs pick it up through the normal pipeline.
+function TopicPicker({ linked, onPick }: { linked: string[]; onPick: (t: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  const { data: all = [] } = useQuery<Array<{ name: string }>>({
+    queryKey: ["topics"],
+    queryFn: async () => (await fetch("/api/topics")).json(),
+    enabled: open,
+  });
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  const names = all.map((t) => t.name);
+  const query = q.trim();
+  const opts = names.filter((n) => !linked.includes(n) && n.toLowerCase().includes(query.toLowerCase()));
+  const validName = query.length > 0 && query.length <= 60 && !/[/\\[\]#|]/.test(query);
+  const canCreate = validName &&
+    !names.some((n) => n.toLowerCase() === query.toLowerCase()) &&
+    !linked.some((n) => n.toLowerCase() === query.toLowerCase());
+  const pick = (t: string) => { onPick(t); setQ(""); setOpen(false); };
+  return (
+    <div ref={boxRef} className="relative inline-block">
+      <button
+        onClick={() => setOpen(!open)}
+        className="rounded-full border border-[var(--line)] px-[10px] py-[3px] text-[10px] text-[var(--dim)] hover:border-[var(--indigo)] hover:text-[var(--indigo)]"
+      >
+        ＋ topic
+      </button>
+      {open && (
+        <div className="mt-1 w-[200px] rounded-xl border border-[var(--line)] bg-[var(--surf-2)] p-2">
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setOpen(false);
+              if (e.key === "Enter") {
+                if (canCreate) pick(query);
+                else if (opts.length) pick(opts[0]);
+              }
+            }}
+            placeholder="Search or create…"
+            className="mb-1 w-full rounded-md border border-[var(--line)] bg-[var(--surf-2)] px-2 py-1 font-sans text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--indigo-3)]"
+          />
+          <div className="max-h-[180px] overflow-auto">
+            {opts.map((n) => (
+              <button
+                key={n}
+                onClick={() => pick(n)}
+                className="block w-full rounded-md px-2 py-[5px] text-left font-sans text-[11.5px] text-[var(--text)] hover:bg-[var(--indigo-2)]"
+              >
+                {n}
+              </button>
+            ))}
+            {canCreate && (
+              <button
+                onClick={() => pick(query)}
+                className="block w-full rounded-md px-2 py-[5px] text-left font-sans text-[11.5px] text-[var(--indigo)] hover:bg-[var(--indigo-2)]"
+              >
+                ＋ Create "{query}"
+              </button>
+            )}
+            {!opts.length && !canCreate && (
+              <div className="px-2 py-1 text-[10.5px] text-[var(--dim)]">Type to create a topic</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Right analytics rail — everything computed from data we already hold:
 // open/overdue counts from the notes + triage, topics from [[wikilinks]].
 // (The mock's talking-time bars need speaker diarization we don't have.)
@@ -75,6 +155,26 @@ function Rail({ call }: { call: Call }) {
     ([k, d]) => k.startsWith(`${call.id}|`) && d < today,
   ).length;
   const topics = [...new Set([...call.notes.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]))];
+  const save = useUpdateNotes();
+  const qc = useQueryClient();
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const addTopic = (t: string) => {
+    if (topics.includes(t)) return;
+    let notes = call.notes;
+    if (/^\*\*Topics:\*\*/m.test(notes)) notes = notes.replace(/^(\*\*Topics:\*\*.*)$/m, `$1 [[${t}]]`);
+    else notes = notes.trimEnd() + `\n\n**Topics:** [[${t}]]\n`;
+    save.mutate({ id: call.id, notes });
+    fetch("/api/topics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: t }),
+    }).then(() => qc.invalidateQueries({ queryKey: ["topics"] })).catch(() => {});
+  };
+  const removeTopic = (t: string) => {
+    const notes = call.notes.replace(/^(\*\*Topics:\*\*.*)$/m,
+      (line) => line.replace(new RegExp(`\\s*\\[\\[${esc(t)}\\]\\]`), ""));
+    if (notes !== call.notes) save.mutate({ id: call.id, notes });
+  };
   return (
     <aside className="hidden w-[260px] shrink-0 overflow-auto border-l border-[var(--line)] bg-[var(--surf)] px-5 py-8 xl:block">
       <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">OPEN ITEMS RAISED</div>
@@ -88,18 +188,25 @@ function Rail({ call }: { call: Call }) {
           <div className="mt-[2px] text-[8.5px] tracking-[1.5px] text-[var(--dim)]">OVERDUE</div>
         </div>
       </div>
-      {topics.length > 0 && (
-        <>
-          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">LINKED TOPICS</div>
-          <div className="mb-6 flex flex-wrap gap-2">
-            {topics.map((t) => (
-              <span key={t} className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[10px] py-[3px] text-[10px] text-[var(--indigo)]">
-                {t}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
+      <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">LINKED TOPICS</div>
+      <div className="mb-6 flex flex-wrap gap-2">
+        {topics.map((t) => (
+          <span
+            key={t}
+            className="group rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[10px] py-[3px] text-[10px] text-[var(--indigo)]"
+          >
+            {t}
+            <button
+              onClick={() => removeTopic(t)}
+              title={`Unlink ${t} from this call`}
+              className="ml-1 hidden text-[var(--dim)] hover:text-[var(--red)] group-hover:inline"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <TopicPicker linked={topics} onPick={addTopic} />
+      </div>
       <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">NOTES</div>
       <LinkedNotes callId={call.id} />
     </aside>
