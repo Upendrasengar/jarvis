@@ -2,7 +2,7 @@
 // The operator comms log — port of the legacy chat design: Jarvis speaks as
 // the system (node + mono eyebrow, no bubble), you transmit in capsules.
 // Voice: 🎙 fills the composer via speech recognition; 🔈 reads replies aloud.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
@@ -38,6 +38,17 @@ function SourceChips({ sources }: { sources: { to: string; kind: "call" | "note"
     </span>
   );
 }
+
+const fmtTime = (ts?: number) =>
+  ts ? new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+const dayKey = (ts?: number) => (ts ? new Date(ts).toDateString() : "");
+const fmtDay = (ts: number) => {
+  const d = new Date(ts); const today = new Date();
+  const yd = new Date(Date.now() - 86_400_000);
+  if (d.toDateString() === today.toDateString()) return "TODAY";
+  if (d.toDateString() === yd.toDateString()) return "YESTERDAY";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+};
 
 const QUICK = [
   "give me today's digest",
@@ -189,7 +200,15 @@ export function ChatPage() {
       >
         {messages.map((m, i) => {
           const groupFirst = m.c === "jarvis" && messages[i - 1]?.c !== "jarvis";
-          return m.c === "me" ? (
+          const prevTs = messages.slice(0, i).reverse().find((x) => x.ts)?.ts;
+          const newDay = m.ts && dayKey(m.ts) !== dayKey(prevTs);
+          const divider = newDay && (
+            <div key={`d${i}`} className="mt-5 mb-1 text-center text-[8.5px] tracking-[2px] text-[var(--dim)]">
+              — {fmtDay(m.ts!)} —
+            </div>
+          );
+          return m.c === "me" ? (<Fragment key={i}>
+            {divider}
             <div
               key={i}
               className="mt-4 max-w-[76%] self-end whitespace-pre-wrap rounded-[18px_18px_6px_18px] border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[14px] py-[10px] font-sans text-[13.5px] leading-relaxed [box-shadow:var(--shadow)]"
@@ -202,16 +221,20 @@ export function ChatPage() {
                 </span>
               ) : null}
               {m.t}
+              {m.ts && (
+                <span className="mt-[3px] block text-right text-[8.5px] text-[var(--dim)]">{fmtTime(m.ts)}</span>
+              )}
             </div>
-          ) : (
+          </Fragment>) : (<Fragment key={i}>
+            {divider}
             <div
               key={i}
               className={`relative max-w-[88%] self-start whitespace-pre-wrap pl-6 font-sans text-[13.5px] leading-relaxed ${groupFirst ? "pt-5" : "pt-[2px]"}`}
             >
               {groupFirst && (
                 <>
-                  <span className="absolute left-6 top-0 text-[9px] font-semibold tracking-[2.5px] text-[var(--cyan-dim)] [font-family:'Roboto_Mono',ui-monospace,monospace]">
-                    JARVIS
+                  <span className="absolute left-6 top-0 whitespace-nowrap text-[9px] font-semibold tracking-[2.5px] text-[var(--cyan-dim)] [font-family:'Roboto_Mono',ui-monospace,monospace]">
+                    JARVIS{m.ts ? ` · ${fmtTime(m.ts)}` : ""}
                   </span>
                   <span className="absolute left-[7px] top-[2px] h-[7px] w-[7px] rounded-full bg-[var(--cyan)] shadow-[0_0_10px_var(--cyan)]" />
                 </>
@@ -222,7 +245,7 @@ export function ChatPage() {
                 return (<>{body}<SourceChips sources={sources} /></>);
               })()}
             </div>
-          );
+          </Fragment>);
         })}
       </div>
 

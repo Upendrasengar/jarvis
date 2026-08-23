@@ -33,13 +33,13 @@ export function useChatStream(sessionId: string) {
     setStreaming(true);
     setMessages((m) => [
       ...m,
-      { c: "me", t: message, ...(images.length ? { imgs: images.map((i) => i.thumb) } : {}) },
-      { c: "jarvis", t: "" },
+      { c: "me", t: message, ts: Date.now(), ...(images.length ? { imgs: images.map((i) => i.thumb) } : {}) },
+      { c: "jarvis", t: "", ts: Date.now() },
     ]);
     const setLast = (t: string) =>
       setMessages((m) => {
         const copy = m.slice();
-        copy[copy.length - 1] = { c: "jarvis", t };
+        copy[copy.length - 1] = { ...copy[copy.length - 1], c: "jarvis", t };
         return copy;
       });
     const tw = makeTypewriter(setLast);

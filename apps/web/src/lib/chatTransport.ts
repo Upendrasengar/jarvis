@@ -2,7 +2,7 @@
 // Shared chat transport — used by the chat page (visible conversation) and
 // the header voice bar (background conversation from any tab). Handles the
 // SSE stream and the ACTION:DELEGATE protocol in one place.
-export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[] };
+export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number };
 
 const TX_KEY = (sid: string) => "jarvis_tx_" + sid;
 const DELEGATE_RE = /ACTION:DELEGATE\s*(\{[\s\S]*?\})\s*/;

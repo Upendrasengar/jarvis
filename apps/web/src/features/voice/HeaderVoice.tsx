@@ -223,14 +223,14 @@ export function HeaderVoice() {
     }
     const sid = currentSessionId();
     setState("thinking");
-    appendTranscript(sid, [{ c: "me", t: text }]);
+    appendTranscript(sid, [{ c: "me", t: text, ts: Date.now() }]);
     try {
       const reply = await streamChatTurn(sid, text);
-      appendTranscript(sid, [{ c: "jarvis", t: reply || "(no reply)" }]);
+      appendTranscript(sid, [{ c: "jarvis", t: reply || "(no reply)", ts: Date.now() }]);
       window.dispatchEvent(new Event("jarvis:transcript"));
       if (reply) await speak(reply);   // speaking events drive state
     } catch {
-      appendTranscript(sid, [{ c: "jarvis", t: "(connection lost)" }]);
+      appendTranscript(sid, [{ c: "jarvis", t: "(connection lost)", ts: Date.now() }]);
     } finally {
       if (activeRef.current) setState("listening");
       else setState("idle");
