@@ -157,7 +157,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(mk("Activity & Logs", #selector(logs), ""))
         menu.addItem(mk("Restart Server", #selector(restart), ""))
         menu.addItem(.separator())
-        menu.addItem(mk("Quit Jarvis Bar", #selector(quit), "q"))
+        menu.addItem(mk("Quit Jarvis (stops services)", #selector(quit), "q"))
     }
 
     func mk(_ title: String, _ sel: Selector, _ key: String) -> NSMenuItem {
@@ -173,7 +173,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func stopRec() { postJSON("/api/calls/stoprec"); DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.poll() } }
     @objc func toggleAuto() { postJSON("/api/autorecord", ["on": !autorecord]); autorecord.toggle() }
     @objc func restart() { runTool(["restart"]) }
-    @objc func quit() { NSApp.terminate(nil) }
+    @objc func quit() {
+        // quitting the icon quits Jarvis: boot the login service out first so
+        // launchd's KeepAlive can't resurrect the server, then stop services
+        timer?.invalidate()
+        DispatchQueue.global().async {
+            let stop = Process()
+            stop.executableURL = URL(fileURLWithPath: "/bin/bash")
+            stop.arguments = ["-c",
+                "launchctl bootout gui/$(id -u)/com.jarvis 2>/dev/null; " +
+                "\"\(jarvisDir)/tools/services.sh\" stop"]
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
+            stop.environment = env
+            try? stop.run()
+            stop.waitUntilExit()
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
+    }
 }
 
 let app = NSApplication.shared

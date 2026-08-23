@@ -14,6 +14,7 @@ echo "1/4 stopping services…"
 bash "$JARVIS_DIR/tools/services.sh" stop 2>/dev/null | sed 's/^/  /'
 bash "$JARVIS_DIR/tools/service.sh" uninstall 2>/dev/null | sed 's/^/  /'
 pkill -f "MacOS/audiocap" 2>/dev/null
+pkill -f "MacOS/jarvisbar" 2>/dev/null   # menu-bar icon
 echo
 echo "2/4 your data (memory, call notes, recordings, brain, secrets):"
 echo "  $JARVIS_DIR — memory/ reports/ brain/ data/ secrets/ models/"
