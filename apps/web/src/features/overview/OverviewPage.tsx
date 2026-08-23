@@ -244,12 +244,19 @@ export function OverviewPage() {
 
         {/* ── right: attention, meetings, activity ── */}
         <div className="flex min-h-0 flex-col gap-3">
-          <Card title="Needs Attention" tag={bucket.length ? <span className="text-[var(--amber)]">{bucket.length} TASKS</span> : undefined} className="flex-1">
+          <Card title="Needs Attention" tag={bucket.length ? <span className="rounded-full bg-[rgba(255,107,132,.12)] px-2 py-[2px] text-[9px] tracking-[1.5px] text-[var(--red)]">{bucket.length} TASKS</span> : undefined} className="flex-1">
             {bucket.length
               ? bucket.map((r) => {
-                  const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+                  // design anatomy: bold title, dim reason, one filled chip;
+                  // red accent only when a deadline is live
+                  const due = r.chips.find((c) => c.kind === "overdue" || c.kind === "due");
+                  const blocked = r.chips.find((c) => c.kind === "blocked");
+                  const recur = r.chips.find((c) => c.kind === "recur");
+                  const hot = !!due;
+                  const chip = [due?.label, blocked?.label, recur?.label]
+                    .filter(Boolean).join(" · ").toUpperCase();
                   return (
-                    <div key={idKey(r.item)} className={`mb-2 flex items-start gap-2 rounded-lg border-l-2 bg-[var(--surf-2)] px-3 py-[8px] ${urgent?.kind === "overdue" ? "border-[var(--red)]" : "border-[var(--amber)]"}`}>
+                    <div key={idKey(r.item)} className={`mb-2 flex items-start gap-2.5 rounded-xl border-l-2 bg-[var(--surf-2)] px-3 py-[9px] ${hot ? "border-[var(--red)]" : "border-[var(--line-2)]"}`}>
                       <input
                         type="checkbox"
                         checked={false}
@@ -257,11 +264,19 @@ export function OverviewPage() {
                         title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
                         className="chk mt-[2px]"
                       />
-                      <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-relaxed text-[var(--text)]">
-                        {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}{r.item.text.replace(/\*\*/g, "").slice(0, 110)}
-                        {urgent && (
-                          <span className="mt-[2px] block text-[10px] uppercase tracking-[1px] text-[var(--dim)]">
-                            <span className={urgent.kind === "overdue" ? "font-medium text-[var(--red)]" : "font-medium text-[var(--amber)]"}>{urgent.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-sans text-[12.5px] font-semibold leading-snug text-[var(--bright)]">
+                          {r.item.text.replace(/\*\*/g, "").slice(0, 110)}
+                        </span>
+                        {r.reason && (
+                          <span className="mt-[2px] block font-sans text-[11.5px] leading-snug text-[var(--dim)]">
+                            {r.reason}
+                          </span>
+                        )}
+                        {chip && (
+                          <span className={`mt-[6px] inline-block max-w-full truncate rounded px-[7px] py-[2px] text-[8.5px] tracking-[1.2px] ${
+                            hot ? "bg-[rgba(255,107,132,.12)] text-[var(--red)]" : "bg-[var(--surf)] text-[var(--dim)]"}`}>
+                            {chip}
                           </span>
                         )}
                       </span>

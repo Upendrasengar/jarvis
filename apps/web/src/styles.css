@@ -112,8 +112,10 @@ input.chk {
   flex: none;
   cursor: pointer;
   border-radius: 5px;
-  border: 1px solid var(--line);
-  background: var(--surf-2);
+  /* line-2 + surf: the box must read on ANY surface, incl. surf-2 rows
+     (needs-attention panels) where a line/surf-2 box disappeared */
+  border: 1px solid var(--line-2);
+  background: var(--surf);
   position: relative;
   transition: background 0.12s, border-color 0.12s;
 }
