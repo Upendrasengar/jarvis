@@ -22,7 +22,11 @@ const PRICES: Array<[RegExp, [number, number, number, number]]> = [
 type Bucket = { in: number; out: number; cacheWrite: number; cacheRead: number; turns: number; cost: number };
 const zero = (): Bucket => ({ in: 0, out: 0, cacheWrite: 0, cacheRead: 0, turns: 0, cost: 0 });
 
-type FileAgg = { mtimeMs: number; size: number; days: Record<string, Record<string, Bucket>> };
+// code workers run inside project dirs, so their transcripts sit next to
+// the owner's own Claude sessions there — this prompt marker separates them
+const WORKER_MARKER = "You are an autonomous worker agent operating INSIDE";
+
+type FileAgg = { mtimeMs: number; size: number; days: Record<string, Record<string, Bucket>> | null };
 const fileCache = new Map<string, FileAgg>();
 
 function slug(dir: string): string {
@@ -34,10 +38,11 @@ function costOf(model: string, b: { in: number; out: number; cacheWrite: number;
   return (b.in * p[0] + b.out * p[1] + b.cacheWrite * p[2] + b.cacheRead * p[3]) / 1_000_000;
 }
 
-function parseFile(file: string): Record<string, Record<string, Bucket>> {
+function parseFile(file: string, requireMarker: boolean): Record<string, Record<string, Bucket>> | null {
   const days: Record<string, Record<string, Bucket>> = {};
   let txt = "";
   try { txt = fs.readFileSync(file, "utf8"); } catch { return days; }
+  if (requireMarker && !txt.slice(0, 8000).includes(WORKER_MARKER)) return null;
   for (const line of txt.split("\n")) {
     if (!line.includes('"usage"')) continue;
     let j: any;
@@ -64,26 +69,47 @@ function parseFile(file: string): Record<string, Record<string, Bucket>> {
 }
 
 export function tokenStats() {
-  const dir = path.join(os.homedir(), ".claude", "projects", slug(JARVIS_DIR));
-  let files: string[] = [];
-  try { files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).map((f) => path.join(dir, f)); }
-  catch { return { days: [], totals: zero(), byModel: {}, note: "no transcripts found" }; }
+  const base = path.join(os.homedir(), ".claude", "projects");
+  const jarvisSlug = slug(JARVIS_DIR);
+  const projPrefix = slug(path.join(os.homedir(), "Documents", "Projects")) + "-";
+
+  // jarvis core: everything in the engine dir's transcripts (chat, ask
+  // workers, digest, triage, call notes, heartbeat). Project dirs: ONLY
+  // files carrying the code-worker prompt marker.
+  const scans: Array<{ dir: string; source: string; marker: boolean }> = [
+    { dir: path.join(base, jarvisSlug), source: "jarvis core", marker: false },
+  ];
+  try {
+    for (const d of fs.readdirSync(base))
+      if (d.startsWith(projPrefix) && d !== jarvisSlug)
+        scans.push({ dir: path.join(base, d), source: d.slice(projPrefix.length), marker: true });
+  } catch {}
 
   const merged: Record<string, Record<string, Bucket>> = {};
-  for (const f of files) {
-    let st: fs.Stats;
-    try { st = fs.statSync(f); } catch { continue; }
-    let agg = fileCache.get(f);
-    if (!agg || agg.mtimeMs !== st.mtimeMs || agg.size !== st.size) {
-      agg = { mtimeMs: st.mtimeMs, size: st.size, days: parseFile(f) };
-      fileCache.set(f, agg);
-    }
-    for (const [day, models] of Object.entries(agg.days))
-      for (const [model, b] of Object.entries(models)) {
-        const t = ((merged[day] ??= {})[model] ??= zero());
-        t.in += b.in; t.out += b.out; t.cacheWrite += b.cacheWrite; t.cacheRead += b.cacheRead;
-        t.turns += b.turns; t.cost += b.cost;
+  const bySource: Record<string, Bucket> = {};
+  for (const scan of scans) {
+    let files: string[] = [];
+    try { files = fs.readdirSync(scan.dir).filter((f) => f.endsWith(".jsonl")).map((f) => path.join(scan.dir, f)); }
+    catch { continue; }
+    for (const f of files) {
+      let st: fs.Stats;
+      try { st = fs.statSync(f); } catch { continue; }
+      let agg = fileCache.get(f);
+      if (!agg || agg.mtimeMs !== st.mtimeMs || agg.size !== st.size) {
+        agg = { mtimeMs: st.mtimeMs, size: st.size, days: parseFile(f, scan.marker) };
+        fileCache.set(f, agg);
       }
+      if (!agg.days) continue;   // non-worker session in a project dir
+      for (const [day, models] of Object.entries(agg.days))
+        for (const [model, b] of Object.entries(models)) {
+          const t = ((merged[day] ??= {})[model] ??= zero());
+          t.in += b.in; t.out += b.out; t.cacheWrite += b.cacheWrite; t.cacheRead += b.cacheRead;
+          t.turns += b.turns; t.cost += b.cost;
+          const sb = (bySource[scan.source] ??= zero());
+          sb.in += b.in; sb.out += b.out; sb.cacheWrite += b.cacheWrite; sb.cacheRead += b.cacheRead;
+          sb.turns += b.turns; sb.cost += b.cost;
+        }
+    }
   }
 
   const totals = zero();
@@ -104,5 +130,5 @@ export function tokenStats() {
       return { date, ...d };
     });
 
-  return { days, totals, byModel };
+  return { days, totals, byModel, bySource };
 }

@@ -239,7 +239,7 @@ function TokensSection() {
       <Heading
         id="tokens"
         title="Token usage"
-        desc="Aggregated from the local Claude Code transcripts every Jarvis run writes — chat, workers, digest, transcription notes, heartbeat. Costs are estimates from list prices; cache reads are the cheap ones."
+        desc="Aggregated from the local Claude Code transcripts every Jarvis run writes — chat, workers (including code workers inside your project folders), digest, transcription notes, heartbeat. Costs are estimates from list prices; cache reads are the cheap ones."
       />
       <div className="mb-3 grid grid-cols-3 gap-3">
         {tiles.map(([l, v, sub]) => (
@@ -258,6 +258,21 @@ function TokensSection() {
               {"  "}{b.turns} turns · {fmt(b.out)} out · ${b.cost.toFixed(2)}
             </span>
           ))}
+        </div>
+      )}
+      {data?.bySource && Object.keys(data.bySource).length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {Object.entries(data.bySource)
+            .sort(([, a]: any, [, b]: any) => b.cost - a.cost)
+            .map(([src, b]: [string, any]) => (
+              <span key={src} className={`rounded-full border px-3 py-[3px] text-[10px] ${
+                src === "jarvis core"
+                  ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
+                  : "border-[var(--line)] bg-[var(--surf-2)] text-[var(--dim)]"}`}>
+                <b className={src === "jarvis core" ? "" : "text-[var(--text)]"}>{src.length > 28 ? "…" + src.slice(-28) : src}</b>
+                {"  "}{b.turns} turns · ${b.cost.toFixed(2)}
+              </span>
+            ))}
         </div>
       )}
       {(data?.days ?? []).length > 0 && (
