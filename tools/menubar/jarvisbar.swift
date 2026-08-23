@@ -11,10 +11,14 @@ import AppKit
 // the port follows memory/settings/port.txt like everything else
 let jarvisDir = (Bundle.main.object(forInfoDictionaryKey: "JarvisDir") as? String) ?? ""
 func port() -> Int {
+    // same precedence as tools/services.sh: port.txt, else 4321
     let p = jarvisDir + "/memory/settings/port.txt"
-    if let s = try? String(contentsOfFile: p, encoding: .utf8),
-       let n = Int(s.trimmingCharacters(in: .whitespacesAndNewlines)) { return n }
-    return 4400
+    if let s = try? String(contentsOfFile: p, encoding: .utf8) {
+        let digits = s.components(separatedBy: .newlines).first?
+            .filter { $0.isNumber } ?? ""
+        if let n = Int(digits), n > 0 { return n }
+    }
+    return 4321
 }
 func base() -> String { "http://127.0.0.1:\(port())" }
 
@@ -53,7 +57,7 @@ func runTool(_ args: [String]) {
 }
 
 func openPage(_ path: String) {
-    if let u = URL(string: base() + path) { NSWorkspace.shared.open(u) }
+    if let u = URL(string: "http://localhost:\(port())" + path) { NSWorkspace.shared.open(u) }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
