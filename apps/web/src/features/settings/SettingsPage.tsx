@@ -79,6 +79,9 @@ function TopicsSection() {
   }
   const [newName, setNewName] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
+  // same rules as the server's badName: topics become vault filenames
+  const badChar = /[/\\[\]#|]/.test(newName);
+  const nameOk = newName.trim().length > 0 && newName.trim().length <= 60 && !badChar;
   const post = async (url: string, body: object) => {
     await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
     qc.invalidateQueries({ queryKey: ["topics"] });
@@ -96,15 +99,23 @@ function TopicsSection() {
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
+          onKeyDown={(e) => { if (e.key === "Enter" && nameOk) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
           placeholder="New topic (Title Case, 1-3 words)…"
           className="w-[260px] rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--indigo-3)]"
         />
         <button
-          onClick={() => { if (newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
-          className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-3 py-1 font-sans text-[12px] text-[var(--indigo)] hover:bg-[var(--indigo-3)]"
+          onClick={() => { if (nameOk) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
+          disabled={!nameOk}
+          className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-3 py-1 font-sans text-[12px] text-[var(--indigo)] hover:bg-[var(--indigo-3)] disabled:cursor-default disabled:opacity-40"
         >＋ Add</button>
       </div>
+      {newName && !nameOk && (
+        <p className="mb-3 -mt-1 font-sans text-[10.5px] text-[var(--amber)]">
+          {badChar
+            ? <>Topic names can't contain <code>/ \ [ ] # |</code> — they become vault filenames.</>
+            : "Topic names max out at 60 characters."}
+        </p>
+      )}
       <div className="flex max-w-[680px] flex-wrap gap-1.5">
         {sorted.map((t) => (
           <span key={t.name} className="group flex items-center gap-1.5 rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-2.5 py-[3px] font-sans text-[11.5px] text-[var(--text)]">
