@@ -115,7 +115,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let btn = item.button else { return }
         let sym = recording ? "waveform.circle.fill" : "waveform.circle"
         let img = NSImage(systemSymbolName: sym, accessibilityDescription: "Jarvis")
-        img?.isTemplate = !recording
+        // ALWAYS template: tinting only applies to template images — a
+        // non-template symbol renders black on any menu bar appearance
+        img?.isTemplate = true
         btn.image = img
         if recording {
             btn.contentTintColor = .systemRed
