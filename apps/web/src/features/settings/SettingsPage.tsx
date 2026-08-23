@@ -36,7 +36,7 @@ const VOICE_MODES: Array<{ key: S.VoiceMode; title: string; desc: string; warn?:
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8">
-      <h2 className="mb-3 border-b border-[var(--line)] pb-1 text-[11px] uppercase tracking-[1.5px] text-[var(--cyan)]">
+      <h2 className="mb-3 border-b border-[var(--line)] pb-1 text-[10px] uppercase tracking-[2px] text-[var(--dim)]">
         {title}
       </h2>
       {children}
@@ -86,12 +86,12 @@ function TopicsSection() {
         />
         <button
           onClick={() => { if (newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
-          className="rounded-full border border-[rgba(57,215,255,.4)] px-3 py-1 font-sans text-[12px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.08)]"
+          className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-3 py-1 font-sans text-[12px] text-[var(--indigo)] hover:bg-[var(--indigo-3)]"
         >＋ Add</button>
       </div>
       <div className="flex max-w-[680px] flex-wrap gap-1.5">
         {sorted.map((t) => (
-          <span key={t.name} className="group flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-2.5 py-[3px] font-sans text-[11.5px] text-[var(--text)]">
+          <span key={t.name} className="group flex items-center gap-1.5 rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-2.5 py-[3px] font-sans text-[11.5px] text-[var(--text)]">
             {t.name}
             <span className="text-[10px] text-[var(--dim)]">{counts.get(t.name) ?? 0}</span>
             <button title="Rename / merge into another topic" onClick={() => setRenaming(t.name)}
@@ -147,7 +147,7 @@ export function SettingsPage() {
   return (
     <div className="mx-auto h-full max-w-[680px] overflow-auto px-6 py-8 font-sans">
       <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="text-2xl text-[var(--bright)]">Settings</h1>
+        <h1 className="text-2xl font-semibold text-[var(--bright)] [font-family:var(--display)]">Settings</h1>
         <span
           className={`flex items-center gap-1 text-xs text-[var(--green)] transition-opacity ${saved ? "opacity-100" : "opacity-0"}`}
         >
@@ -163,8 +163,8 @@ export function SettingsPage() {
               onClick={() => patch.mutate({ voiceMode: m.key })}
               className={`rounded-xl border p-4 text-left transition ${
                 settings.voiceMode === m.key
-                  ? "border-[rgba(57,215,255,.5)] bg-[rgba(57,215,255,.07)]"
-                  : "border-[var(--line)] hover:border-[rgba(57,215,255,.3)]"
+                  ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                  : "border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)]"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export function SettingsPage() {
       </Section>
 
       <Section title="Call recording">
-        <label className="flex items-center justify-between rounded-xl border border-[var(--line)] p-4">
+        <label className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
           <span>
             <span className="block text-[13px] font-semibold text-[var(--bright)]">
               Auto-record calls
@@ -206,8 +206,8 @@ export function SettingsPage() {
             onClick={() => patch.mutate({ autorecord: !settings.autorecord })}
             className={`relative h-[22px] w-[42px] shrink-0 rounded-full border transition ${
               settings.autorecord
-                ? "border-[rgba(57,215,255,.5)] bg-[rgba(57,215,255,.25)]"
-                : "border-[var(--line)] bg-[rgba(95,137,173,.2)]"
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                : "border-[var(--line)] bg-[var(--surf-2)]"
             }`}
           >
             <span
@@ -221,7 +221,7 @@ export function SettingsPage() {
         </label>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <label className="rounded-xl border border-[var(--line)] p-4">
+          <label className="rounded-xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
             <span className="block text-[13px] font-semibold text-[var(--bright)]">
               Transcription model
             </span>
@@ -236,7 +236,7 @@ export function SettingsPage() {
               <option value="small">small (faster)</option>
             </select>
           </label>
-          <label className="rounded-xl border border-[var(--line)] p-4">
+          <label className="rounded-xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
             <span className="block text-[13px] font-semibold text-[var(--bright)]">
               Keep call audio
             </span>
@@ -282,7 +282,7 @@ export function SettingsPage() {
       <Section title="Diagnostics">
         <a
           href="/logs"
-          className="block rounded-xl border border-[var(--line)] p-4 transition hover:border-[rgba(57,215,255,.4)]"
+          className="block rounded-xl border border-[var(--line)] bg-[var(--surf)] p-4 transition [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)]"
         >
           <span className="block text-[13px] font-semibold text-[var(--bright)]">
             Activity &amp; logs →
