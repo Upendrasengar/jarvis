@@ -16,11 +16,13 @@ import { chatRoutes } from "./routes/chat.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { logRoutes } from "./routes/logs.js";
 import { noteRoutes } from "./routes/notes.js";
+import { reminderRoutes } from "./routes/reminders.js";
 import { addClient, startWatching } from "./live/liveState.js";
 import { startWatchdog } from "./integrations/watchdog.js";
 import { startTelegram } from "./integrations/telegram.js";
 import { startDigestCron } from "./integrations/digestCron.js";
 import { startCalendar } from "./integrations/calendar.js";
+import { startReminders } from "./integrations/reminders.js";
 
 // bodyLimit raised for pasted screenshots (4 × ~7MB data URLs)
 const app = Fastify({ logger: { level: "warn" }, bodyLimit: 32 * 1024 * 1024 });
@@ -37,6 +39,7 @@ startWatchdog();
 startTelegram();
 startDigestCron();
 startCalendar();
+startReminders();
 
 callRoutes(app);
 contentRoutes(app);
@@ -45,6 +48,7 @@ chatRoutes(app);
 settingsRoutes(app);
 logRoutes(app);
 noteRoutes(app);
+reminderRoutes(app);
 
 // Serve the built React app when it exists (production). SPA fallback: any
 // non-API GET renders index.html and the client router takes over.

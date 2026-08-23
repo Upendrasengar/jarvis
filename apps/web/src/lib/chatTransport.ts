@@ -6,6 +6,7 @@ export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[] };
 
 const TX_KEY = (sid: string) => "jarvis_tx_" + sid;
 const DELEGATE_RE = /ACTION:DELEGATE\s*(\{[\s\S]*?\})\s*/;
+const REMIND_RE = /ACTION:REMIND\s*(\{[\s\S]*?\})\s*/;
 
 export function loadTranscript(sid: string): Msg[] {
   try { return JSON.parse(localStorage.getItem(TX_KEY(sid)) ?? "[]"); } catch { return []; }
@@ -38,7 +39,7 @@ export async function streamChatTurn(
 ): Promise<string> {
   let full = "";
   let delegated = false;
-  const visible = () => full.replace(DELEGATE_RE, "").trimEnd();
+  const visible = () => full.replace(DELEGATE_RE, "").replace(REMIND_RE, "").trimEnd();
 
   const maybeDelegate = () => {
     if (delegated) return;
@@ -52,6 +53,22 @@ export async function streamChatTurn(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(d),
+      }).catch(() => {});
+    } catch {}
+  };
+
+  let reminded = false;
+  const maybeRemind = () => {
+    if (reminded) return;
+    const rm = full.match(REMIND_RE);
+    if (!rm) return;
+    reminded = true;
+    try {
+      const r = JSON.parse(rm[1]);
+      fetch("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: r.name, schedule: r.schedule, message: r.message }),
       }).catch(() => {});
     } catch {}
   };
@@ -82,6 +99,7 @@ export async function streamChatTurn(
       if (ev === "done") continue;
       full += JSON.parse(data);
       maybeDelegate();
+      maybeRemind();
       onText?.(visible() || "…");
     }
   }

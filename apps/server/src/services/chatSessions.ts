@@ -24,6 +24,9 @@ const CONCISE =
   'ACTION:DELEGATE {"type":"ask","project":"<project name or empty>","task":"<clear self-contained instructions>"}\n' +
   'Types: "ask" = read-only lookups, recall, digests, questions about the user\'s files/vaults; "code" = change code in a specific project (worker branches safely); "note" = the user asks you to REMEMBER/save/note something durable — put the fact to remember in task, and it\'s written to your memory vault; "voice" = the user asks to change your speaking voice — put the voice name or ID in task (it applies immediately, no restart, so just confirm it\'s done — never mention servers or IDs out loud).\n' +
   "You have a growing memory vault; recall lookups can read it, so things you were told to remember can be recalled later.\n" +
+  "3) If the user asks to be REMINDED of something, or wants a recurring nudge/check-in (\"remind me\", \"every Monday tell me\", \"ping me at 5\"), say ONE short sentence confirming what and when, then on a NEW LINE emit EXACTLY:\n" +
+  'ACTION:REMIND {"name":"<short label>","schedule":<schedule>,"message":"<the nudge text to send>"}\n' +
+  'Where <schedule> is ONE of: {"kind":"at","at":"YYYY-MM-DD HH:MM"} for one-offs (LOCAL time, 24h — compute the concrete date from context, never placeholders), or {"kind":"cron","expr":"m h dom mon dow"} for recurring (local time, e.g. every weekday 9am = "0 9 * * 1-5"). The reminder arrives as a macOS notification and a Telegram message. Do not delegate reminder creation.\n' +
   "If a worker report contains a line starting with 'SOURCES:', reproduce that line VERBATIM as the final line of your reply — the interface renders it as links to the files; never read it aloud as part of a sentence and never reformat it.\n" +
   "CORE MEMORY: your owner's memory files are included below, loaded fresh when this session started. Questions about who your owner is, their role, team, colleagues, preferences, or active projects: answer DIRECTLY from them, no delegation. They are complete copies, not snippets.\n" +
   "CRITICAL: You do NOT need tools and it is BY DESIGN that you have none. NEVER tell the user that tools, file access, or the Agent tool are unavailable, and NEVER offer manual workarounds (sed, terminal commands, 'run this yourself'). Delegating IS how you read/write files and change config, and it always works. For anything NOT covered by the core memory below (vault notes, call notes, file or project contents, config), NEVER answer from guesswork — always DELEGATE to get complete, fresh data. If unsure whether you can answer from knowledge, delegate.\n" +
@@ -78,10 +81,13 @@ function spawnWarm(sessionId: string): Session {
     : [];
   if (UUID_RE.test(sessionId) && !known.has(sessionId)) { known.add(sessionId); persist(); }
 
+  // cost discipline: the reminders/heartbeat session is a yes/no judgement
+  // over server-gathered facts — Haiku territory. Conversations stay Sonnet.
+  const model = sessionId === "reminders" ? "haiku" : "sonnet";
   const child = spawn(CLAUDE, [
     "-p", "--verbose",
     "--input-format", "stream-json", "--output-format", "stream-json",
-    "--include-partial-messages", "--model", "sonnet",
+    "--include-partial-messages", "--model", model,
     ...sessArgs,
     "--append-system-prompt", CONCISE + memoryBrief(),
     "--disallowedTools", "Bash,Read,Edit,Write,Grep,Glob,WebFetch,WebSearch,Task,NotebookEdit",

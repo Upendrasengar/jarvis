@@ -9,6 +9,7 @@ import { readSecrets } from "../services/env.js";
 import { sendTurn } from "../services/chatSessions.js";
 import { dispatchDelegate } from "../services/agents.js";
 import { onEvent } from "../live/liveState.js";
+import { createFromAction, setReminderSender } from "./reminders.js";
 
 const SESSION = "telegram";
 const DELIVER_PROMPT =
@@ -50,6 +51,12 @@ function runTurn(message: string): Promise<string> {
         if (m) {
           try { dispatchDelegate(JSON.parse(m[1]), SESSION); } catch {}
           out = out.replace(m[0], "").trim() || "On it — I'll message you when it's done.";
+        }
+        const rm = out.match(/^ACTION:REMIND\s+(\{.*\})\s*$/m);
+        if (rm) {
+          let note = "Reminder set.";
+          try { createFromAction(JSON.parse(rm[1])); } catch { note = "I couldn't set that reminder — try rephrasing the time."; }
+          out = out.replace(rm[0], "").trim() || note;
         }
         resolve(out);
       },
@@ -103,6 +110,7 @@ export function startTelegram() {
     if (e?.type === "worker-result" && e?.sessionId === SESSION)
       runTurn(DELIVER_PROMPT).then(say).catch(() => {});
   });
+  setReminderSender(say);   // reminders fire through the same owner chat
   void pollLoop();
   console.log("[telegram] listening (long-poll)");
 }
