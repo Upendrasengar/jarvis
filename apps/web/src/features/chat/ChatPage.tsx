@@ -28,7 +28,7 @@ function SourceChips({ sources }: { sources: { to: string; label: string }[] }) 
         <Link
           key={i}
           to={s.to}
-          className="rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-2 py-[2px] text-[10.5px] text-[var(--cyan)] no-underline hover:border-[var(--cyan)]"
+          className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-2 py-[2px] font-sans text-[10.5px] text-[var(--cyan)] no-underline hover:border-[var(--cyan)]"
         >
           {s.label}
         </Link>
@@ -155,7 +155,7 @@ export function ChatPage() {
     <div className="relative mx-auto flex h-full max-w-[780px] flex-col px-6 py-4">
       {messages.length === 0 && (
         <div className="absolute inset-x-6 bottom-[120px] top-0 z-10 flex flex-col items-center justify-center gap-2 text-center">
-          <span className="blip h-[11px] w-[11px] rounded-full bg-[var(--cyan)] shadow-[0_0_18px_var(--cyan),0_0_44px_rgba(57,215,255,.35)]" />
+          <span className="blip h-[11px] w-[11px] rounded-full bg-[var(--cyan)] shadow-[0_0_18px_var(--cyan),0_0_44px_var(--cyan-3)]" />
           <div className="mt-2 font-sans text-[17px] font-semibold text-[var(--text)]">Channel open</div>
           <div className="text-[9.5px] uppercase tracking-[1.8px] text-[var(--dim)]">
             Projects · calls · second brain — type, or just talk
@@ -165,7 +165,7 @@ export function ChatPage() {
               <button
                 key={q}
                 onClick={() => submit(q)}
-                className="rounded-xl border border-[var(--line)] bg-[var(--chipbg)] px-3 py-3 text-left text-[11px] text-[var(--dim)] transition hover:-translate-y-px hover:border-[rgba(57,215,255,.45)] hover:text-[var(--cyan)]"
+                className="rounded-xl border border-[var(--line)] bg-[var(--surf)] px-3 py-3 text-left font-sans text-[11.5px] text-[var(--dim)] transition [box-shadow:var(--shadow)] hover:-translate-y-px hover:border-[var(--cyan-3)] hover:text-[var(--cyan)]"
               >
                 {q}
               </button>
@@ -183,12 +183,12 @@ export function ChatPage() {
           return m.c === "me" ? (
             <div
               key={i}
-              className="mt-4 max-w-[76%] self-end whitespace-pre-wrap rounded-[16px_16px_5px_16px] border border-[rgba(57,215,255,.22)] bg-[rgba(57,215,255,.10)] px-[14px] py-[10px] font-sans text-[13.5px] leading-relaxed shadow-[0_3px_14px_rgba(0,0,0,.22)]"
+              className="mt-4 max-w-[76%] self-end whitespace-pre-wrap rounded-[18px_18px_6px_18px] border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-[14px] py-[10px] font-sans text-[13.5px] leading-relaxed [box-shadow:var(--shadow)]"
             >
               {m.imgs?.length ? (
                 <span className="mb-2 flex flex-wrap gap-2">
                   {m.imgs.map((src, k) => (
-                    <img key={k} src={src} alt="pasted" className="max-h-36 rounded-lg border border-[rgba(57,215,255,.25)]" />
+                    <img key={k} src={src} alt="pasted" className="max-h-36 rounded-lg border border-[var(--cyan-3)]" />
                   ))}
                 </span>
               ) : null}
@@ -234,7 +234,7 @@ export function ChatPage() {
             ))}
           </div>
         )}
-        <div className="flex items-center gap-[6px] rounded-2xl border border-[var(--line)] bg-[var(--field)] p-[6px] backdrop-blur-lg transition focus-within:border-[rgba(57,215,255,.55)] focus-within:shadow-[0_0_22px_rgba(57,215,255,.15)]">
+        <div className="flex items-center gap-[6px] rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-[6px] transition [box-shadow:var(--shadow)] focus-within:border-[var(--cyan-3)]">
           <button
             onClick={mic}
             title="Click to speak"
@@ -279,7 +279,7 @@ export function ChatPage() {
             onClick={() => submit()}
             disabled={streaming}
             title="Send"
-            className="h-[38px] w-[38px] shrink-0 rounded-full bg-gradient-to-br from-[var(--cyan)] to-[#7ae7ff] text-[15px] font-extrabold text-[#02121a] hover:shadow-[0_0_16px_rgba(57,215,255,.5)] disabled:opacity-50"
+            className="h-[38px] w-[38px] shrink-0 rounded-full bg-[var(--cyan)] text-[15px] font-extrabold text-[#02121a] transition hover:shadow-[0_0_16px_var(--cyan-3)] disabled:opacity-50"
           >
             ❯
           </button>

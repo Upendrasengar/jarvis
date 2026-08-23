@@ -1,6 +1,8 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // ⚙ Settings — voice listening modes, call recording, transcription, speech
 // voice. Non-secret preferences only; changes auto-save with a saved tick.
+// v2 layout: a SETTINGS section rail on the left scrolls the single content
+// column; each section is a display-face heading + cards.
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
@@ -14,33 +16,45 @@ function useVoices() {
   });
 }
 
-const VOICE_MODES: Array<{ key: S.VoiceMode; title: string; desc: string; warn?: string }> = [
+const VOICE_MODES: Array<{ key: S.VoiceMode; title: string; desc: string; warn?: string; icon: string }> = [
   {
     key: "on-demand",
     title: "On-demand",
     desc: "Click the mic, say one thing, it stops. Nothing is captured unless you ask.",
+    icon: "M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z M6 11a6 6 0 0 0 12 0 M12 17v4",
   },
   {
     key: "wake-word",
-    title: "Wake word — “Jarvis”",
-    desc: "The mic stays open, but only sentences starting with “Jarvis …” are sent — everything else is discarded locally. After Jarvis replies, it keeps listening ~8s so you can continue without re-waking.",
+    title: "Wake word",
+    desc: "Mic stays open, but only sentences starting with “Jarvis …” are sent — everything else is discarded locally. Keeps listening ~8s after a reply.",
+    icon: "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   },
   {
     key: "conversation",
     title: "Conversation",
-    desc: "The mic stays open and everything you say goes to Jarvis. Best for a focused back-and-forth session.",
+    desc: "Mic stays open and everything you say goes to Jarvis. Best for a focused back-and-forth session.",
     warn: "Careful in meetings — every spoken sentence becomes a query.",
+    icon: "M4 5h16v11H10l-5 4v-4H4z",
   },
 ];
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const SECTIONS: Array<{ id: string; label: string }> = [
+  { id: "voice", label: "Voice" },
+  { id: "recording", label: "Call recording" },
+  { id: "speaking", label: "Speaking voice" },
+  { id: "diagnostics", label: "Diagnostics" },
+  { id: "topics", label: "Topics" },
+];
+
+function Heading({ id, title, desc, right }: { id: string; title: string; desc?: string; right?: React.ReactNode }) {
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 border-b border-[var(--line)] pb-1 text-[11px] uppercase tracking-[1.5px] text-[var(--cyan)]">
-        {title}
-      </h2>
-      {children}
-    </section>
+    <div id={id} className="mb-4 scroll-mt-6 pt-2">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-[22px] font-semibold text-[var(--bright)] [font-family:var(--display)]">{title}</h2>
+        {right}
+      </div>
+      {desc && <p className="mt-1 max-w-[640px] font-sans text-[12.5px] leading-relaxed text-[var(--dim)]">{desc}</p>}
+    </div>
   );
 }
 
@@ -70,28 +84,28 @@ function TopicsSection() {
   };
   const sorted = [...topics].sort((a, b) => (counts.get(b.name) ?? 0) - (counts.get(a.name) ?? 0));
   return (
-    <Section title="Topics — the knowledge-graph vocabulary">
-      <p className="mb-3 font-sans text-[11.5px] text-[var(--dim)]">
-        Calls and notes are tagged with these topics ([[wikilinks]] in your brain vault). The
-        summarizer strongly prefers this list, so curating it keeps the graph tidy. Renaming a
-        topic MERGES it — every link across your calls and notes is rewritten.
-      </p>
+    <section className="mb-12">
+      <Heading
+        id="topics"
+        title="Topics"
+        desc="The knowledge-graph vocabulary. Calls and notes are tagged with these topics ([[wikilinks]] in your brain vault); the summarizer strongly prefers this list, so curating it keeps the graph tidy. Renaming a topic MERGES it — every link across your calls and notes is rewritten."
+      />
       <div className="mb-3 flex gap-2">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
           placeholder="New topic (Title Case, 1-3 words)…"
-          className="w-[260px] rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+          className="w-[260px] rounded-full border border-[var(--line)] bg-[var(--field)] px-3 py-1 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--indigo-3)]"
         />
         <button
           onClick={() => { if (newName.trim()) { post("/api/topics", { name: newName.trim() }); setNewName(""); } }}
-          className="rounded-full border border-[rgba(57,215,255,.4)] px-3 py-1 font-sans text-[12px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.08)]"
+          className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-3 py-1 font-sans text-[12px] text-[var(--indigo)] hover:bg-[var(--indigo-3)]"
         >＋ Add</button>
       </div>
       <div className="flex max-w-[680px] flex-wrap gap-1.5">
         {sorted.map((t) => (
-          <span key={t.name} className="group flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-2.5 py-[3px] font-sans text-[11.5px] text-[var(--text)]">
+          <span key={t.name} className="group flex items-center gap-1.5 rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-2.5 py-[3px] font-sans text-[11.5px] text-[var(--text)]">
             {t.name}
             <span className="text-[10px] text-[var(--dim)]">{counts.get(t.name) ?? 0}</span>
             <button title="Rename / merge into another topic" onClick={() => setRenaming(t.name)}
@@ -110,7 +124,7 @@ function TopicsSection() {
         onSubmit={(v: string) => { if (renaming && v.trim()) post("/api/topics/rename", { from: renaming, to: v.trim() }); setRenaming(null); }}
         onClose={() => setRenaming(null)}
       />
-    </Section>
+    </section>
   );
 }
 
@@ -119,6 +133,7 @@ export function SettingsPage() {
   const { data: voices } = useVoices();
   const qc = useQueryClient();
   const [saved, setSaved] = useState(false);
+  const [section, setSection] = useState("voice");
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const patch = useMutation({
@@ -144,162 +159,198 @@ export function SettingsPage() {
   if (!settings)
     return <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>;
 
-  return (
-    <div className="mx-auto h-full max-w-[680px] overflow-auto px-6 py-8 font-sans">
-      <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="text-2xl text-[var(--bright)]">Settings</h1>
-        <span
-          className={`flex items-center gap-1 text-xs text-[var(--green)] transition-opacity ${saved ? "opacity-100" : "opacity-0"}`}
-        >
-          ✓ Saved
-        </span>
-      </div>
+  const jump = (id: string) => {
+    setSection(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
-      <Section title="Voice listening">
-        <div className="flex flex-col gap-2">
-          {VOICE_MODES.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => patch.mutate({ voiceMode: m.key })}
-              className={`rounded-xl border p-4 text-left transition ${
-                settings.voiceMode === m.key
-                  ? "border-[rgba(57,215,255,.5)] bg-[rgba(57,215,255,.07)]"
-                  : "border-[var(--line)] hover:border-[rgba(57,215,255,.3)]"
-              }`}
-            >
-              <div className="flex items-center gap-2">
+  return (
+    <div className="flex h-full font-sans">
+      {/* section rail */}
+      <aside className="flex w-[200px] shrink-0 flex-col overflow-auto border-r border-[var(--line)] bg-[var(--surf)] px-4 py-8">
+        <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">SETTINGS</div>
+        {SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => jump(s.id)}
+            className={`mb-1 w-full rounded-lg border px-3 py-[7px] text-left text-[12px] ${
+              section === s.id
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
+                : "border-transparent text-[var(--dim)] hover:bg-[var(--surf-2)] hover:text-[var(--bright)]"}`}
+          >
+            {s.label}
+          </button>
+        ))}
+        <p className="mt-6 px-1 text-[11px] leading-relaxed text-[var(--dim)]">
+          Non-secret preferences only. Changes auto-save.
+        </p>
+      </aside>
+
+      {/* content */}
+      <div className="min-w-0 flex-1 overflow-auto px-10 py-8">
+        <div className="mx-auto max-w-[820px]">
+          <section className="mb-12">
+            <Heading
+              id="voice"
+              title="Voice"
+              desc="How Jarvis listens. In the open-mic modes it keeps listening through silence, mutes itself while speaking, and tells the call recorder the hot mic is voice control."
+              right={
+                <span className={`flex items-center gap-1 text-xs text-[var(--green)] transition-opacity ${saved ? "opacity-100" : "opacity-0"}`}>
+                  ✓ SAVED
+                </span>
+              }
+            />
+            <div className="grid gap-3 md:grid-cols-3">
+              {VOICE_MODES.map((m) => {
+                const active = settings.voiceMode === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => patch.mutate({ voiceMode: m.key })}
+                    className={`rounded-2xl border p-4 text-left transition ${
+                      active
+                        ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                        : "border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)]"}`}
+                  >
+                    <div className="mb-3 flex items-start justify-between">
+                      <span className={`flex h-[34px] w-[34px] items-center justify-center rounded-lg ${active ? "bg-[var(--cyan-3)] text-[var(--cyan)]" : "bg-[var(--surf-2)] text-[var(--dim)]"}`}>
+                        <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+                          <path d={m.icon} />
+                        </svg>
+                      </span>
+                      <span
+                        className={`mt-1 h-3 w-3 rounded-full border ${
+                          active
+                            ? "border-[var(--cyan)] bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"
+                            : "border-[var(--dim)]"}`}
+                      />
+                    </div>
+                    <div className="text-[13.5px] font-semibold text-[var(--bright)]">{m.title}</div>
+                    <div className="mt-1 text-xs leading-relaxed text-[var(--dim)]">{m.desc}</div>
+                    {m.warn && <div className="mt-2 text-xs leading-relaxed text-[var(--amber)]">{m.warn}</div>}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mb-12">
+            <Heading id="recording" title="Call recording" />
+            <label className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+              <span>
+                <span className="block text-[13px] font-semibold text-[var(--bright)]">
+                  Auto-record calls
+                </span>
+                <span className="text-xs text-[var(--dim)]">
+                  Detect meetings (browser tabs, Teams desktop, Teams web) and record automatically.
+                  The Record button always works regardless.
+                </span>
+              </span>
+              <button
+                onClick={() => patch.mutate({ autorecord: !settings.autorecord })}
+                className={`relative h-[22px] w-[42px] shrink-0 rounded-full border transition ${
+                  settings.autorecord
+                    ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                    : "border-[var(--line)] bg-[var(--surf-2)]"
+                }`}
+              >
                 <span
-                  className={`h-3 w-3 rounded-full border ${
-                    settings.voiceMode === m.key
-                      ? "border-[var(--cyan)] bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"
-                      : "border-[var(--dim)]"
+                  className={`absolute top-[2px] h-4 w-4 rounded-full transition-all ${
+                    settings.autorecord
+                      ? "left-[22px] bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"
+                      : "left-[2px] bg-[var(--dim)]"
                   }`}
                 />
-                <span className="text-[13px] font-semibold text-[var(--bright)]">{m.title}</span>
-              </div>
-              <div className="mt-1 pl-5 text-xs leading-relaxed text-[var(--dim)]">{m.desc}</div>
-              {m.warn && (
-                <div className="mt-1 pl-5 text-xs text-[var(--amber)]">{m.warn}</div>
-              )}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-[var(--dim)]">
-          In the open-mic modes Jarvis keeps listening through silence, mutes itself while
-          speaking, and tells the call recorder the hot mic is voice control — so it can't be
-          mistaken for a Teams call.
-        </p>
-      </Section>
+              </button>
+            </label>
 
-      <Section title="Call recording">
-        <label className="flex items-center justify-between rounded-xl border border-[var(--line)] p-4">
-          <span>
-            <span className="block text-[13px] font-semibold text-[var(--bright)]">
-              Auto-record calls
-            </span>
-            <span className="text-xs text-[var(--dim)]">
-              Detect meetings (browser tabs, Teams desktop, Teams web) and record automatically.
-              The Record button always works regardless.
-            </span>
-          </span>
-          <button
-            onClick={() => patch.mutate({ autorecord: !settings.autorecord })}
-            className={`relative h-[22px] w-[42px] shrink-0 rounded-full border transition ${
-              settings.autorecord
-                ? "border-[rgba(57,215,255,.5)] bg-[rgba(57,215,255,.25)]"
-                : "border-[var(--line)] bg-[rgba(95,137,173,.2)]"
-            }`}
-          >
-            <span
-              className={`absolute top-[2px] h-4 w-4 rounded-full transition-all ${
-                settings.autorecord
-                  ? "left-[22px] bg-[var(--cyan)] shadow-[0_0_8px_var(--cyan)]"
-                  : "left-[2px] bg-[var(--dim)]"
-              }`}
-            />
-          </button>
-        </label>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+                <span className="block text-[13px] font-semibold text-[var(--bright)]">
+                  Transcription model
+                </span>
+                <span className="text-[10.5px] text-[var(--dim)]">medium = better names, ~3× slower</span>
+                <select
+                  value={settings.whisperModel}
+                  onChange={(e) => patch.mutate({ whisperModel: e.target.value as "base" | "small" | "medium" })}
+                  className="mt-3 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+                >
+                  <option value="medium">medium (recommended)</option>
+                  <option value="base">base (fastest)</option>
+                  <option value="small">small (faster)</option>
+                </select>
+              </label>
+              <label className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+                <span className="block text-[13px] font-semibold text-[var(--bright)]">
+                  Keep call audio
+                </span>
+                <span className="text-[10.5px] text-[var(--dim)]">days before recordings are purged · 1–90</span>
+                <span className="mt-2 flex items-baseline gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={90}
+                    defaultValue={settings.retentionDays}
+                    onBlur={(e) => {
+                      const v = Math.min(90, Math.max(1, parseInt(e.target.value, 10) || 7));
+                      if (v !== settings.retentionDays) patch.mutate({ retentionDays: v });
+                    }}
+                    className="w-[84px] rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-1 text-[26px] font-semibold text-[var(--bright)] outline-none [font-family:var(--display)] focus:border-[var(--cyan)]"
+                  />
+                  <span className="text-[11px] text-[var(--dim)]">days</span>
+                </span>
+              </label>
+            </div>
+          </section>
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <label className="rounded-xl border border-[var(--line)] p-4">
-            <span className="block text-[13px] font-semibold text-[var(--bright)]">
-              Transcription model
-            </span>
-            <span className="text-xs text-[var(--dim)]">medium = better names, ~3× slower</span>
-            <select
-              value={settings.whisperModel}
-              onChange={(e) => patch.mutate({ whisperModel: e.target.value as "base" | "small" | "medium" })}
-              className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+          <section className="mb-12">
+            <Heading id="speaking" title="Speaking voice" />
+            <label className="block rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+              <span className="block text-[13px] font-semibold text-[var(--bright)]">
+                Jarvis's voice
+              </span>
+              <span className="text-[10.5px] text-[var(--dim)]">
+                ElevenLabs presets from memory/settings/voices.txt — applies immediately
+              </span>
+              <select
+                value={settings.voice}
+                onChange={(e) => patch.mutate({ voice: e.target.value })}
+                className="mt-3 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+              >
+                {!voices?.presets.includes(settings.voice) && (
+                  <option value={settings.voice}>{settings.voice}</option>
+                )}
+                {voices?.presets.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </label>
+          </section>
+
+          <section className="mb-12">
+            <Heading id="diagnostics" title="Diagnostics" />
+            <a
+              href="/logs"
+              className="block rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 transition [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)]"
             >
-              <option value="medium">medium (recommended)</option>
-              <option value="base">base (fastest)</option>
-              <option value="small">small (faster)</option>
-            </select>
-          </label>
-          <label className="rounded-xl border border-[var(--line)] p-4">
-            <span className="block text-[13px] font-semibold text-[var(--bright)]">
-              Keep call audio
-            </span>
-            <span className="text-xs text-[var(--dim)]">days before recordings are purged</span>
-            <input
-              type="number"
-              min={1}
-              max={90}
-              defaultValue={settings.retentionDays}
-              onBlur={(e) => {
-                const v = Math.min(90, Math.max(1, parseInt(e.target.value, 10) || 7));
-                if (v !== settings.retentionDays) patch.mutate({ retentionDays: v });
-              }}
-              className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
-            />
-          </label>
+              <span className="block text-[13px] font-semibold text-[var(--bright)]">
+                Activity &amp; logs →
+              </span>
+              <span className="text-xs text-[var(--dim)]">
+                Live view of what's running — recording, transcription, workers — with tailing logs,
+                so "transcribing…" is never a mystery.
+              </span>
+            </a>
+          </section>
+
+          <TopicsSection />
+
+          <p className="text-[11px] text-[var(--dim)]">
+            Model provider settings (OpenAI / Google for summarization) are planned — API keys will
+            live only in the gitignored <code>secrets/.env</code>, never in the repo.
+          </p>
         </div>
-      </Section>
-
-      <Section title="Speaking voice">
-        <label className="block rounded-xl border border-[var(--line)] p-4">
-          <span className="block text-[13px] font-semibold text-[var(--bright)]">
-            Jarvis's voice
-          </span>
-          <span className="text-xs text-[var(--dim)]">
-            ElevenLabs presets from memory/settings/voices.txt — applies immediately
-          </span>
-          <select
-            value={settings.voice}
-            onChange={(e) => patch.mutate({ voice: e.target.value })}
-            className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
-          >
-            {!voices?.presets.includes(settings.voice) && (
-              <option value={settings.voice}>{settings.voice}</option>
-            )}
-            {voices?.presets.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </label>
-      </Section>
-
-      <Section title="Diagnostics">
-        <a
-          href="/logs"
-          className="block rounded-xl border border-[var(--line)] p-4 transition hover:border-[rgba(57,215,255,.4)]"
-        >
-          <span className="block text-[13px] font-semibold text-[var(--bright)]">
-            Activity &amp; logs →
-          </span>
-          <span className="text-xs text-[var(--dim)]">
-            Live view of what's running — recording, transcription, workers — with tailing logs,
-            so "transcribing…" is never a mystery.
-          </span>
-        </a>
-      </Section>
-
-      <TopicsSection />
-
-      <p className="text-[11px] text-[var(--dim)]">
-        Model provider settings (OpenAI / Google for summarization) are planned — API keys will
-        live only in the gitignored <code>secrets/.env</code>, never in the repo.
-      </p>
+      </div>
     </div>
   );
 }

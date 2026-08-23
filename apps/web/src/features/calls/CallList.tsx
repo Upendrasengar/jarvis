@@ -5,19 +5,31 @@ import {
   callHost, callTitle, useAutorecord, useRecordingControls, useSetAutorecord,
 } from "./hooks";
 
-const DOT: Record<string, string> = {
-  recording: "bg-[var(--red)] shadow-[0_0_8px_var(--red)] blip",
-  processing: "bg-[var(--amber)] blip",
-  done: "bg-[var(--green)]",
-  failed: "bg-[var(--red)] opacity-60",
-  empty: "bg-[var(--red)] opacity-60",
+const CHIP: Record<string, { label: string; cls: string }> = {
+  recording: { label: "RECORDING", cls: "border-[rgba(255,107,132,.4)] bg-[rgba(255,107,132,.1)] text-[var(--red)] blip" },
+  processing: { label: "TRANSCRIBING", cls: "border-[rgba(255,201,92,.35)] bg-[rgba(255,201,92,.08)] text-[var(--amber)] blip" },
+  done: { label: "NOTES READY", cls: "border-[rgba(53,217,155,.3)] bg-[rgba(53,217,155,.08)] text-[var(--green)]" },
+  failed: { label: "NEEDS RERUN", cls: "border-[rgba(255,201,92,.35)] bg-[rgba(255,201,92,.08)] text-[var(--amber)]" },
+  empty: { label: "NO AUDIO", cls: "border-[var(--line)] text-[var(--dim)]" },
 };
-const STATUS_TXT: Record<string, string> = {
-  recording: "recording",
-  processing: "transcribing",
-  failed: "needs rerun",
-  empty: "no audio",
-};
+
+
+// "2026-08-21" → "AUG 21 · TODAY / YESTERDAY / N DAYS AGO"
+function dayLabel(day: string): string {
+  const d = new Date(day + "T00:00:00");
+  if (isNaN(d.getTime())) return day;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+  const md = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const rel = diff <= 0 ? "today" : diff === 1 ? "yesterday" : `${diff} days ago`;
+  return `${md} · ${rel}`;
+}
+
+function minutes(c: Call): number | null {
+  if (!c.ended) return null;
+  const ms = new Date(c.ended.replace(" ", "T")).getTime() - new Date(c.started.replace(" ", "T")).getTime();
+  return ms > 0 ? Math.round(ms / 60_000) : null;
+}
 
 export function CallList({
   calls, selected, onSelect,
@@ -38,24 +50,36 @@ export function CallList({
   let lastDay = "";
 
   return (
-    <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--chipbg)] p-3 backdrop-blur-lg">
+    <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] p-3">
+      <div className="flex items-center justify-between px-1 pt-1">
+        <h2 className="text-[18px] font-semibold text-[var(--bright)] [font-family:var(--display)]">Calls</h2>
+        {!anyRecording && (
+          <button
+            onClick={() => start.mutate()}
+            disabled={start.isPending}
+            className="rounded-full border border-[rgba(255,107,132,.35)] bg-[rgba(255,107,132,.08)] px-3 py-[5px] text-[9.5px] tracking-[1.5px] text-[var(--red)] transition hover:bg-[rgba(255,107,132,.16)] disabled:opacity-50"
+          >
+            {start.isPending ? "STARTING…" : "● RECORD"}
+          </button>
+        )}
+      </div>
       <input
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filter calls…"
-        className="w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-[11px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+        className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
       />
       <div
         title="When off, Jarvis never starts recording on its own — the Record button still works"
-        className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--chipbg)] px-3 py-2 text-[9px] tracking-[1.5px] text-[var(--dim)]"
+        className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surf-2)] px-3 py-2 text-[9px] tracking-[1.5px] text-[var(--dim)]"
       >
         <span>AUTO-RECORD CALLS</span>
         <button
           onClick={() => setAutorec.mutate(!autorec.data?.on)}
           className={`relative h-[18px] w-[34px] rounded-full border transition ${
             autorec.data?.on
-              ? "border-[rgba(57,215,255,.5)] bg-[rgba(57,215,255,.25)]"
-              : "border-[var(--line)] bg-[rgba(95,137,173,.2)]"
+              ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+              : "border-[var(--line)] bg-[var(--surf-2)]"
           }`}
         >
           <span
@@ -67,15 +91,6 @@ export function CallList({
           />
         </button>
       </div>
-      {!anyRecording && (
-        <button
-          onClick={() => start.mutate()}
-          disabled={start.isPending}
-          className="w-full rounded-lg border border-[rgba(255,92,122,.35)] bg-[rgba(255,92,122,.08)] py-2 text-[10px] tracking-[1.5px] text-[var(--red)] hover:bg-[rgba(255,92,122,.16)] disabled:opacity-50"
-        >
-          {start.isPending ? "STARTING…" : "● RECORD A CALL NOW"}
-        </button>
-      )}
       <div className="min-h-0 flex-1">
         {items.length === 0 && (
           <div className="mt-8 text-center text-[11px] text-[var(--dim)]">
@@ -87,29 +102,37 @@ export function CallList({
         {items.map((c) => {
           const day = c.started.slice(0, 10);
           const header = day !== lastDay ? (lastDay = day) : null;
-          const st = STATUS_TXT[c.status];
+          const chip = CHIP[c.status];
+          const mins = minutes(c);
           return (
             <div key={c.id}>
               {header && (
-                <div className="mx-1 mb-1 mt-3 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">
-                  {header}
+                <div className="mb-2 mt-3 rounded-md bg-[var(--surf-2)] px-3 py-[6px] text-[9.5px] font-semibold uppercase tracking-[2px] text-[var(--text)]">
+                  {dayLabel(header)}
                 </div>
               )}
               <button
                 onClick={() => onSelect(c.id)}
-                className={`mb-[3px] w-full rounded-lg border px-3 py-2 text-left transition ${
+                className={`mb-2 w-full rounded-xl border px-3 py-[10px] text-left transition ${
                   c.id === selected
-                    ? "border-[rgba(57,215,255,.35)] bg-[rgba(57,215,255,.08)]"
-                    : "border-transparent hover:bg-[rgba(57,215,255,.05)]"
+                    ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                    : "border-[var(--line)] bg-[var(--surf)] hover:bg-[var(--surf-2)]"
                 }`}
               >
-                <div className="truncate font-sans text-xs font-semibold text-[var(--bright)]">
+                <div className="flex items-center justify-between gap-2">
+                  {chip && (
+                    <span className={`rounded border px-[6px] py-[2px] text-[8px] tracking-[1.2px] ${chip.cls}`}>
+                      {chip.label}
+                    </span>
+                  )}
+                  <span className="shrink-0 text-[9.5px] text-[var(--dim)]">{c.started.slice(11, 16)}</span>
+                </div>
+                <div className="mt-[6px] font-sans text-[12.5px] font-semibold leading-snug text-[var(--bright)]">
                   {callTitle(c)}
                 </div>
-                <div className="mt-[3px] flex items-center gap-2 text-[10px] text-[var(--dim)]">
-                  <span className={`h-[7px] w-[7px] shrink-0 rounded-full ${DOT[c.status]}`} />
-                  {c.started.slice(11, 16)} · {callHost(c.url)}
-                  {st ? ` · ${st}` : ""}
+                <div className="mt-[6px] text-[9.5px] text-[var(--dim)]">
+                  {callHost(c.url)}
+                  {mins ? ` · ${mins}m` : ""}
                 </div>
               </button>
             </div>

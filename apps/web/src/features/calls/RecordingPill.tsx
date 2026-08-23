@@ -28,7 +28,7 @@ export function RecordingPill() {
     <button
       onClick={() => navigate(`/calls/${data.id}`)}
       title="Recording a call — click to open, ■ to stop & save"
-      className="group flex items-center gap-2 rounded-full border border-[rgba(255,92,122,.45)] bg-[rgba(255,92,122,.08)] px-3 py-[5px] text-[10px] font-bold tracking-[1.5px] text-[var(--red)] hover:shadow-[0_0_14px_rgba(255,92,122,.35)]"
+      className="group flex items-center gap-2 rounded-full border border-[rgba(255,107,132,.45)] bg-[rgba(255,107,132,.08)] px-3 py-[5px] text-[10px] font-bold tracking-[1.5px] text-[var(--red)] hover:shadow-[0_0_14px_rgba(255,107,132,.35)]"
     >
       <span className="blip h-[7px] w-[7px] rounded-full bg-current" />
       {stop.isPending ? "SAVING…" : `REC ${elapsed(data.started)}`}

@@ -59,7 +59,7 @@ export function HeaderVoice() {
       const st = stateRef.current;
       let level = 0;
       if (st === "thinking") {
-        x.fillStyle = "#ffcf5c";
+        x.fillStyle = "#ffc95c";
         for (let i = 0; i < 24; i++) {
           const on = Math.floor(t / 6) % 24;
           x.globalAlpha = i === on ? 1 : 0.25;
@@ -69,7 +69,7 @@ export function HeaderVoice() {
       } else if (st === "listening" && analyserRef.current) {
         const data = new Uint8Array(analyserRef.current.frequencyBinCount);
         analyserRef.current.getByteFrequencyData(data);
-        x.fillStyle = "#39d7ff";
+        x.fillStyle = "#22d3ee";
         const bars = 24;
         for (let i = 0; i < bars; i++) {
           const v = data[Math.floor((i / bars) * data.length)] / 255;
@@ -81,7 +81,7 @@ export function HeaderVoice() {
         // even while the recognition engine is mid-restart and deaf
         if (level > 0.25) lastVoiceRef.current = performance.now();
       } else if (st === "speaking") {
-        x.fillStyle = "#3ee08a";
+        x.fillStyle = "#35d99b";
         const bars = 24;
         level = 0.4 + 0.3 * Math.abs(Math.sin(t * 0.1));
         for (let i = 0; i < bars; i++) {
@@ -89,7 +89,7 @@ export function HeaderVoice() {
           x.fillRect((i / bars) * w, mid - bh / 2, w / bars - 2, bh);
         }
       } else {
-        x.fillStyle = "rgba(95,137,173,.5)";
+        x.fillStyle = "rgba(125,144,168,.5)";
         for (let i = 0; i < 24; i++) x.fillRect((i / 24) * w, mid - 1, 2, 2);
       }
       (window as any)._jarvisVoiceLevel = level;   // neural core breathes with this
@@ -401,7 +401,7 @@ export function HeaderVoice() {
     : "VOICE READY";
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--chipbg)] py-1 pl-1 pr-3">
+    <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surf-2)] py-1 pl-1 pr-3">
       <button
         onClick={onMicClick}
         title={
@@ -412,7 +412,7 @@ export function HeaderVoice() {
         className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border text-[14px] ${
           state === "listening"
             ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[#012] shadow-[0_0_18px_var(--cyan)]"
-            : "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.12)] text-[var(--cyan)]"
+            : "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
         }`}
       >
         🎙️
@@ -421,7 +421,7 @@ export function HeaderVoice() {
       <span
         className={`min-w-[64px] text-[9px] tracking-[1.5px] ${
           state === "listening"
-            ? "text-[var(--cyan)] [text-shadow:0_0_10px_rgba(57,215,255,.6)]"
+            ? "text-[var(--cyan)] [text-shadow:0_0_10px_var(--cyan-3)]"
             : state === "thinking"
               ? "text-[var(--amber)]"
               : state === "speaking"

@@ -1,7 +1,8 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
-// Command-center overview: daily-moving KPIs (each a door to its tab),
-// today's focus from the digest, git activity, live agents + recording,
-// today's calls, git activity — around the neural-core globe.
+// Command-center overview, redesign v2: left instrument stack (focus + KPI
+// tiles), the neural core center with a stats band beneath, right column of
+// needs-attention cards, today's meetings, and a live activity feed.
+// All behavior identical to main — presentation only.
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import * as S from "@jarvis/shared";
@@ -31,24 +32,22 @@ function useAgents() {
   });
 }
 
-function Panel({ title, tag, children }: { title: string; tag?: string; children: React.ReactNode }) {
+function Card({ title, tag, children, className = "" }: {
+  title: string; tag?: React.ReactNode; children: React.ReactNode; className?: string;
+}) {
   return (
-    <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 backdrop-blur-lg">
-      <h3 className="mb-2 flex justify-between text-[10px] uppercase tracking-[1.5px] text-[var(--cyan)]">
-        {title} <span className="text-[var(--dim)]">{tag}</span>
+    <div className={`min-h-0 overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)] ${className}`}>
+      <h3 className="mb-3 flex items-baseline justify-between text-[10px] uppercase tracking-[2px] text-[var(--dim)]">
+        <span className="text-[var(--text)]">{title}</span>
+        <span>{tag}</span>
       </h3>
       {children}
     </div>
   );
 }
 
-const Row = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-  <div
-    onClick={onClick}
-    className={`truncate border-b border-dashed border-[rgba(60,140,220,.1)] py-[5px] font-sans text-[12.5px] leading-relaxed text-[var(--text)] ${onClick ? "cursor-pointer hover:text-[var(--cyan)]" : ""}`}
-  >
-    {children}
-  </div>
+const Quiet = ({ children }: { children: React.ReactNode }) => (
+  <div className="py-1 font-sans text-[12.5px] leading-relaxed text-[var(--dim)]">{children}</div>
 );
 
 export function OverviewPage() {
@@ -117,165 +116,219 @@ export function OverviewPage() {
     .split("\n").filter((l) => /^\s*(\d+\.|[-*])\s+/.test(l))
     .map((l) => l.replace(/^\s*(\d+\.|[-*])\s+/, "").replace(/\*\*/g, "").trim()).slice(0, 3);
 
-  const kpis: Array<[string, string | number, string, string]> = [
-    ["Active Projects", s?.stats.activeProjects ?? "…", `of ${s?.stats.totalProjects ?? "…"}`, "/projects"],
-    ["Commits", s?.stats.commits7d ?? "…", "7 days", "/digest"],
-    ["Calls", todaysCalls.length, "today", "/calls"],
-    ["Open Actions", openActions, "from calls", "/actions"],
-    ["Brain Notes", s?.stats.notes ?? "…", `${s?.stats.links ?? "…"} links`, "/brain"],
-    ["Overdue", bucket.filter((r) => r.chips.some((c) => c.kind === "overdue")).length, "needs action", "/actions"],
+  const overdueCount = bucket.filter((r) => r.chips.some((c) => c.kind === "overdue")).length;
+  const tiles: Array<[string, string | number, string, string, string]> = [
+    ["Active Projects", s?.stats.activeProjects ?? "…", `of ${s?.stats.totalProjects ?? "…"}`, "/projects",
+      "M3 6h6l2 2h10v11H3z"],
+    ["Open Actions", openActions, "from calls", "/actions", "M13 2 6 14h5l-1 8 7-12h-5z"],
+    ["Overdue", overdueCount, overdueCount ? "needs action" : "all clear", "/actions",
+      "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z M12 8v4l3 2"],
   ];
 
   return (
-    <div className="grid h-full grid-cols-[300px_1fr_300px] grid-rows-[auto_1fr] gap-3 p-3">
-      <div className="col-span-3 grid grid-cols-6 gap-2">
-        {kpis.map(([lbl, val, sub, to]) => (
-          <button
-            key={lbl}
-            onClick={() => navigate(to)}
-            className="relative overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--panel)] p-[10px] text-left transition hover:-translate-y-[2px] hover:border-[rgba(57,215,255,.45)]"
-          >
-            <div className="text-[9px] uppercase tracking-[1.5px] text-[var(--dim)]">{lbl}</div>
-            <div className="mt-[2px] text-xl font-bold text-[var(--bright)]">{val}</div>
-            <div className="text-[10px] text-[var(--green)]">{sub}</div>
-          </button>
-        ))}
-      </div>
-
-      <div className="flex min-h-0 flex-col gap-3">
-        <Panel title="A-01 · Today's Focus" tag="FROM DIGEST">
-          {focus.length
-            ? focus.map((f, i) => (
-                <Link
-                  key={i}
-                  to="/digest"
-                  className="block whitespace-normal border-b border-dashed border-[rgba(60,140,220,.1)] py-[6px] font-sans text-[12.5px] leading-relaxed text-[var(--text)] no-underline hover:text-[var(--cyan)]"
-                >
-                  <b className="mr-2 text-[var(--cyan)]">{i + 1}</b>{f}
-                </Link>
-              ))
-            : <Row>No digest yet — ask Jarvis for one.</Row>}
-        </Panel>
-        <Panel title="A-02 · Needs Attention" tag="LIVE">
-          {bucket.length
-            ? bucket.map((r) => {
-                const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
-                return (
-                  <div key={idKey(r.item)} className="flex items-start gap-2 border-b border-dashed border-[rgba(60,140,220,.1)] py-[6px] font-sans text-[12.5px] leading-relaxed text-[var(--text)]">
-                    <button
-                      onClick={() => toggleCluster(r.cluster)}
-                      title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
-                      className="cursor-pointer text-[var(--cyan)]"
-                    >☐</button>
-                    <span className="min-w-0 flex-1">
-                      <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "").slice(0, 110)}
-                      {urgent && (
-                        <span className={`ml-1 text-[10px] font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
-                          {urgent.label}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })
-            : <Row>Nothing urgent — the ledger is calm.</Row>}
-        </Panel>
-      </div>
-
-      <div className="relative min-h-0">
-        <NeuralCore
-          status={{
-            recording: !!recording,
-            processing: calls.some((c) => c.status === "processing"),
-            agents: working.length,
-          }}
-        />
-      </div>
-
-      <div className="flex min-h-0 flex-col gap-3">
-        {cal?.enabled && (
-          <Panel title="Z-00 · Today" tag={String(meetings.length || "—")}>
-            {(() => {
-              if (!meetings.length) return <Row>No meetings today.</Row>;
-              const now = Date.now();
-              const phase = (e: any) =>
-                now > Date.parse(e.end || e.start) ? 2 : now >= Date.parse(e.start) ? 0 : 1;
-              const ordered = [...meetings].sort((a, b) =>
-                phase(a) - phase(b) || a.start.localeCompare(b.start));
-              const nextUp = ordered.find((e) => phase(e) === 1);
-              const dur = (e: any) => {
-                const m = Math.round((Date.parse(e.end || e.start) - Date.parse(e.start)) / 60_000);
-                return m >= 60 ? `${+(m / 60).toFixed(1)}h`.replace(".0", "") : `${m}m`;
-              };
-              const inLabel = (e: any) => {
-                const m = Math.round((Date.parse(e.start) - now) / 60_000);
-                return m < 60 ? `in ${m}m` : `in ${Math.round(m / 60)}h`;
-              };
-              return ordered.map((e, i) => {
-                const ph = phase(e);
-                const bar =
-                  ph === 0 ? "bg-[var(--red)]"
-                  : e === nextUp ? "bg-[var(--amber)]"
-                  : ph === 1 ? "bg-[var(--cyan-dim,#5b9ec4)]"
-                  : "bg-[var(--line)]";
-                return (
-                  <div
+    <div className="flex h-full flex-col gap-3 p-3">
+      <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr_320px] gap-3">
+        {/* ── left: focus + instrument stack ── */}
+        <div className="flex min-h-0 flex-col gap-3">
+          <Card title="Today's Focus" tag="FROM DIGEST" className="flex-1">
+            {focus.length
+              ? focus.map((f, i) => (
+                  <Link
                     key={i}
-                    onClick={() => prepMe(e)}
-                    className={`flex cursor-pointer gap-2 border-b border-dashed border-[rgba(60,140,220,.1)] py-[6px] hover:bg-[rgba(57,215,255,.04)] ${ph === 2 ? "opacity-40" : ""}`}
+                    to="/digest"
+                    className="group mb-2 block rounded-lg border-l-2 border-[var(--cyan-3)] bg-[var(--surf-2)] px-3 py-[8px] font-sans text-[12.5px] leading-relaxed text-[var(--text)] no-underline transition hover:border-[var(--cyan)]"
                   >
-                    <span className="w-[42px] shrink-0 text-right">
-                      <b className="block text-[11.5px] leading-tight text-[var(--text)]">{localTime(e.start)}</b>
-                      <span className="block text-[9.5px] text-[var(--dim)]">{dur(e)}</span>
-                    </span>
-                    <span className={`w-[3px] shrink-0 self-stretch rounded-full ${bar}`} />
-                    <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-snug text-[var(--text)]">
-                      <span className="block truncate">{e.subject}</span>
-                      <span className="block text-[10px] text-[var(--dim)]">
-                        {ph === 0 && <span className="blip font-medium text-[var(--red)]">now</span>}
-                        {ph === 1 && e === nextUp && <span className="font-medium text-[var(--amber)]">{inLabel(e)}</span>}
-                        {(ph === 0 || (ph === 1 && e === nextUp)) && e.attendees?.length > 0 && " · "}
-                        {e.attendees?.length > 0 && `${e.attendees.length} people`}
-                      </span>
-                    </span>
-                  </div>
-                );
-              });
-            })()}
-          </Panel>
-        )}
-        <Panel title="Z-01 · Live Now" tag={`${working.length}/${agents.length}`}>
-          {recording && (
-            <div
-              onClick={() => navigate(`/calls/${recording.id}`)}
-              className="blip mb-2 cursor-pointer rounded-lg border border-[rgba(255,92,122,.4)] bg-[rgba(255,92,122,.08)] px-3 py-2 text-[11px] text-[var(--red)]"
+                    {f}
+                  </Link>
+                ))
+              : <Quiet>No digest yet — ask Jarvis for one.</Quiet>}
+          </Card>
+          {tiles.map(([lbl, val, sub, to, icon]) => (
+            <button
+              key={lbl}
+              onClick={() => navigate(to)}
+              className="flex shrink-0 items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 text-left transition [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)]"
             >
-              ● recording a call now — tap to open
-            </div>
+              <span>
+                <span className="block text-[9.5px] uppercase tracking-[2px] text-[var(--dim)]">{lbl}</span>
+                <span className="mt-1 flex items-baseline gap-2">
+                  <span className="text-[28px] font-semibold leading-none text-[var(--bright)] [font-family:var(--display)]">{val}</span>
+                  <span className="font-sans text-[11px] text-[var(--dim)]">{sub}</span>
+                </span>
+              </span>
+              <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-[var(--indigo-2)] text-[var(--indigo)]">
+                <svg viewBox="0 0 24 24" className="h-[14px] w-[14px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+                  <path d={icon} />
+                </svg>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* ── center: the core (untouched per D1) ── */}
+        <div className="relative min-h-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)]">
+          <NeuralCore
+            status={{
+              recording: !!recording,
+              processing: calls.some((c) => c.status === "processing"),
+              agents: working.length,
+            }}
+          />
+          <div className="absolute inset-x-0 bottom-0 flex items-center gap-6 border-t border-[var(--line)] bg-[var(--surf)] px-5 py-3">
+            {[
+              ["COMMITS 7D", String(s?.stats.commits7d ?? "…")],
+              ["CALLS TODAY", String(todaysCalls.length)],
+              ["BRAIN NOTES", `${s?.stats.notes ?? "…"} · ${s?.stats.links ?? "…"} links`],
+            ].map(([k, v]) => (
+              <span key={k} className="text-[9.5px] tracking-[1.5px] text-[var(--dim)]">
+                {k} <b className="ml-1 text-[12px] font-semibold text-[var(--text)] [font-family:var(--display)]">{v}</b>
+              </span>
+            ))}
+            <span className="ml-auto flex gap-2">
+              <button
+                onClick={() => navigate("/chat")}
+                className="rounded-full border border-[var(--line-2)] px-4 py-[6px] text-[10px] tracking-[1.5px] text-[var(--text)] transition hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+              >
+                ASK JARVIS
+              </button>
+              <button
+                onClick={() => fetch("/api/calls/startrec", { method: "POST", headers: { "Content-Type": "application/json" } }).catch(() => {})}
+                className="rounded-full bg-[var(--cyan-2)] px-4 py-[6px] text-[10px] tracking-[1.5px] text-[var(--cyan)] outline outline-1 outline-[var(--cyan-3)] transition hover:bg-[var(--cyan-3)]"
+              >
+                ● RECORD A CALL
+              </button>
+            </span>
+          </div>
+        </div>
+
+        {/* ── right: attention, meetings, activity ── */}
+        <div className="flex min-h-0 flex-col gap-3">
+          <Card title="Needs Attention" tag={bucket.length ? <span className="text-[var(--amber)]">{bucket.length} TASKS</span> : undefined} className="flex-1">
+            {bucket.length
+              ? bucket.map((r) => {
+                  const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+                  return (
+                    <div key={idKey(r.item)} className={`mb-2 flex items-start gap-2 rounded-lg border-l-2 bg-[var(--surf-2)] px-3 py-[8px] ${urgent?.kind === "overdue" ? "border-[var(--red)]" : "border-[var(--amber)]"}`}>
+                      <button
+                        onClick={() => toggleCluster(r.cluster)}
+                        title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
+                        className="cursor-pointer text-[var(--cyan)]"
+                      >☐</button>
+                      <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-relaxed text-[var(--text)]">
+                        {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}{r.item.text.replace(/\*\*/g, "").slice(0, 110)}
+                        {urgent && (
+                          <span className="mt-[2px] block text-[10px] uppercase tracking-[1px] text-[var(--dim)]">
+                            <span className={urgent.kind === "overdue" ? "font-medium text-[var(--red)]" : "font-medium text-[var(--amber)]"}>{urgent.label}</span>
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })
+              : <Quiet>Nothing urgent — the ledger is calm.</Quiet>}
+          </Card>
+
+          {cal?.enabled && (
+            <Card title="Today" tag={String(meetings.length || "—")} className="flex-1">
+              {(() => {
+                if (!meetings.length) return <Quiet>No meetings today.</Quiet>;
+                const now = Date.now();
+                const phase = (e: any) =>
+                  now > Date.parse(e.end || e.start) ? 2 : now >= Date.parse(e.start) ? 0 : 1;
+                const ordered = [...meetings].sort((a, b) =>
+                  phase(a) - phase(b) || a.start.localeCompare(b.start));
+                const nextUp = ordered.find((e) => phase(e) === 1);
+                const dur = (e: any) => {
+                  const m = Math.round((Date.parse(e.end || e.start) - Date.parse(e.start)) / 60_000);
+                  return m >= 60 ? `${+(m / 60).toFixed(1)}h`.replace(".0", "") : `${m}m`;
+                };
+                const inLabel = (e: any) => {
+                  const m = Math.round((Date.parse(e.start) - now) / 60_000);
+                  return m < 60 ? `in ${m}m` : `in ${Math.round(m / 60)}h`;
+                };
+                return ordered.map((e, i) => {
+                  const ph = phase(e);
+                  const bar =
+                    ph === 0 ? "bg-[var(--red)]"
+                    : e === nextUp ? "bg-[var(--amber)]"
+                    : ph === 1 ? "bg-[var(--cyan-3)]"
+                    : "bg-[var(--line)]";
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => prepMe(e)}
+                      className={`flex cursor-pointer gap-2 rounded-lg px-1 py-[6px] transition hover:bg-[var(--surf-2)] ${ph === 2 ? "opacity-40" : ""}`}
+                    >
+                      <span className="w-[42px] shrink-0 text-right">
+                        <b className="block text-[11.5px] leading-tight text-[var(--text)] [font-family:var(--display)]">{localTime(e.start)}</b>
+                        <span className="block text-[9.5px] text-[var(--dim)]">{dur(e)}</span>
+                      </span>
+                      <span className={`w-[3px] shrink-0 self-stretch rounded-full ${bar}`} />
+                      <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-snug text-[var(--text)]">
+                        <span className="block truncate">{e.subject}</span>
+                        <span className="block text-[10px] text-[var(--dim)]">
+                          {ph === 0 && <span className="blip font-medium text-[var(--red)]">now</span>}
+                          {ph === 1 && e === nextUp && <span className="font-medium text-[var(--amber)]">{inLabel(e)}</span>}
+                          {(ph === 0 || (ph === 1 && e === nextUp)) && e.attendees?.length > 0 && " · "}
+                          {e.attendees?.length > 0 && `${e.attendees.length} people`}
+                        </span>
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
+            </Card>
           )}
-          {working.length
-            ? working.map((a) => (
-                <Row key={a.id}><b className="text-[var(--text)]">{a.project}</b> · {a.task.slice(0, 50)}</Row>
-              ))
-            : <Row>No active agents. Ask Jarvis to "work on &lt;project&gt;".</Row>}
-        </Panel>
-        <Panel title="Z-02 · Calls Today" tag={String(todaysCalls.length || "—")}>
-          {todaysCalls.length
-            ? todaysCalls.slice(0, 5).map((c) => {
-                const open = ((c.notes.match(/- \[ \]/g)) ?? []).length;
-                return (
-                  <Row key={c.id} onClick={() => navigate(`/calls/${c.id}`)}>
-                    <b className="text-[var(--text)]">{callTitle(c).slice(0, 34)}</b> · {c.started.slice(11, 16)}
-                    {open ? <span className="text-[var(--amber)]"> · {open} open</span> : null}
-                  </Row>
-                );
-              })
-            : <Row>No calls captured today.</Row>}
-        </Panel>
-        <Panel title="Z-03 · Recent Git Activity" tag="7D">
-          {(s?.activity.length ? s.activity : ["no commits in the last window — quiet repo day"])
-            .map((a, i) => <Row key={i}>{a.slice(0, 80)}</Row>)}
-        </Panel>
+
+          <Card title="Activity" tag={working.length ? `${working.length} LIVE` : undefined} className="flex-1">
+            {recording && (
+              <div
+                onClick={() => navigate(`/calls/${recording.id}`)}
+                className="blip mb-2 cursor-pointer rounded-lg border-l-2 border-[var(--red)] bg-[var(--surf-2)] px-3 py-2 font-sans text-[11.5px] text-[var(--red)]"
+              >
+                ● recording a call now — tap to open
+              </div>
+            )}
+            {working.map((a) => (
+              <div key={a.id} className="mb-1.5 flex gap-2 font-sans text-[12px] leading-relaxed">
+                <span className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[var(--cyan)]" />
+                <span className="min-w-0 flex-1 truncate text-[var(--text)]">
+                  <b>{a.project}</b> · {a.task.slice(0, 46)}
+                </span>
+              </div>
+            ))}
+            {todaysCalls.slice(0, 4).map((c) => {
+              const open = ((c.notes.match(/- \[ \]/g)) ?? []).length;
+              return (
+                <div key={c.id} onClick={() => navigate(`/calls/${c.id}`)}
+                  className="mb-1.5 flex cursor-pointer gap-2 font-sans text-[12px] leading-relaxed hover:text-[var(--cyan)]">
+                  <span className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[var(--green)]" />
+                  <span className="min-w-0 flex-1 truncate text-[var(--text)]">
+                    {callTitle(c).slice(0, 38)}
+                    <span className="ml-1 text-[10px] text-[var(--dim)]">{c.started.slice(11, 16)}{open ? ` · ${open} open` : ""}</span>
+                  </span>
+                </div>
+              );
+            })}
+            {(s?.activity ?? []).slice(0, 3).map((a, i) => (
+              <div key={i} className="mb-1.5 flex gap-2 font-sans text-[12px] leading-relaxed">
+                <span className="mt-[6px] h-[6px] w-[6px] shrink-0 rounded-full bg-[var(--indigo)]" />
+                <span className="min-w-0 flex-1 truncate text-[var(--dim)]">{a.slice(0, 70)}</span>
+              </div>
+            ))}
+            {!working.length && !todaysCalls.length && !(s?.activity ?? []).length && (
+              <Quiet>Quiet so far — no agents, calls, or commits today.</Quiet>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      {/* ── status footer: the promise, always visible ── */}
+      <div className="flex shrink-0 items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--surf)] px-4 py-[6px] text-[9px] tracking-[1.5px] text-[var(--dim)]">
+        <span>
+          <b className="text-[var(--green)]">●</b> SYNCED · WHISPER {String((s as any)?.stats?.whisper ?? "LOCAL")} · AUDIO RETAINED LOCALLY
+        </span>
+        <span>LOCAL ONLY — NOTHING LEAVES THE MACHINE</span>
       </div>
     </div>
   );

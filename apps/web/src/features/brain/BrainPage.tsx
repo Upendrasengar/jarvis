@@ -13,25 +13,25 @@ import SpriteText from "three-spritetext";
 const isLight = () => document.documentElement.classList.contains("light");
 // Group names come from the user's vault directory names (any number of
 // them), so colors are assigned by rank: the biggest vault gets the
-// signature cyan, then green, purple, amber, rose. "ref" (link targets
-// with no page) stays deliberately muted.
+// indigo knowledge accent (cyan stays reserved for live surfaces), then
+// cyan, green, amber, rose. "ref" (link targets with no page) stays muted.
 const palette = () =>
   isLight()
     ? {
-        bg: "#eef3fa",
-        series: ["#0369a1", "#0c7f4d", "#7c3aed", "#9a6b00", "#c72e50"],
+        bg: "#eef2f7",
+        series: ["#4f5bd5", "#0e7490", "#0c7f4d", "#8a5a00", "#bd2f4d"],
         ref: "#8fa6b8",
-        label: "#22394f",
-        link: "rgba(3,105,161,0.28)",
-        particle: "#0369a1",
+        label: "#17222f",
+        link: "rgba(79,91,213,0.30)",
+        particle: "#4f5bd5",
       }
     : {
-        bg: "#04070f",
-        series: ["#39d7ff", "#3ee08a", "#c792ea", "#ffcf5c", "#ff8fa3"],
+        bg: "#060a11",
+        series: ["#8b93ff", "#22d3ee", "#35d99b", "#ffc95c", "#ff6b84"],
         ref: "#2a3a4a",
-        label: "#cfe8ff",
-        link: "rgba(57,215,255,0.22)",
-        particle: "#39d7ff",
+        label: "#d5e2f0",
+        link: "rgba(139,147,255,0.24)",
+        particle: "#8b93ff",
       };
 
 type Controls = {
@@ -97,7 +97,7 @@ function Slider({ label, min, max, step, value, onChange }: {
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-[var(--cyan)]"
+        className="w-full accent-[var(--indigo)]"
       />
     </label>
   );
@@ -108,7 +108,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
     <label className="flex cursor-pointer items-center justify-between text-[11px] text-[var(--text)]">
       {label}
       <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)}
-        className="accent-[var(--cyan)]" />
+        className="accent-[var(--indigo)]" />
     </label>
   );
 }
@@ -161,6 +161,10 @@ export function BrainPage() {
     });
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
+    const ro = new ResizeObserver(() => {
+      graphRef.current?.width(wrap.clientWidth).height(wrap.clientHeight);
+    });
+
     (async () => {
       const data = await (await fetch("/api/graph")).json();
       if (cancelled) return;
@@ -182,6 +186,8 @@ export function BrainPage() {
       const c = ctlRef.current;
       const pal = palRef.current;
       const graph = new ForceGraph3D(wrap)
+        .width(wrap.clientWidth)
+        .height(wrap.clientHeight)
         .graphData(filterData(data, c))
         .backgroundColor(pal.bg)
         .nodeColor((n: any) => colorFor(n.group))
@@ -235,11 +241,16 @@ export function BrainPage() {
         requestAnimationFrame(orbit);
       };
       orbit();
+
+      // the canvas defaults to WINDOW size — with the icon rail the content
+      // area is narrower, so track the container instead of the window
+      ro.observe(wrap);
     })();
 
     return () => {
       cancelled = true;
       orbiting = false;
+      ro.disconnect();
       mo.disconnect();
       graphRef.current?._destructor?.();
       graphRef.current = null;
@@ -274,24 +285,24 @@ export function BrainPage() {
   const set = (patch: Partial<Controls>) => setCtl((c) => ({ ...c, ...patch }));
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full overflow-hidden">
       <div className="absolute left-5 top-4 z-[5]">
-        <div className="font-bold tracking-[2px] text-[var(--cyan)] [text-shadow:0_0_14px_var(--node-glow-h)]">
+        <div className="font-bold tracking-[2px] text-[var(--indigo)] [font-family:var(--display)] [text-shadow:0_0_14px_var(--indigo-3)]">
           KRONOS · SECOND BRAIN
         </div>
         <div className="text-[11px] text-[var(--dim)]">{stats}</div>
       </div>
 
       {/* Obsidian-style controls */}
-      <div className="absolute right-4 top-4 z-[6] w-[230px] rounded-xl border border-[var(--line)] bg-[var(--panel)] backdrop-blur">
+      <div className="absolute right-4 top-4 z-[6] w-[230px] rounded-2xl border border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)]">
         <div className="flex items-center justify-between px-3 py-2">
           <button onClick={() => setPanelOpen(!panelOpen)}
-            className="text-[10px] tracking-[2px] text-[var(--cyan)]">
+            className="text-[10px] tracking-[2px] text-[var(--indigo)]">
             {panelOpen ? "▾" : "▸"} GRAPH CONTROLS
           </button>
           {panelOpen && (
             <button title="Reset to defaults" onClick={() => setCtl({ ...DEFAULTS })}
-              className="text-[11px] text-[var(--dim)] hover:text-[var(--cyan)]">↺</button>
+              className="text-[11px] text-[var(--dim)] hover:text-[var(--indigo)]">↺</button>
           )}
         </div>
         {panelOpen && (
@@ -300,7 +311,7 @@ export function BrainPage() {
               value={ctl.search}
               onChange={(e) => set({ search: e.target.value })}
               placeholder="Search notes…"
-              className="w-full rounded-md border border-[var(--line)] bg-[var(--field)] px-2 py-1 text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+              className="w-full rounded-md border border-[var(--line)] bg-[var(--surf-2)] px-2 py-1 text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--indigo-3)]"
             />
             <Toggle label="Orphans" value={ctl.orphans} onChange={(v) => set({ orphans: v })} />
             {vaults.length > 1 && (
@@ -318,7 +329,7 @@ export function BrainPage() {
                             : [...ctl.hiddenGroups, v],
                         })
                       }
-                      className="accent-[var(--cyan)]"
+                      className="accent-[var(--indigo)]"
                     />
                     <span className="inline-block h-2 w-2 rounded-full" style={{ background: colorFor(v) }} />
                     <span className="truncate">{v}</span>

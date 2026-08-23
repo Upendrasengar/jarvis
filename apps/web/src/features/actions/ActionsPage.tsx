@@ -11,14 +11,9 @@ import { useActions, useToggleAction } from "./hooks";
 import { PromptDialog } from "../../components/PromptDialog";
 import { ago, parseStamp } from "../../lib/time";
 import { buildClusters, idKey } from "../../lib/actionClusters";
-import { attentionBucket, rankAttention, type Chip, type Triage } from "../../lib/attention";
+import { attentionBucket, rankAttention, type Chip, type Ranked, type Triage } from "../../lib/attention";
 import { useQuery } from "@tanstack/react-query";
 
-const CHIP_STYLE: Record<string, string> = {
-  overdue: "border-[rgba(255,92,122,.5)] text-[var(--red)]",
-  due: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
-  blocked: "border-[rgba(255,207,92,.5)] text-[var(--amber)]",
-};
 import { useQueryClient } from "@tanstack/react-query";
 
 type Who = "all" | "me" | "others";
@@ -35,51 +30,21 @@ function ageDays(callStarted: string): number {
   return Math.max(0, Math.floor((Date.now() - d) / 86_400_000));
 }
 
-function OwnerLane({ owner }: { owner: string }) {
-  const mine = owner === "Me";
-  return (
-    <span
-      className={`w-[86px] shrink-0 truncate rounded-full border px-2 py-[2px] text-center text-[9px] tracking-wider ${
-        mine
-          ? "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.07)] text-[var(--cyan)]"
-          : owner
-            ? "border-[var(--line)] text-[var(--dim)]"
-            : "border-transparent text-[var(--dim)]"
-      }`}
-      title={owner || "no owner recorded"}
-    >
-      {owner || "—"}
-    </span>
-  );
-}
 
 function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: ActionItem; onToggle: () => void; onComment: () => void; recurringIn?: number; chips?: Chip[] }) {
   const age = ageDays(item.callStarted);
   return (
-    <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[7px] pl-6 pr-3 font-sans text-[13px] leading-snug hover:bg-[rgba(57,215,255,.05)]">
-      <input
-        type="checkbox"
-        checked={item.done}
-        onChange={onToggle}
-        className="mt-[2px] cursor-pointer accent-[var(--cyan)]"
-      />
-      <OwnerLane owner={item.owner} />
+    <label className="group flex cursor-pointer items-start gap-3 rounded-lg py-[9px] pl-9 pr-3 font-sans text-[13px] leading-snug hover:bg-[var(--surf-2)]">
+      <input type="checkbox" checked={item.done} onChange={onToggle} className="chk mt-[1px]" />
       <span className="min-w-0 flex-1">
         <span className={item.done ? "text-[var(--dim)] line-through" : "text-[var(--text)]"}>
+          {item.owner ? `${item.owner}: ` : ""}
           {inline(item.text)}
           {chips?.slice(0, 1).map((c, k) => (
             <span key={k} className={`ml-2 text-[10px] font-medium ${c.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
               {c.label}
             </span>
           ))}
-          {recurringIn && recurringIn > 1 ? (
-            <span
-              title="This item was raised in multiple calls"
-              className="ml-2 rounded-full border border-[rgba(255,207,92,.4)] px-[7px] py-[1px] text-[9.5px] text-[var(--amber)]"
-            >
-              ⟳ {recurringIn} calls
-            </span>
-          ) : null}
         </span>
         {item.comments.map((c, i) => {
           const { when, text } = parseStamp(c);
@@ -102,9 +67,14 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
       >
         ＋
       </button>
+      {recurringIn && recurringIn > 1 ? (
+        <span title="This item was raised in multiple calls" className="mt-[2px] shrink-0 rounded-md border border-[var(--line)] px-[7px] py-[2px] text-[8.5px] tracking-[1px] text-[var(--dim)]">
+          {recurringIn} CALLS
+        </span>
+      ) : null}
       {!item.done && age >= 1 && (
-        <span className="shrink-0 rounded-full border border-[rgba(255,207,92,.35)] px-[7px] py-[1px] text-[9px] text-[var(--amber)]">
-          {age}d
+        <span className="mt-[2px] shrink-0 rounded-md border border-[var(--line)] px-[7px] py-[2px] text-[8.5px] tracking-[1px] text-[var(--dim)]">
+          OPEN {age}D
         </span>
       )}
     </label>
@@ -113,25 +83,80 @@ function ItemRow({ item, onToggle, onComment, recurringIn, chips }: { item: Acti
 
 function CallGroup({ items, onToggle, onComment, clusterOf, chipsOf }: { items: ActionItem[]; onToggle: (i: ActionItem) => void; onComment: (i: ActionItem) => void; clusterOf?: (i: ActionItem) => number | undefined; chipsOf?: (i: ActionItem) => Chip[] | undefined }) {
   const head = items[0];
+  const isNote = head.callId.startsWith("note:");
   return (
-    <div className="relative mb-4 pl-6">
-      {/* transmission node + rail — this group came in over the channel */}
-      <span className="absolute left-[7px] top-[6px] h-[7px] w-[7px] rounded-full bg-[var(--cyan)] shadow-[0_0_10px_var(--cyan)]" />
-      <span className="absolute bottom-1 left-[10px] top-[18px] w-px bg-[rgba(57,215,255,.12)]" />
-      <div className="mb-1 flex items-baseline gap-3">
+    <div className="mb-5">
+      <div className="mb-1 flex items-center gap-2.5 border-b border-[var(--line)] pb-2">
+        <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-[var(--indigo-2)] text-[var(--indigo)]">
+          <svg viewBox="0 0 24 24" className="h-[12px] w-[12px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+            {isNote
+              ? <path d="M5 4h11l3 3v13H5z M8 10h8 M8 14h8" />
+              : <path d="M6 4c0 8 6 14 14 14l1-4-4-1.5-1.5 1.5c-3-1.2-5.3-3.5-6.5-6.5L10.5 6 9 2z" />}
+          </svg>
+        </span>
         <Link
-          to={head.callId.startsWith("note:") ? `/notes/${head.callId.slice(5)}` : `/calls/${head.callId}`}
+          to={isNote ? `/notes/${head.callId.slice(5)}` : `/calls/${head.callId}`}
           className="truncate font-sans text-[13px] font-semibold text-[var(--bright)] hover:text-[var(--cyan)]"
         >
           {head.callTitle || head.callId}
         </Link>
-        <span className="shrink-0 text-[10px] text-[var(--dim)]">
-          {head.callStarted.slice(11, 16)} · {items.length} open
+        <span className="ml-auto shrink-0 text-[10px] text-[var(--dim)]">
+          {head.callStarted.slice(0, 10)} · {items.length} open
         </span>
       </div>
       {items.map((i) => (
         <ItemRow recurringIn={clusterOf?.(i)} chips={chipsOf?.(i)} key={`${i.callId}:${i.index}`} item={i} onToggle={() => onToggle(i)} onComment={() => onComment(i)} />
       ))}
+    </div>
+  );
+}
+
+
+// One flagged item as a full card — the design's "Needs attention" ledger.
+// Title is the item text; the LLM triage reason (when present) is the
+// description; the source line links back to the call/note it came from.
+function AttentionCard({ r, onToggle }: { r: Ranked; onToggle: () => void }) {
+  const it = r.item as ActionItem;
+  const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
+  const hot = urgent && urgent.kind !== "blocked";
+  const rest = r.chips.filter((c) => c !== urgent && c.kind !== "me").map((c) => c.label);
+  const desc = r.reason || [it.owner && it.owner !== "Me" ? it.owner : "", ...rest].filter(Boolean).join(" · ");
+  const chipLabel = urgent
+    ? urgent.kind === "blocked" ? "BLOCKED" : urgent.label.split(" (")[0].toUpperCase()
+    : "NO DATE";
+  const isNote = it.callId.startsWith("note:");
+  return (
+    <div className={`mb-3 rounded-2xl border bg-[var(--surf)] p-4 [box-shadow:var(--shadow)] ${
+      hot ? "border-[rgba(255,107,132,.45)] !bg-[rgba(255,107,132,.05)]" : "border-[var(--line)]"}`}>
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={false}
+          onChange={onToggle}
+          title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
+          className="chk mt-[2px]"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="font-sans text-[13.5px] font-semibold leading-snug text-[var(--bright)]">
+            {it.text.replace(/\*\*/g, "")}
+          </div>
+          {desc && <div className="mt-1 font-sans text-[12px] leading-snug text-[var(--dim)]">{desc}</div>}
+          <Link
+            to={isNote ? `/notes/${it.callId.slice(5)}` : `/calls/${it.callId}`}
+            className="mt-2 block truncate text-[10.5px] text-[var(--cyan)] hover:underline"
+          >
+            ↳ {isNote ? "note" : "call"} {it.callStarted.slice(0, 10)}{it.callTitle ? ` · ${it.callTitle}` : ""}
+          </Link>
+        </div>
+        <span className={`shrink-0 rounded px-2 py-[2px] text-[9px] tracking-[1.5px] ${
+          hot
+            ? "border border-[rgba(255,107,132,.5)] bg-[rgba(255,107,132,.12)] text-[var(--red)]"
+            : urgent
+              ? "border border-[var(--line)] text-[var(--amber)]"
+              : "border border-[var(--line)] text-[var(--dim)]"}`}>
+          {chipLabel}
+        </span>
+      </div>
     </div>
   );
 }
@@ -198,105 +223,110 @@ export function ActionsPage() {
   if (isLoading)
     return <div className="mt-20 text-center text-xs text-[var(--dim)]">loading…</div>;
 
-  const filters: Array<{ key: Who; label: string }> = [
-    { key: "all", label: `All ${open.length}` },
-    { key: "me", label: `You owe ${mineCount}` },
-    { key: "others", label: `Others owe ${open.length - mineCount}` },
+  const filters: Array<{ key: Who; name: string; count: number }> = [
+    { key: "all", name: "All", count: open.length },
+    { key: "me", name: "You owe", count: mineCount },
+    { key: "others", name: "Others owe", count: open.length - mineCount },
   ];
 
+  const srcCalls = new Set(open.filter((i) => !i.callId.startsWith("note:")).map((i) => i.callId)).size;
+  const srcNotes = new Set(open.filter((i) => i.callId.startsWith("note:")).map((i) => i.callId)).size;
+  const critical = bucket.filter((r) =>
+    r.chips.some((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked")).length;
+
   return (
-    <div className="mx-auto h-full max-w-[860px] overflow-auto px-6 py-8">
-      <div className="mb-1 flex items-baseline justify-between">
-        <h1 className="font-sans text-2xl text-[var(--bright)]">Actions</h1>
-        <span className="text-[10px] uppercase tracking-[2px] text-[var(--dim)]">
-          from {new Set(open.map((i) => i.callId)).size} calls
-        </span>
-      </div>
-      <p className="mb-5 font-sans text-xs text-[var(--dim)]">
-        Every open item from your recorded calls. Checking one updates the call's notes and your vault.
-      </p>
-
-      <div className="mb-7 flex gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setWho(f.key)}
-            className={`rounded-full border px-3 py-1 font-sans text-[11px] ${
-              who === f.key
-                ? "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.08)] text-[var(--cyan)]"
-                : "border-[var(--line)] text-[var(--dim)] hover:text-[var(--bright)]"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {visible.length === 0 && (
-        <div className="mt-16 text-center font-sans text-sm text-[var(--dim)]">
-          {who === "me" ? "You owe nothing. Enjoy it while it lasts." : "Ledger clear — nothing outstanding."}
-        </div>
-      )}
-
-      {who === "all" && bucket.length > 0 && (
-        <div className="mb-6 rounded-xl border border-[var(--line)] bg-[var(--chipbg)] p-3">
-          <div className="mb-2 text-[10px] tracking-[2px] text-[var(--amber)]">NEEDS ATTENTION</div>
-          {bucket.map((r) => {
-            const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
-            const rest = r.chips.filter((c) => c !== urgent && c.kind !== "me").map((c) => c.label);
-            return (
-              <div key={idKey(r.item)} className="mb-1.5 flex items-start gap-2 font-sans text-[12.5px]">
-                <button
-                  onClick={() => r.cluster.forEach((a) => doToggle(a as ActionItem))}
-                  title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
-                  className="cursor-pointer text-[var(--cyan)]"
-                >☐</button>
-                <span className="min-w-0 flex-1">
-                  <b className="text-[var(--bright)]">{r.item.owner}:</b> {r.item.text.replace(/\*\*/g, "")}
-                  <span className="ml-2 text-[10.5px] text-[var(--dim)]">
-                    {urgent && (
-                      <span className={`font-medium ${urgent.kind === "overdue" ? "text-[var(--red)]" : "text-[var(--amber)]"}`}>
-                        {urgent.label}
-                      </span>
-                    )}
-                    {urgent && rest.length > 0 && " · "}
-                    {rest.join(" · ")}
-                  </span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {[...days.entries()].map(([day, calls]) => (
-        <section key={day} className="mb-6">
-          <div className="mb-2 text-[9px] uppercase tracking-[2px] text-[var(--dim)]">{day}</div>
-          {[...calls.values()].map((group) => (
-            <CallGroup chipsOf={(a) => chipsById.get(idKey(a))} clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
+    <div className="flex h-full overflow-hidden">
+      {/* ledger rail — filters live here now, one accent for the active one */}
+      <aside className="w-[200px] shrink-0 space-y-7 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] px-4 py-8">
+        <div>
+          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">LEDGER</div>
+          {filters.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setWho(f.key)}
+              className={`mb-1 flex w-full items-center justify-between rounded-lg border px-3 py-[7px] font-sans text-[12px] ${
+                who === f.key
+                  ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
+                  : "border-transparent text-[var(--dim)] hover:bg-[var(--surf-2)] hover:text-[var(--bright)]"}`}
+            >
+              <span>{f.name}</span>
+              <span className="text-[10.5px] opacity-80">{f.count}</span>
+            </button>
           ))}
-        </section>
-      ))}
-
-      {done.length > 0 && (
-        <details
-          className="mt-10 border-t border-[var(--line)] pt-3"
-          open={showDone}
-          onToggle={(e) => setShowDone((e.target as HTMLDetailsElement).open)}
-        >
-          <summary className="cursor-pointer text-[10px] uppercase tracking-[1.5px] text-[var(--dim)]">
-            settled · {done.length}
-          </summary>
-          <div className="mt-2 opacity-60">
-            {done.map((i) => (
-              <ItemRow key={`${i.callId}:${i.index}`} item={i} onToggle={() => doToggle(i)} onComment={() => setCommentFor(i)} />
-            ))}
+        </div>
+        <div>
+          <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">SOURCE</div>
+          <div className="space-y-[5px] font-sans text-[11.5px] text-[var(--dim)]">
+            <div>Calls · {srcCalls}</div>
+            <div>Notes · {srcNotes}</div>
+            <div>Digest triage · {bucket.length}</div>
           </div>
-        </details>
-      )}
+        </div>
+      </aside>
+
+      {/* the ledger itself */}
+      <div className="min-w-0 flex-1 overflow-auto px-8 py-8">
+        <div className="mx-auto max-w-[760px]">
+          <h1 className="text-2xl font-semibold text-[var(--bright)] [font-family:var(--display)]">Actions</h1>
+          <p className="mb-6 mt-1 font-sans text-xs text-[var(--dim)]">
+            Every open item from your recorded calls. Checking one updates the call's notes and your vault.
+          </p>
+
+          {visible.length === 0 && (
+            <div className="mt-16 text-center font-sans text-sm text-[var(--dim)]">
+              {who === "me" ? "You owe nothing. Enjoy it while it lasts." : "Ledger clear — nothing outstanding."}
+            </div>
+          )}
+
+          {who === "all" && bucket.length > 0 && (
+            <>
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="font-sans text-[15px] font-semibold text-[var(--bright)]">Needs attention</h2>
+                {critical > 0 && (
+                  <span className="rounded border border-[rgba(255,107,132,.5)] px-2 py-[2px] text-[9px] tracking-[2px] text-[var(--red)]">
+                    {critical} CRITICAL
+                  </span>
+                )}
+              </div>
+              <div className="mb-8">
+                {bucket.map((r) => (
+                  <AttentionCard key={idKey(r.item)} r={r} onToggle={() => r.cluster.forEach((a) => doToggle(a as ActionItem))} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {[...days.entries()].map(([day, calls]) => (
+            <section key={day} className="mb-2">
+              {[...calls.values()].map((group) => (
+                <CallGroup chipsOf={(a) => chipsById.get(idKey(a))} clusterOf={(a) => clusterById.get(idKey(a))?.items.length} key={group[0].callId} items={group} onToggle={doToggle} onComment={setCommentFor} />
+              ))}
+            </section>
+          ))}
+
+          {done.length > 0 && (
+            <details
+              className="mt-10 border-t border-[var(--line)] pt-3"
+              open={showDone}
+              onToggle={(e) => setShowDone((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="cursor-pointer text-[10px] uppercase tracking-[1.5px] text-[var(--dim)]">
+                settled · {done.length}
+              </summary>
+              <div className="mt-2 opacity-60">
+                {done.map((i) => (
+                  <ItemRow key={`${i.callId}:${i.index}`} item={i} onToggle={() => doToggle(i)} onComment={() => setCommentFor(i)} />
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      </div>
+
       <PromptDialog
         open={!!commentFor}
         title="Add comment"
-        placeholder="Context, resolution, reference…"
+        placeholder="Context, resolution, reference\u2026"
         submitLabel="ADD"
         onSubmit={(text) => commentFor && addComment(commentFor, text)}
         onClose={() => setCommentFor(null)}
