@@ -42,6 +42,7 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: "voice", label: "Voice" },
   { id: "recording", label: "Call recording" },
   { id: "speaking", label: "Speaking voice" },
+  { id: "reminders", label: "Reminders" },
   { id: "diagnostics", label: "Diagnostics" },
   { id: "topics", label: "Topics" },
 ];
@@ -124,6 +125,81 @@ function TopicsSection() {
         onSubmit={(v: string) => { if (renaming && v.trim()) post("/api/topics/rename", { from: renaming, to: v.trim() }); setRenaming(null); }}
         onClose={() => setRenaming(null)}
       />
+    </section>
+  );
+}
+
+
+// scheduled jobs from the reminders engine — the file data/reminders.json
+// rendered honestly: pause/resume and delete, creation happens in chat
+// ("Jarvis, remind me…") or via the API
+function RemindersSection() {
+  const qc = useQueryClient();
+  const { data: jobs = [] } = useQuery<any[]>({
+    queryKey: ["reminders"],
+    queryFn: async () => (await fetch("/api/reminders")).json(),
+    refetchInterval: 30_000,
+  });
+  const post = async (url: string) => {
+    await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+    qc.invalidateQueries({ queryKey: ["reminders"] });
+  };
+  const when = (j: any): string => {
+    if (j.schedule.kind === "at") return `once at ${j.schedule.at}`;
+    if (j.schedule.kind === "cron") return `cron ${j.schedule.expr} (local)`;
+    const m = Math.round(j.schedule.everyMs / 60_000);
+    return m >= 60 && m % 60 === 0 ? `every ${m / 60}h` : `every ${m}m`;
+  };
+  return (
+    <section className="mb-12">
+      <Heading
+        id="reminders"
+        title="Reminders"
+        desc={'Scheduled nudges and the heartbeat pulse. Create them by asking — "Jarvis, remind me Monday 9am to…" — from chat, voice, or Telegram. Delivery is a notification here plus a Telegram message.'}
+      />
+      {jobs.length === 0 && (
+        <p className="font-sans text-[11.5px] text-[var(--dim)]">Nothing scheduled yet.</p>
+      )}
+      <div className="flex flex-col gap-2">
+        {jobs.map((j) => (
+          <div key={j.id} className="group flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surf)] px-4 py-3 [box-shadow:var(--shadow)]">
+            <span className={`h-[8px] w-[8px] shrink-0 rounded-full ${
+              j.enabled
+                ? j.state?.lastStatus === "error" ? "bg-[var(--red)]" : "bg-[var(--green)]"
+                : "bg-[var(--dim)] opacity-50"}`} />
+            <span className="min-w-0 flex-1">
+              <span className={`block truncate text-[13px] font-semibold ${j.enabled ? "text-[var(--bright)]" : "text-[var(--dim)]"}`}>
+                {j.name}
+              </span>
+              <span className="block text-[10px] text-[var(--dim)]">
+                {when(j)}
+                {j.state?.lastRunAt && ` · last ${new Date(j.state.lastRunAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+                {j.state?.lastStatus && ` · ${j.state.lastStatus === "quiet" ? "quiet (nothing to flag)" : j.state.lastStatus}`}
+              </span>
+            </span>
+            <button
+              onClick={() => post(`/api/reminders/${j.id}/toggle`)}
+              className={`shrink-0 rounded-full border px-3 py-[3px] text-[9.5px] tracking-[1px] ${
+                j.enabled
+                  ? "border-[var(--line)] text-[var(--dim)] hover:border-[var(--amber)] hover:text-[var(--amber)]"
+                  : "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"}`}
+            >
+              {j.enabled ? "PAUSE" : "RESUME"}
+            </button>
+            <button
+              onClick={() => post(`/api/reminders/${j.id}/delete`)}
+              title="Delete this reminder"
+              className="invisible shrink-0 rounded-full border border-[var(--line)] px-2 py-[3px] text-[10px] text-[var(--dim)] hover:border-[var(--red)] hover:text-[var(--red)] group-hover:visible"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 font-sans text-[10.5px] text-[var(--dim)]">
+        The heartbeat's checklist lives in memory/HEARTBEAT.md; cadence and quiet hours in
+        memory/settings/heartbeat-minutes.txt and heartbeat-quiet.txt.
+      </p>
     </section>
   );
 }
@@ -342,6 +418,8 @@ export function SettingsPage() {
               </span>
             </a>
           </section>
+
+          <RemindersSection />
 
           <TopicsSection />
 
