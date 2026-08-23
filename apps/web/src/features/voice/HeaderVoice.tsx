@@ -401,7 +401,7 @@ export function HeaderVoice() {
     : "VOICE READY";
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--chipbg)] py-1 pl-1 pr-3">
+    <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surf-2)] py-1 pl-1 pr-3">
       <button
         onClick={onMicClick}
         title={
@@ -412,7 +412,7 @@ export function HeaderVoice() {
         className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border text-[14px] ${
           state === "listening"
             ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[#012] shadow-[0_0_18px_var(--cyan)]"
-            : "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.12)] text-[var(--cyan)]"
+            : "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
         }`}
       >
         🎙️
@@ -421,7 +421,7 @@ export function HeaderVoice() {
       <span
         className={`min-w-[64px] text-[9px] tracking-[1.5px] ${
           state === "listening"
-            ? "text-[var(--cyan)] [text-shadow:0_0_10px_rgba(57,215,255,.6)]"
+            ? "text-[var(--cyan)] [text-shadow:0_0_10px_var(--cyan-3)]"
             : state === "thinking"
               ? "text-[var(--amber)]"
               : state === "speaking"

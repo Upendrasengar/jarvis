@@ -64,4 +64,4 @@ mockup go to the backlog at the bottom.
 - [x] 7 Notes — APPROVED (8ee4604)
 - [x] 8 Projects — APPROVED (d01909e)
 - [x] 9 Settings — AWAITING OWNER REVIEW
-- [ ] 10 Header/voice
+- [x] 10 Header/voice — AWAITING OWNER REVIEW (sweep)

@@ -104,7 +104,7 @@ export function LogsPage() {
             onClick={() => setParams({ src: s.id })}
             className={`rounded-full border px-3 py-1 text-[10px] ${
               s.id === selected
-                ? "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.08)] text-[var(--cyan)]"
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
                 : "border-[var(--line)] text-[var(--dim)] hover:text-[var(--bright)]"
             }`}
           >

@@ -78,7 +78,7 @@ function AttentionPanel({ bucket, generatedAt, onToggleAll }: {
 }) {
   if (!bucket.length) return null;
   return (
-    <div className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--chipbg)] p-3">
+    <div className="mb-4 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
       <div className="mb-2 flex items-baseline justify-between">
         <span title="Ranked: overdue → yours → blocking → repeated → aging. Checking an item completes it in every source it appears in."
           className="text-[10px] tracking-[2px] text-[var(--amber)]">NEEDS ATTENTION</span>
