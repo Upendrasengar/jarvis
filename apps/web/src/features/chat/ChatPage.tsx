@@ -13,11 +13,15 @@ import { ContextRail } from "./ContextRail";
 function splitSources(t: string): { body: string; sources: { to: string; kind: "call" | "note"; label: string }[] } {
   const m = t.match(/^SOURCES:\s*(.+)$/im);
   if (!m) return { body: t, sources: [] };
-  const sources = (m[1].match(/\/(?:calls|notes)\/\S+/g) ?? []).map((raw) => {
+  const seen = new Set<string>();
+  const sources = (m[1].match(/\/(?:calls|notes)\/\S+/g) ?? []).flatMap((raw) => {
     const to = raw.replace(/[.,;]+$/, "");
     const id = decodeURIComponent(to.split("/").pop() ?? "");
     const kind = (to.startsWith("/calls/") ? "call" : "note") as "call" | "note";
-    return { to, kind, label: (kind === "call" ? "☎ " : "◇ ") + id };
+    if (kind === "call" && !/^\d{4}-\d{2}-\d{2}-\d{4}$/.test(id)) return [];   // malformed
+    if (id.length < 2 || seen.has(to)) return [];
+    seen.add(to);
+    return [{ to, kind, label: (kind === "call" ? "☎ " : "◇ ") + id }];
   });
   return { body: t.replace(m[0], "").trimEnd(), sources };
 }
@@ -165,8 +169,11 @@ export function ChatPage() {
   };
 
   const lastSources = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--)
-      if (messages[i].c === "jarvis" && messages[i].t) return splitSources(messages[i].t).sources;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].c !== "jarvis" || !messages[i].t) continue;
+      const src = splitSources(messages[i].t).sources;
+      if (src.length) return src;    // most recent reply that cited anything
+    }
     return [];
   }, [messages]);
 

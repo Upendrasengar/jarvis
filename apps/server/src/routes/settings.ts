@@ -6,6 +6,7 @@ import { patchSettings, readSettings, setVoiceListening, voicesInfo } from "../s
 import { localOnly } from "../plugins/localOnly.js";
 import { voiceActive } from "../live/liveState.js";
 import { calendarState, fetchDay } from "../integrations/calendar.js";
+import { tokenStats } from "../services/tokens.js";
 
 export function settingsRoutes(app: FastifyInstance) {
   app.get("/api/settings", async () => readSettings());
@@ -22,6 +23,7 @@ export function settingsRoutes(app: FastifyInstance) {
   app.get("/api/voicestate", async () => ({ listening: voiceActive() }));
 
   // optional calendar adapter — { enabled:false } when not configured
+  app.get("/api/tokens", async () => tokenStats());
   app.get("/api/calendar", async () => calendarState());
   // workers' calendar tool: any single day, fetched live from the feed
   app.get("/api/calendar/day", async (req, reply) => {

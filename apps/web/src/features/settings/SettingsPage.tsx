@@ -44,6 +44,7 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: "speaking", label: "Speaking voice" },
   { id: "reminders", label: "Reminders" },
   { id: "diagnostics", label: "Diagnostics" },
+  { id: "tokens", label: "Token usage" },
   { id: "topics", label: "Topics" },
 ];
 
@@ -200,6 +201,80 @@ function RemindersSection() {
         The heartbeat's checklist lives in memory/HEARTBEAT.md; cadence and quiet hours in
         memory/settings/heartbeat-minutes.txt and heartbeat-quiet.txt.
       </p>
+    </section>
+  );
+}
+
+
+// token accounting from ~/.claude transcripts — read-side, estimates only
+function TokensSection() {
+  const { data } = useQuery<any>({
+    queryKey: ["tokens"],
+    queryFn: async () => (await fetch("/api/tokens")).json(),
+    staleTime: 60_000,
+  });
+  const fmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n));
+  const today = new Date().toLocaleDateString("sv-SE");
+  const t = data?.totals;
+  const d0 = data?.days?.find((d: any) => d.date === today);
+  const week = (data?.days ?? []).slice(0, 7).reduce((a: number, d: any) => a + d.cost, 0);
+  const tiles: Array<[string, string, string]> = t ? [
+    ["TODAY", `$${(d0?.cost ?? 0).toFixed(2)}`, d0 ? `${fmt(d0.in + d0.cacheWrite)} in · ${fmt(d0.out)} out` : "no usage yet"],
+    ["LAST 7 DAYS", `$${week.toFixed(2)}`, `${(data.days ?? []).slice(0, 7).length} active days`],
+    ["ALL TRACKED", `$${t.cost.toFixed(2)}`, `${fmt(t.out)} out · ${t.turns} turns`],
+  ] : [];
+  return (
+    <section className="mb-12">
+      <Heading
+        id="tokens"
+        title="Token usage"
+        desc="Aggregated from the local Claude Code transcripts every Jarvis run writes — chat, workers, digest, transcription notes, heartbeat. Costs are estimates from list prices; cache reads are the cheap ones."
+      />
+      <div className="mb-3 grid grid-cols-3 gap-3">
+        {tiles.map(([l, v, sub]) => (
+          <div key={l} className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+            <div className="text-[9px] tracking-[2px] text-[var(--dim)]">{l}</div>
+            <div className="mt-1 text-[24px] font-semibold text-[var(--bright)] [font-family:var(--display)]">{v}</div>
+            <div className="text-[10px] text-[var(--dim)]">{sub}</div>
+          </div>
+        ))}
+      </div>
+      {data?.byModel && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {Object.entries(data.byModel).map(([m, b]: [string, any]) => (
+            <span key={m} className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-3 py-[3px] text-[10px] text-[var(--dim)]">
+              <b className="text-[var(--text)]">{m.replace("claude-", "").replace(/-\d{8}$/, "")}</b>
+              {"  "}{b.turns} turns · {fmt(b.out)} out · ${b.cost.toFixed(2)}
+            </span>
+          ))}
+        </div>
+      )}
+      {(data?.days ?? []).length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)]">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="text-left text-[8.5px] tracking-[1.5px] text-[var(--dim)]">
+                {["DAY", "IN", "OUT", "CACHE WRITE", "CACHE READ", "TURNS", "EST COST"].map((h, i) => (
+                  <th key={h} className={`px-3 py-2 font-normal ${i > 0 ? "text-right" : ""}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="font-sans">
+              {(data.days as any[]).slice(0, 14).map((d) => (
+                <tr key={d.date} className="border-t border-[var(--line)] text-[var(--text)]">
+                  <td className="px-3 py-[7px] font-mono text-[10.5px] text-[var(--dim)]">{d.date}</td>
+                  <td className="px-3 py-[7px] text-right">{fmt(d.in)}</td>
+                  <td className="px-3 py-[7px] text-right">{fmt(d.out)}</td>
+                  <td className="px-3 py-[7px] text-right text-[var(--dim)]">{fmt(d.cacheWrite)}</td>
+                  <td className="px-3 py-[7px] text-right text-[var(--dim)]">{fmt(d.cacheRead)}</td>
+                  <td className="px-3 py-[7px] text-right text-[var(--dim)]">{d.turns}</td>
+                  <td className="px-3 py-[7px] text-right font-semibold text-[var(--bright)]">${d.cost.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }
@@ -420,6 +495,8 @@ export function SettingsPage() {
           </section>
 
           <RemindersSection />
+
+          <TokensSection />
 
           <TopicsSection />
 
