@@ -43,8 +43,13 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="h-full overflow-auto p-5">
-      <div className="mb-4 flex items-center gap-2">
+    <div className="h-full overflow-auto px-8 py-8">
+      <div className="mx-auto max-w-[1100px]">
+      <h1 className="text-2xl font-semibold text-[var(--bright)] [font-family:var(--display)]">Projects</h1>
+      <p className="mb-5 mt-1 font-sans text-xs text-[var(--dim)]">
+        What the digest scans and the brain graphs. Pause a project to mute it everywhere.
+      </p>
+      <div className="mb-5 flex items-center gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -57,7 +62,7 @@ export function ProjectsPage() {
             onClick={() => setFilter(f)}
             className={`rounded-full border px-3 py-1 font-sans text-[11px] capitalize ${
               filter === f
-                ? "border-[rgba(57,215,255,.4)] bg-[rgba(57,215,255,.08)] text-[var(--cyan)]"
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
                 : "border-[var(--line)] text-[var(--dim)] hover:text-[var(--bright)]"
             }`}
           >
@@ -74,16 +79,16 @@ export function ProjectsPage() {
           return (
             <div
               key={p.id}
-              className={`rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 backdrop-blur-lg transition hover:border-[rgba(57,215,255,.4)] ${active ? "" : "opacity-55"}`}
+              className={`rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 transition [box-shadow:var(--shadow)] hover:border-[var(--cyan-3)] ${active ? "" : "opacity-55"}`}
             >
-              <div className="mb-1 flex items-center text-[10px] uppercase tracking-wider text-[var(--cyan)]">
+              <div className="mb-1 flex items-center text-[9.5px] uppercase tracking-[1.5px] text-[var(--indigo)]">
                 {p.category || "project"}
                 <button
                   onClick={() => toggle(p)}
                   title={active ? "Pause: hide from brain graph and digest scan" : "Reactivate"}
                   className={`ml-2 cursor-pointer rounded-full px-2 py-[1px] text-[9px] transition ${
                     active
-                      ? "bg-[rgba(62,224,138,.14)] text-[var(--green)] hover:bg-[rgba(255,92,122,.15)] hover:text-[var(--red)]"
+                      ? "bg-[rgba(62,224,138,.14)] text-[var(--green)] hover:bg-[rgba(255,107,132,.15)] hover:text-[var(--red)]"
                       : "bg-[rgba(95,137,173,.15)] text-[var(--dim)] hover:bg-[rgba(62,224,138,.15)] hover:text-[var(--green)]"
                   }`}
                 >
@@ -95,6 +100,7 @@ export function ProjectsPage() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
