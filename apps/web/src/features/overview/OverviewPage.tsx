@@ -207,15 +207,17 @@ export function OverviewPage() {
         </div>
 
         {/* ── center: the core (untouched per D1) ── */}
-        <div className="relative min-h-0 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)]">
-          <NeuralCore
-            status={{
-              recording: !!recording,
-              processing: calls.some((c) => c.status === "processing"),
-              agents: working.length,
-            }}
-          />
-          <div className="absolute inset-x-0 bottom-0 flex items-center gap-6 border-t border-[var(--line)] bg-[var(--surf)] px-5 py-3">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surf)] [box-shadow:var(--shadow)]">
+          <div className="relative min-h-0 flex-1">
+            <NeuralCore
+              status={{
+                recording: !!recording,
+                processing: calls.some((c) => c.status === "processing"),
+                agents: working.length,
+              }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-[var(--line)] bg-[var(--surf)] px-5 py-3">
             {[
               ["COMMITS 7D", String(s?.stats.commits7d ?? "…")],
               ["CALLS TODAY", String(todaysCalls.length)],

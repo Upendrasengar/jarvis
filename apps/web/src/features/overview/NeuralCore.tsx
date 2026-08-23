@@ -60,7 +60,7 @@ export function NeuralCore({ status }: { status: CoreStatus }) {
   return (
     <div className="relative h-full w-full">
       <div className="absolute inset-x-0 top-1 z-[1] text-center text-[10px] tracking-[3px] text-[var(--dim)]">
-        NEURAL CORE · KRONOS
+        NEURAL CORE · JARVIS
       </div>
 
       {style === "particles" ? (

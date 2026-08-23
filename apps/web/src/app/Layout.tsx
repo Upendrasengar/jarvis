@@ -4,6 +4,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { RecordingPill } from "../features/calls/RecordingPill";
 import { HeaderVoice } from "../features/voice/HeaderVoice";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SearchBar } from "../components/SearchBar";
 import { useLive } from "../lib/live";
 import { useWorkerDelivery } from "../lib/workerDelivery";
 
@@ -58,14 +59,15 @@ export function Layout() {
       <header className="z-10 flex items-center gap-4 border-b border-[var(--line)] bg-[var(--surf)] px-5 py-[10px]">
         <span className="flex items-center gap-2 font-[var(--display)] text-[15px] font-bold tracking-[3px] text-[var(--bright)] [font-family:var(--display)]">
           <span className="blip h-[8px] w-[8px] rounded-full bg-[var(--cyan)] shadow-[0_0_12px_var(--cyan)]" />
-          KRONOS
+          JARVIS
         </span>
-        <span className="text-[10.5px] tracking-widest text-[var(--dim)]">
-          <b className="text-[var(--green)]">● ONLINE</b> · LOCAL
-        </span>
+        <SearchBar />
         <HeaderVoice />
         <RecordingPill />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-[10.5px] tracking-widest text-[var(--dim)]">
+            <b className="text-[var(--green)]">● ONLINE</b> · LOCAL
+          </span>
           <ThemeToggle />
         </div>
       </header>
