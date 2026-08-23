@@ -186,6 +186,32 @@ async function poll(url: string) {
   }
 }
 
+// Fetch ONE arbitrary day live from the Power Automate feed — the workers'
+// calendar tool (GET /api/calendar/day?date=…). Only possible in the PA
+// dialect (per-day POST); plain ICS/JSON feeds fall back to the cached
+// window in data/calendar.json.
+export async function fetchDay(date: string): Promise<{ ok: true; events: CalEvent[] } | { ok: false; error: string }> {
+  const url = readSecrets().CALENDAR_FEED_URL;
+  const key = readSecrets().CALENDAR_FEED_KEY;
+  if (!url) return { ok: false, error: "calendar not configured" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "bad date" };
+  try {
+    if (key) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": key },
+        body: JSON.stringify({ date }),
+      });
+      if (!res.ok) return { ok: false, error: `feed HTTP ${res.status}` };
+      return { ok: true, events: normalizeJSON(await res.json()).sort((a, b) => a.start.localeCompare(b.start)) };
+    }
+    // generic feed: serve from the cached window
+    return { ok: true, events: state.events.filter((e) => e.start.startsWith(date)) };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 120) };
+  }
+}
+
 export function startCalendar() {
   const url = readSecrets().CALENDAR_FEED_URL;
   if (!url) {

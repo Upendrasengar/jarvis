@@ -9,7 +9,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
-import { BRAIN_DIR, JARVIS_DIR, setting } from "../config.js";
+import { BRAIN_DIR, JARVIS_DIR, PORT, setting } from "../config.js";
+import { readSecrets } from "./env.js";
 import { CLAUDE, WORKER_PATH, readVaults, setVoice } from "./env.js";
 import { recordResult } from "./chatSessions.js";
 import { pushEvent } from "../live/liveState.js";
@@ -132,6 +133,14 @@ export function spawnAsk(task: string, sessionId = "") {
     "",
     "You MAY read files, run read-only shell (git log/status, grep, the tools/*.sh scripts in ~/jarvis),",
     "and search the Obsidian vaults. Do NOT write or modify anything. Be quick.",
+    ...(readSecrets().CALENDAR_FEED_URL ? [
+      `CALENDAR TOOL: the owner's work calendar is live. For ANY question about meetings/schedule on a`,
+      `specific day, run: curl -s 'http://127.0.0.1:${PORT}/api/calendar/day?date=YYYY-MM-DD' — it returns`,
+      `{events:[{subject,start,end,organizer,attendees,...}]} — start/end are UTC ISO timestamps;`,
+      `ALWAYS convert them to the owner's local timezone before answering.`,
+      `Compute the concrete date first (today is ${new Date().toLocaleDateString("sv-SE")}, a ${new Date().toLocaleDateString("en-US", { weekday: "long" })}).`,
+      `Trust this API over notes/digests for what is ON the calendar; notes still matter for context.`,
+    ] : []),
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, grep the vaults for the literal text [[X]] (e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
     "End your reply with a line 'ANSWER:' then 1-4 plain sentences a voice assistant can read aloud (no markdown, lists, or code).",
     "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
