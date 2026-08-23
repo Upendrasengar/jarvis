@@ -36,13 +36,13 @@ function AttentionRow({ r, onToggleAll }: { r: Ranked; onToggleAll: (items: Rank
     .filter((s) => (seen.has(s.label) ? false : (seen.add(s.label), true)));
   return (
     <div className="mb-2.5 flex items-start gap-2">
-      <button
-        onClick={click}
+      <input
+        type="checkbox"
+        checked={state === "done"}
+        onChange={click}
         title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off in the source note"}
-        className={`cursor-pointer text-[var(--cyan)] ${state === "busy" ? "animate-pulse" : ""}`}
-      >
-        {state === "done" ? "☑" : "☐"}
-      </button>
+        className={`chk mt-[2px] ${state === "busy" ? "animate-pulse" : ""}`}
+      />
       <span className={`min-w-0 flex-1 ${state === "done" ? "text-[var(--dim)] line-through" : ""}`}>
         {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}
         {r.item.text.replace(/\*\*/g, "")}
@@ -176,9 +176,7 @@ function LedgerBuckets({ actions, triage, onToggle }: {
     const d = dl(a);
     return (
       <div className={`mb-2 flex items-start gap-2 rounded-lg bg-[var(--surf-2)] px-3 py-[8px] ${done ? "opacity-45" : ""}`}>
-        <button onClick={() => onToggle(a)} className="cursor-pointer text-[var(--cyan)]">
-          {done ? "☑" : "☐"}
-        </button>
+        <input type="checkbox" checked={done} onChange={() => onToggle(a)} className="chk mt-[2px]" />
         <span className="min-w-0 flex-1 font-sans text-[13px] leading-relaxed text-[var(--text)]">
           <span className={done ? "line-through" : ""}>
             {a.owner && <b className="text-[var(--bright)]">{a.owner}: </b>}

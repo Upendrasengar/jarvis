@@ -128,14 +128,14 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
           };
           return (
             <div key={i} className="ml-2 mb-1 flex gap-2">
-              <button
-                onClick={toggle}
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={toggle}
                 disabled={!canToggle}
                 title={canToggle ? "Check off in the source note — no need to leave the digest" : undefined}
-                className={`text-[var(--cyan)] ${canToggle ? "cursor-pointer hover:drop-shadow-[0_0_6px_var(--cyan)]" : "cursor-default"}`}
-              >
-                {checked ? "☑" : "☐"}
-              </button>
+                className="chk mt-[2px] disabled:cursor-default disabled:opacity-60"
+              />
               <span className={checked ? "text-[var(--dim)] line-through" : ""}>{inline(box[2])}</span>
             </div>
           );

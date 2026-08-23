@@ -250,11 +250,13 @@ export function OverviewPage() {
                   const urgent = r.chips.find((c) => c.kind === "overdue" || c.kind === "due" || c.kind === "blocked");
                   return (
                     <div key={idKey(r.item)} className={`mb-2 flex items-start gap-2 rounded-lg border-l-2 bg-[var(--surf-2)] px-3 py-[8px] ${urgent?.kind === "overdue" ? "border-[var(--red)]" : "border-[var(--amber)]"}`}>
-                      <button
-                        onClick={() => toggleCluster(r.cluster)}
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        onChange={() => toggleCluster(r.cluster)}
                         title={r.cluster.length > 1 ? `Check off in all ${r.cluster.length} sources` : "Check off"}
-                        className="cursor-pointer text-[var(--cyan)]"
-                      >☐</button>
+                        className="chk mt-[2px]"
+                      />
                       <span className="min-w-0 flex-1 font-sans text-[12.5px] leading-relaxed text-[var(--text)]">
                         {r.item.owner && <b className="text-[var(--bright)]">{r.item.owner}: </b>}{r.item.text.replace(/\*\*/g, "").slice(0, 110)}
                         {urgent && (
