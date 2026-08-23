@@ -62,6 +62,8 @@ mockup go to the backlog at the bottom.
 - [x] 5 Brain — APPROVED (2e1c352)
 - [x] 6 Actions — APPROVED (feb0194..2616feb + mock-match iterations)
 - [x] 7 Notes — APPROVED (8ee4604)
+
+ALL SCREENS COMPLETE — merged to main.
 - [x] 8 Projects — APPROVED (d01909e)
-- [x] 9 Settings — AWAITING OWNER REVIEW
-- [x] 10 Header/voice — AWAITING OWNER REVIEW (sweep)
+- [x] 9 Settings — APPROVED (4edc1b7 + 4313b56 rail layout)
+- [x] 10 Header/voice — APPROVED (f9cb630)
