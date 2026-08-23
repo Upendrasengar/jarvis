@@ -27,3 +27,6 @@ apps/server/dist/
 apps/web/dist/
 *.tsbuildinfo
 __pycache__/
+
+# built app bundles (rebuilt by install.sh)
+tools/menubar/JarvisBar.app/

@@ -82,6 +82,36 @@ PLIST
   else bad "JarvisAudio.app build failed — see /tmp/jarvis-swift-err"; fi
 fi
 
+# JarvisBar.app: the menu-bar face — status icon, record controls, master
+# switch (starting it starts the server). Rebuilt whenever the source is
+# newer than the binary so upgrades pick up changes.
+BARD="tools/menubar/JarvisBar.app/Contents"
+if [[ -x "$BARD/MacOS/jarvisbar" && "$BARD/MacOS/jarvisbar" -nt tools/menubar/jarvisbar.swift ]]; then ok "JarvisBar.app"
+elif [[ $CHECK_ONLY == 1 ]]; then bad "JarvisBar.app not built — run: jarvis setup"
+else
+  mkdir -p "$BARD/MacOS"
+  cat > "$BARD/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>com.jarvis.bar</string>
+  <key>CFBundleName</key><string>Jarvis</string>
+  <key>CFBundleDisplayName</key><string>Jarvis</string>
+  <key>CFBundleExecutable</key><string>jarvisbar</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSUIElement</key><true/>
+  <key>JarvisDir</key><string>$PWD</string>
+</dict>
+</plist>
+PLIST
+  if swiftc -O tools/menubar/jarvisbar.swift -o "$BARD/MacOS/jarvisbar" 2>/tmp/jarvis-swift-err \
+     && codesign --force -s - tools/menubar/JarvisBar.app 2>>/tmp/jarvis-swift-err; then
+    ok "JarvisBar.app built + signed (menu-bar icon)"
+  else bad "JarvisBar.app build failed — see /tmp/jarvis-swift-err"; fi
+fi
+
 echo "── recording permissions (attributed to Jarvis Audio) ──"
 check_perms() {
   local rf; rf="$(mktemp)"

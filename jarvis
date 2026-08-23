@@ -8,6 +8,7 @@
 #   jarvis setup      -> full dependency setup (whisper model download etc.)
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
+#   jarvis bar        -> open the menu-bar icon (status + record controls)
 #   jarvis upgrade    -> update to the latest release and restart
 #   jarvis uninstall  -> remove Jarvis completely (asks about your data)
 #   jarvis "what do I know about X"  -> one-shot question
@@ -23,7 +24,15 @@ fi
 
 if [[ $# -eq 0 ]]; then
   exec claude          # interactive: type, or hold space for voice
-elif [[ "$1" == "start" || "$1" == "stop" || "$1" == "restart" || "$1" == "status" ]]; then
+elif [[ "$1" == "start" ]]; then
+  bash tools/services.sh start
+  # the menu-bar icon rides along when it's built
+  [[ -d tools/menubar/JarvisBar.app ]] && ! pgrep -qf JarvisBar.app && open -g -a "$PWD/tools/menubar/JarvisBar.app" 2>/dev/null
+  exit 0
+elif [[ "$1" == "stop" ]]; then
+  pkill -f JarvisBar.app 2>/dev/null
+  exec bash tools/services.sh stop
+elif [[ "$1" == "restart" || "$1" == "status" ]]; then
   exec bash tools/services.sh "$1"
 elif [[ "$1" == "ui" ]]; then
   exec bash tools/services.sh start
@@ -44,6 +53,9 @@ elif [[ "$1" == "setup" ]]; then
     case "$yn" in [Yy]*) bash tools/service.sh install ;; esac
   fi
   exit 0
+elif [[ "$1" == "bar" ]]; then
+  [[ -d tools/menubar/JarvisBar.app ]] || { echo "not built yet — run: jarvis setup"; exit 1; }
+  exec open -g -a "$PWD/tools/menubar/JarvisBar.app"
 elif [[ "$1" == "service" ]]; then
   shift
   exec bash tools/service.sh "$@"
