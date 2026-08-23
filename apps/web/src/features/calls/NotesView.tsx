@@ -49,6 +49,10 @@ type Props = {
   onToggle: (index: number) => void;
   onEditLine?: (lineIndex: number, newLine: string) => void;
   onComment?: (index: number) => void;
+  // card mode groups ## sections into the call-notes grid; flat mode (Notes
+  // page) renders the document as one flow — freeform notes rarely have the
+  // section skeleton the cards assume
+  cards?: boolean;
 };
 
 // visual placement per known section (matched on the H2 text, lowercased);
@@ -67,7 +71,7 @@ const LAYOUT: Record<string, { order: number; span?: boolean; glyph?: string }> 
 let editingNow = false;
 
 export const NotesView = memo(
-  function NotesView({ notes, onToggle, onEditLine, onComment }: Props) {
+  function NotesView({ notes, onToggle, onEditLine, onComment, cards = true }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
     let checkboxIndex = -1;
     // ↳-comment styling applies ONLY to indented bullets directly under a
@@ -196,6 +200,22 @@ export const NotesView = memo(
       }
       return <p key={i} className="mb-2">{editable(i, "", "", line)}</p>;
     };
+
+    if (!cards)
+      return (
+        <div ref={rootRef} className="max-w-[720px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
+          {lines.map((line, i) => {
+            const h2 = line.match(/^## (.+)$/);
+            if (h2)
+              return (
+                <h2 key={i} className="mb-2 mt-6 border-b border-[var(--line)] pb-1 text-[13px] font-semibold text-[var(--bright)]">
+                  {editable(i, "## ", "", h2[1])}
+                </h2>
+              );
+            return renderLine(line, i, "");
+          })}
+        </div>
+      );
 
     // group lines into ## sections (display-only; file order preserved)
     type Sec = { title?: { text: string; i: number }; rows: Array<{ line: string; i: number }> };

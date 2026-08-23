@@ -60,8 +60,8 @@ mockup go to the backlog at the bottom.
 - [x] 3 Calls — APPROVED (35fff81)
 - [x] 4 Chat — APPROVED (514fc41)
 - [x] 5 Brain — APPROVED (2e1c352)
-- [x] 6 Actions — AWAITING OWNER REVIEW
-- [ ] 7 Notes
+- [x] 6 Actions — APPROVED (feb0194..2616feb + mock-match iterations)
+- [x] 7 Notes — AWAITING OWNER REVIEW
 - [ ] 8 Projects
 - [ ] 9 Settings
 - [ ] 10 Header/voice

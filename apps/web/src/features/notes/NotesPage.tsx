@@ -130,10 +130,11 @@ export function NotesPage() {
 
   return (
     <div className="flex h-full">
-      <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--chipbg)] p-3 backdrop-blur-lg">
+      <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] p-3">
+        <h2 className="px-1 pt-1 text-[18px] font-semibold text-[var(--bright)] [font-family:var(--display)]">Notes</h2>
         <button
           onClick={newNote}
-          className="w-full rounded-lg border border-[rgba(57,215,255,.35)] bg-[rgba(57,215,255,.06)] py-2 text-[10px] tracking-[1.5px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.12)]"
+          className="w-full rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] py-2 text-[10px] tracking-[1.5px] text-[var(--cyan)] hover:bg-[var(--cyan-3)]"
         >
           ＋ NEW NOTE
         </button>
@@ -147,10 +148,10 @@ export function NotesPage() {
           <button
             key={n.id}
             onClick={() => navigate(`/notes/${n.id}`)}
-            className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+            className={`w-full rounded-xl border px-3 py-2 text-left transition ${
               n.id === selected
-                ? "border-[rgba(57,215,255,.35)] bg-[rgba(57,215,255,.08)]"
-                : "border-transparent hover:bg-[rgba(57,215,255,.05)]"
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)]"
+                : "border-transparent hover:bg-[var(--surf-2)]"
             }`}
           >
             <div className="truncate font-sans text-xs font-semibold text-[var(--bright)]">{n.title}</div>
@@ -169,7 +170,7 @@ export function NotesPage() {
         ) : (
           <>
             <div className="flex items-start justify-between gap-4">
-              <h1 className="text-2xl leading-tight text-[var(--bright)]">{meta.title}</h1>
+              <h1 className="text-[26px] leading-tight text-[var(--bright)] [font-family:var(--display)]">{meta.title}</h1>
               <span className="flex shrink-0 gap-2">
                 {draft !== null ? (
                   <>
@@ -212,13 +213,13 @@ export function NotesPage() {
             </div>
 
             <div className="mb-5 mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border border-[var(--line)] bg-[var(--chipbg)] px-[10px] py-[3px] text-[10px] text-[var(--dim)]">
+              <span className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-[10px] py-[3px] text-[10px] text-[var(--dim)]">
                 updated {ago(meta.updated)}
               </span>
               {meta.call && (
                 <Link
                   to={`/calls/${meta.call}`}
-                  className="rounded-full border border-[rgba(57,215,255,.4)] bg-[var(--chipbg)] px-[10px] py-[3px] text-[10px] text-[var(--cyan)] hover:bg-[rgba(57,215,255,.1)]"
+                  className="rounded-full border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-[10px] py-[3px] text-[10px] text-[var(--cyan)] hover:bg-[var(--cyan-3)]"
                 >
                   from call {meta.call} →
                 </Link>
@@ -231,12 +232,13 @@ export function NotesPage() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   spellCheck={false}
-                  className="h-[60vh] w-full resize-y rounded-xl border border-[rgba(57,215,255,.35)] bg-[var(--field)] p-4 font-mono text-[12.5px] leading-relaxed text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+                  className="h-[60vh] w-full resize-y rounded-xl border border-[var(--cyan-3)] bg-[var(--field)] p-4 font-mono text-[12.5px] leading-relaxed text-[var(--text)] outline-none focus:border-[var(--cyan)]"
                 />
               </div>
             ) : doc ? (
               <>
                 <NotesView
+                  cards={false}
                   notes={doc.md.replace(/^---\n[\s\S]*?\n---\n?/, "")}
                   onToggle={toggleItem}
                   onComment={setCommentFor}
@@ -258,7 +260,7 @@ export function NotesPage() {
               <div className={`fixed bottom-6 right-6 z-50 rounded-full border px-4 py-2 font-sans text-xs shadow-lg backdrop-blur ${
                 toast === "ok"
                   ? "border-[rgba(62,224,138,.45)] bg-[rgba(62,224,138,.12)] text-[var(--green)]"
-                  : "border-[rgba(255,92,122,.45)] bg-[rgba(255,92,122,.12)] text-[var(--red)]"
+                  : "border-[rgba(255,107,132,.45)] bg-[rgba(255,107,132,.12)] text-[var(--red)]"
               }`}>
                 {toast === "ok" ? "✓ Auto-saved" : "✕ Save failed"}
               </div>
