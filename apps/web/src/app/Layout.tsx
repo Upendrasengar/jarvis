@@ -78,7 +78,7 @@ export function Layout() {
             <RailLink to="/settings" icon="settings" label="SETUP" />
           </div>
         </aside>
-        <main className="relative min-h-0 flex-1">
+        <main className="relative min-h-0 min-w-0 flex-1">
           <Outlet />
         </main>
       </div>

@@ -161,6 +161,10 @@ export function BrainPage() {
     });
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
+    const ro = new ResizeObserver(() => {
+      graphRef.current?.width(wrap.clientWidth).height(wrap.clientHeight);
+    });
+
     (async () => {
       const data = await (await fetch("/api/graph")).json();
       if (cancelled) return;
@@ -182,6 +186,8 @@ export function BrainPage() {
       const c = ctlRef.current;
       const pal = palRef.current;
       const graph = new ForceGraph3D(wrap)
+        .width(wrap.clientWidth)
+        .height(wrap.clientHeight)
         .graphData(filterData(data, c))
         .backgroundColor(pal.bg)
         .nodeColor((n: any) => colorFor(n.group))
@@ -235,11 +241,16 @@ export function BrainPage() {
         requestAnimationFrame(orbit);
       };
       orbit();
+
+      // the canvas defaults to WINDOW size — with the icon rail the content
+      // area is narrower, so track the container instead of the window
+      ro.observe(wrap);
     })();
 
     return () => {
       cancelled = true;
       orbiting = false;
+      ro.disconnect();
       mo.disconnect();
       graphRef.current?._destructor?.();
       graphRef.current = null;
@@ -274,7 +285,7 @@ export function BrainPage() {
   const set = (patch: Partial<Controls>) => setCtl((c) => ({ ...c, ...patch }));
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full overflow-hidden">
       <div className="absolute left-5 top-4 z-[5]">
         <div className="font-bold tracking-[2px] text-[var(--indigo)] [font-family:var(--display)] [text-shadow:0_0_14px_var(--indigo-3)]">
           KRONOS · SECOND BRAIN
