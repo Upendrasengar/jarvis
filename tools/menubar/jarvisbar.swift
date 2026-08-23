@@ -114,13 +114,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func render() {
         guard let btn = item.button else { return }
         let sym = recording ? "waveform.circle.fill" : "waveform.circle"
-        let img = NSImage(systemSymbolName: sym, accessibilityDescription: "Jarvis")
-        // ALWAYS template: tinting only applies to template images — a
-        // non-template symbol renders black on any menu bar appearance
-        img?.isTemplate = true
-        btn.image = img
         if recording {
-            btn.contentTintColor = .systemRed
+            // contentTintColor on status-item buttons is unreliable — paint
+            // the symbol itself via a palette configuration, and the counter
+            // via an attributed title. Red on ANY menu bar appearance.
+            let cfg = NSImage.SymbolConfiguration(paletteColors: [.systemRed])
+            let img = NSImage(systemSymbolName: sym, accessibilityDescription: "Jarvis recording")?
+                .withSymbolConfiguration(cfg)
+            img?.isTemplate = false
+            btn.image = img
             var t = " REC"
             if let s = recStarted {
                 let secs = max(0, Int(Date().timeIntervalSince(s)))
@@ -128,10 +130,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 t = m >= 60 ? String(format: " %d:%02dh", m / 60, m % 60)
                             : String(format: " %d:%02d", m, secs % 60)
             }
-            btn.title = t
+            btn.attributedTitle = NSAttributedString(string: t, attributes: [
+                .foregroundColor: NSColor.systemRed,
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
+            ])
         } else {
+            let img = NSImage(systemSymbolName: sym, accessibilityDescription: "Jarvis")
+            img?.isTemplate = true       // adapts to light/dark menu bars
+            btn.image = img
             btn.contentTintColor = serverUp ? nil : .disabledControlTextColor
-            btn.title = ""
+            btn.attributedTitle = NSAttributedString(string: "")
         }
     }
 
