@@ -7,20 +7,22 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
+import { ContextRail } from "./ContextRail";
 
 // "SOURCES: /calls/x /notes/y" (from recall workers) renders as link chips
-function splitSources(t: string): { body: string; sources: { to: string; label: string }[] } {
+function splitSources(t: string): { body: string; sources: { to: string; kind: "call" | "note"; label: string }[] } {
   const m = t.match(/^SOURCES:\s*(.+)$/im);
   if (!m) return { body: t, sources: [] };
   const sources = (m[1].match(/\/(?:calls|notes)\/\S+/g) ?? []).map((raw) => {
     const to = raw.replace(/[.,;]+$/, "");
     const id = decodeURIComponent(to.split("/").pop() ?? "");
-    return { to, label: (to.startsWith("/calls/") ? "📞 " : "📝 ") + id };
+    const kind = (to.startsWith("/calls/") ? "call" : "note") as "call" | "note";
+    return { to, kind, label: (kind === "call" ? "☎ " : "◇ ") + id };
   });
   return { body: t.replace(m[0], "").trimEnd(), sources };
 }
 
-function SourceChips({ sources }: { sources: { to: string; label: string }[] }) {
+function SourceChips({ sources }: { sources: { to: string; kind: "call" | "note"; label: string }[] }) {
   if (!sources.length) return null;
   return (
     <span className="mt-2 flex flex-wrap gap-1.5">
@@ -28,7 +30,7 @@ function SourceChips({ sources }: { sources: { to: string; label: string }[] }) 
         <Link
           key={i}
           to={s.to}
-          className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-2 py-[2px] font-sans text-[10.5px] text-[var(--cyan)] no-underline hover:border-[var(--cyan)]"
+          className={`rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-2 py-[2px] text-[10px] no-underline ${s.kind === "call" ? "text-[var(--cyan)] hover:border-[var(--cyan-3)]" : "text-[var(--indigo)] hover:border-[var(--indigo-3)]"}`}
         >
           {s.label}
         </Link>
@@ -151,8 +153,15 @@ export function ChatPage() {
     navigate(`/chat/${id}`);
   };
 
+  const lastSources = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--)
+      if (messages[i].c === "jarvis" && messages[i].t) return splitSources(messages[i].t).sources;
+    return [];
+  }, [messages]);
+
   return (
-    <div className="relative mx-auto flex h-full max-w-[780px] flex-col px-6 py-4">
+    <div className="flex h-full">
+    <div className="relative mx-auto flex h-full w-full max-w-[780px] flex-col px-6 py-4">
       {messages.length === 0 && (
         <div className="absolute inset-x-6 bottom-[120px] top-0 z-10 flex flex-col items-center justify-center gap-2 text-center">
           <span className="blip h-[11px] w-[11px] rounded-full bg-[var(--cyan)] shadow-[0_0_18px_var(--cyan),0_0_44px_var(--cyan-3)]" />
@@ -183,7 +192,7 @@ export function ChatPage() {
           return m.c === "me" ? (
             <div
               key={i}
-              className="mt-4 max-w-[76%] self-end whitespace-pre-wrap rounded-[18px_18px_6px_18px] border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-[14px] py-[10px] font-sans text-[13.5px] leading-relaxed [box-shadow:var(--shadow)]"
+              className="mt-4 max-w-[76%] self-end whitespace-pre-wrap rounded-[18px_18px_6px_18px] border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[14px] py-[10px] font-sans text-[13.5px] leading-relaxed [box-shadow:var(--shadow)]"
             >
               {m.imgs?.length ? (
                 <span className="mb-2 flex flex-wrap gap-2">
@@ -288,6 +297,11 @@ export function ChatPage() {
           enter to send · 🎙 to speak
         </div>
       </div>
+    </div>
+
+    <aside className="hidden w-[260px] shrink-0 overflow-auto border-l border-[var(--line)] bg-[var(--surf)] px-4 py-6 xl:block">
+      <ContextRail sources={lastSources} onAsk={(t) => submit(t)} />
+    </aside>
     </div>
   );
 }
