@@ -70,6 +70,7 @@ Homebrew (recommended):
 
 ```bash
 brew tap upendrasengar/jarvis
+brew trust upendrasengar/jarvis   # newer Homebrew requires trusting third-party taps once
 brew install jarvis
 jarvis init && jarvis start     # → http://localhost:4321 · data in ~/.jarvis
 ```
