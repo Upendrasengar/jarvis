@@ -119,7 +119,14 @@ empty, say 'All clear.' Then a calendar line (say 'not checked in headless \
 mode'), and 1-3 suggested focuses — read data/triage.json (attention annotations: \
 deadlines, blocked flags, duplicate clusters) and lead with overdue items, \
 then items I own that block others, then the oldest or most blocking \
-open items. Keep it scannable. Then print the digest file path." \
+open items. EACH focus item MUST follow this exact structure on one line: \
+'N. **Short title (3-6 words)** — one or two sentences of why it matters \
+today. (due: YYYY-MM-DD)' — the bold title is mandatory and must contain \
+NO dates, deadlines, or urgency words (URGENT, due, days left); deadlines \
+live ONLY in the trailing (due: YYYY-MM-DD) tag, included when a real \
+deadline exists (from triage or the item text) and omitted otherwise. Example: '1. **EC Oct 1 promotion** — All approval \
+steps must clear by Thursday, not just be submitted. Irreversible if \
+missed. (due: 2026-08-27)'. Keep it scannable. Then print the digest file path." \
   --model sonnet --allowedTools "Read,Write" 2>&1 | tail -3
 
 echo "[run-digest] done: $JARVIS_DIR/reports/digest-$DATE.md"

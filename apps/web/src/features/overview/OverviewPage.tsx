@@ -112,9 +112,28 @@ export function OverviewPage() {
     qc.invalidateQueries({ queryKey: ["actions"] });
   };
 
+  // structured focus items: '**Title** — why it matters. (due: YYYY-MM-DD)';
+  // pre-structure digests fall back to a plain-text card
   const focus = ((dig?.md ?? "").split(/## Suggested focuses/i)[1] ?? "").split(/\n## /)[0]
     .split("\n").filter((l) => /^\s*(\d+\.|[-*])\s+/.test(l))
-    .map((l) => l.replace(/^\s*(\d+\.|[-*])\s+/, "").replace(/\*\*/g, "").trim()).slice(0, 3);
+    .map((l) => {
+      const raw = l.replace(/^\s*(\d+\.|[-*])\s+/, "").trim();
+      const due = raw.match(/\(due:\s*(\d{4}-\d{2}-\d{2})\)\s*$/)?.[1];
+      const body = raw.replace(/\s*\(due:[^)]*\)\s*$/, "").trim();
+      const tm = body.match(/^\*\*(.+?)\*\*\s*[—–-]?\s*/);
+      return {
+        title: tm?.[1],
+        desc: (tm ? body.slice(tm[0].length) : body).replace(/\*\*/g, "").trim(),
+        due,
+      };
+    }).slice(0, 3);
+  const dueMeta = (due: string) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const days = Math.round((new Date(due + "T00:00:00").getTime() - today.getTime()) / 86_400_000);
+    const label = new Date(due + "T12:00:00")
+      .toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+    return { days, label };
+  };
 
   const overdueCount = bucket.filter((r) => r.chips.some((c) => c.kind === "overdue")).length;
   const tiles: Array<[string, string | number, string, string, string]> = [
@@ -132,15 +151,37 @@ export function OverviewPage() {
         <div className="flex min-h-0 flex-col gap-3">
           <Card title="Today's Focus" tag="FROM DIGEST" className="flex-1">
             {focus.length
-              ? focus.map((f, i) => (
-                  <Link
-                    key={i}
-                    to="/digest"
-                    className="group mb-2 block rounded-lg border-l-2 border-[var(--cyan-3)] bg-[var(--surf-2)] px-3 py-[8px] font-sans text-[12.5px] leading-relaxed text-[var(--text)] no-underline transition hover:border-[var(--cyan)]"
-                  >
-                    {f}
-                  </Link>
-                ))
+              ? focus.map((f, i) => {
+                  const meta = f.due ? dueMeta(f.due) : null;
+                  const urgent = meta !== null && meta.days <= 5;
+                  return (
+                    <Link
+                      key={i}
+                      to="/digest"
+                      className={`group mb-2 block rounded-lg border-l-2 bg-[var(--surf-2)] px-3 py-[8px] no-underline transition ${
+                        urgent ? "border-[var(--red)]" : "border-[var(--cyan-3)] hover:border-[var(--cyan)]"}`}
+                    >
+                      {f.title && (
+                        <span className="block font-sans text-[12.5px] font-semibold leading-snug text-[var(--bright)]">
+                          {f.title}
+                        </span>
+                      )}
+                      <span className={`block font-sans text-[12px] leading-relaxed ${f.title ? "text-[var(--dim)]" : "text-[var(--text)]"}`}>
+                        {f.desc}
+                      </span>
+                      {meta && (
+                        <span className={`mt-[6px] inline-block rounded border px-[7px] py-[2px] text-[8.5px] tracking-[1.2px] ${
+                          urgent
+                            ? "border-[rgba(255,107,132,.4)] bg-[rgba(255,107,132,.1)] text-[var(--red)]"
+                            : "border-[var(--line)] text-[var(--dim)]"}`}>
+                          {meta.days < 0 ? `OVERDUE · WAS ${meta.label}` :
+                           meta.days === 0 ? `DUE TODAY` :
+                           `DUE ${meta.label} · ${meta.days} DAY${meta.days === 1 ? "" : "S"}`}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })
               : <Quiet>No digest yet — ask Jarvis for one.</Quiet>}
           </Card>
           {tiles.map(([lbl, val, sub, to, icon]) => (
