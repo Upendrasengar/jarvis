@@ -102,6 +102,8 @@ export function spawnAgent(project: string, task: string, sessionId = "") {
     `- You MAY read, edit, and run build/test commands. Do NOT push, do NOT merge, do NOT force-push,`,
     `  and NEVER commit to or modify main/master/develop directly.`,
     `- If the task is unclear or risky, STOP and explain what you need instead of guessing.`,
+    `- When finished, run: git checkout - (return the repo to the branch you found it on —`,
+    `  leaving it on your agent branch breaks the owner's next commit).`,
     `- When finished, end your response with a section "SUMMARY:" containing: what you changed,`,
     `  files touched, whether build/tests pass, and the branch name. Keep it under 8 lines.`,
     `Work now and report.`,
