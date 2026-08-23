@@ -138,7 +138,10 @@ export function spawnAsk(task: string, sessionId = "") {
       `specific day, run: curl -s 'http://127.0.0.1:${PORT}/api/calendar/day?date=YYYY-MM-DD' — it returns`,
       `{events:[{subject,start,end,organizer,attendees,...}]} — start/end are UTC ISO timestamps;`,
       `ALWAYS convert them to the owner's local timezone before answering.`,
-      `Compute the concrete date first (today is ${new Date().toLocaleDateString("sv-SE")}, a ${new Date().toLocaleDateString("en-US", { weekday: "long" })}).`,
+      `DATE REFERENCE (local) — use THIS mapping, never compute weekdays yourself: ${Array.from({ length: 8 }, (_, i) => {
+        const d = new Date(Date.now() + i * 86_400_000);
+        return `${d.toLocaleDateString("en-US", { weekday: "short" })}=${d.toLocaleDateString("sv-SE")}`;
+      }).join(" ")} (first entry is today).`,
       `Trust this API over notes/digests for what is ON the calendar; notes still matter for context.`,
     ] : []),
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, grep the vaults for the literal text [[X]] (e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",

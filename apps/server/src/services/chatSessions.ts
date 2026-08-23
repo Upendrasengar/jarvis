@@ -89,7 +89,11 @@ function spawnWarm(sessionId: string): Session {
     "--input-format", "stream-json", "--output-format", "stream-json",
     "--include-partial-messages", "--model", model,
     ...sessArgs,
-    "--append-system-prompt", CONCISE + memoryBrief(),
+    "--append-system-prompt", CONCISE + memoryBrief() +
+      `\n\nDATE REFERENCE (local) — when the user says a weekday, use THIS mapping, never compute it: ${Array.from({ length: 8 }, (_, i) => {
+        const d = new Date(Date.now() + i * 86_400_000);
+        return `${d.toLocaleDateString("en-US", { weekday: "short" })}=${d.toLocaleDateString("sv-SE")}`;
+      }).join(" ")} (first entry is today).`,
     "--disallowedTools", "Bash,Read,Edit,Write,Grep,Glob,WebFetch,WebSearch,Task,NotebookEdit",
   ], {
     cwd: JARVIS_DIR,
