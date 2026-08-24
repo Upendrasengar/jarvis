@@ -5,7 +5,7 @@ import { SettingsPatch } from "@jarvis/shared";
 import { patchSettings, readSettings, setVoiceListening, voicesInfo } from "../services/settings.js";
 import { localOnly } from "../plugins/localOnly.js";
 import { voiceActive } from "../live/liveState.js";
-import { calendarState, fetchDay } from "../integrations/calendar.js";
+import { calendarState, fetchDay, refreshCalendar } from "../integrations/calendar.js";
 import { tokenStats } from "../services/tokens.js";
 
 export function settingsRoutes(app: FastifyInstance) {
@@ -25,6 +25,7 @@ export function settingsRoutes(app: FastifyInstance) {
   // optional calendar adapter — { enabled:false } when not configured
   app.get("/api/tokens", async () => tokenStats());
   app.get("/api/calendar", async () => calendarState());
+  app.post("/api/calendar/refresh", { preHandler: localOnly }, async () => refreshCalendar());
   // workers' calendar tool: any single day, fetched live from the feed
   app.get("/api/calendar/day", async (req, reply) => {
     const { date } = req.query as { date?: string };

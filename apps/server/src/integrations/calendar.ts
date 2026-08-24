@@ -61,6 +61,14 @@ let state: { enabled: boolean; fetchedAt: string | null; events: CalEvent[] } = 
 
 export function calendarState() { return state; }
 
+// on-demand refresh — the Today card's resync button
+export async function refreshCalendar() {
+  const url = readSecrets().CALENDAR_FEED_URL;
+  if (!url) return state;
+  await poll(url);
+  return state;
+}
+
 // ---- ICS parsing (the 20% that covers real feeds) ----
 function unfoldICS(text: string): string[] {
   return text.replace(/\r\n[ \t]/g, "").replace(/\r/g, "").split("\n");

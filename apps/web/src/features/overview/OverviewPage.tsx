@@ -289,7 +289,28 @@ export function OverviewPage() {
           </Card>
 
           {cal?.enabled && (
-            <Card title="Today" tag={String(meetings.length || "—")} className="flex-1">
+            <Card
+              title="Today"
+              tag={
+                <span className="flex items-center gap-2">
+                  {String(meetings.length || "—")}
+                  <button
+                    onClick={async (e) => {
+                      const el = e.currentTarget;
+                      el.classList.add("animate-spin");
+                      await fetch("/api/calendar/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
+                      qc.invalidateQueries({ queryKey: ["calendar"] });
+                      el.classList.remove("animate-spin");
+                    }}
+                    title="Resync the calendar feed now"
+                    className="text-[12px] leading-none text-[var(--dim)] hover:text-[var(--cyan)]"
+                  >
+                    ↻
+                  </button>
+                </span>
+              }
+              className="flex-1"
+            >
               {(() => {
                 if (!meetings.length) return <Quiet>No meetings today.</Quiet>;
                 const now = Date.now();
