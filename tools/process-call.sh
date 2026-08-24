@@ -161,7 +161,7 @@ Group related points; keep each bullet one line. This is the heart of the note.
 ## Decisions
 Bullets, each with who drove it if clear. Omit section if none.
 ## Action items
-Bullets, '- [ ]' checkboxes, owner FIRST: '- [ ] Arjun: send the design doc'. Use the named owner the call assigned it to; 'Me' for $OWNER's items; 'Unassigned' if nobody owns it. Omit if none.
+Bullets, '- [ ]' checkboxes, owner FIRST: '- [ ] Arjun: send the design doc'. Use the named owner the call assigned it to; 'Me' for $OWNER's items; 'Unassigned' if nobody owns it. Pay special attention to first-person commitments $OWNER spoke aloud ('I'll send', 'let me check', 'I need to', 'I'll follow up') — capture EVERY one as a Me: item; spoken promises are the easiest to lose. Omit if none.
 ## Open questions
 Bullets. Omit if none.
 End with EXACTLY one line connecting this call into the knowledge graph:
