@@ -31,13 +31,17 @@ export function SearchBar() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      // capture phase + code-based match: fires even when focus sits in an
+      // input/contentEditable, and beats any handler that stops propagation
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === "k" || e.code === "KeyK")) {
         e.preventDefault();
+        e.stopPropagation();
         inputRef.current?.focus();
+        inputRef.current?.select();
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   }, []);
 
   useEffect(() => {
