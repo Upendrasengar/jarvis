@@ -39,6 +39,19 @@ export type Job = {
   state: { lastRunAt?: string; lastStatus?: string; lastFiredKey?: string; nextRunAt?: number };
 };
 
+// the heartbeat's own memory: what it already sent today. Without this,
+// every pulse is a fresh session that happily re-nags the same item all
+// day (the "seven Niharika reminders" incident).
+const SENT_LOG = path.join(JARVIS_DIR, "data", "heartbeat-log.json");
+function loadSent(): Array<{ at: string; text: string }> {
+  try { return JSON.parse(fs.readFileSync(SENT_LOG, "utf8")); } catch { return []; }
+}
+function logSent(text: string) {
+  const log = loadSent().slice(-29);
+  log.push({ at: new Date().toISOString(), text: text.slice(0, 250) });
+  try { fs.writeFileSync(SENT_LOG, JSON.stringify(log, null, 1)); } catch {}
+}
+
 // telegram registers its sender at startup — avoids a circular import
 let sender: ((text: string) => Promise<void>) | null = null;
 export function setReminderSender(fn: (text: string) => Promise<void>) { sender = fn; }
@@ -124,6 +137,12 @@ function heartbeatContext(): string {
     });
     if (failed.length) lines.push(`FAILED call processing: ${failed.join(", ")} (rerunnable from the Calls page)`);
   } catch {}
+  const today2 = new Date().toLocaleDateString("sv-SE");
+  const sent = loadSent().filter((e) => e.at.slice(0, 10) === today2 ||
+    new Date(e.at).toLocaleDateString("sv-SE") === today2);
+  if (sent.length)
+    lines.push("ALREADY SENT TODAY (yours — do NOT re-send these topics):\n" +
+      sent.map((e) => `  [${new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}] ${e.text}`).join("\n"));
   return lines.join("\n");
 }
 
@@ -146,10 +165,11 @@ async function fire(j: Job): Promise<string> {
   const context = j.id === HEARTBEAT_ID ? `\n\n=== CURRENT STATE (server-gathered) ===\n${heartbeatContext()}` : "";
   const out = await runAgent(
     j.payload.prompt + context +
-    "\n\nIf nothing genuinely needs the owner's attention right now, reply with exactly HEARTBEAT_OK and nothing else.",
+    "\n\nHARD RULES: an item that appears in ALREADY SENT TODAY must NOT be mentioned again unless its status materially changed since (e.g. it just became overdue, or a meeting moved). Maximum twice per day for any single item — once to flag it, once near end of day if still open. If everything you would flag is already covered, reply with exactly HEARTBEAT_OK and nothing else. If nothing genuinely needs the owner's attention right now, reply HEARTBEAT_OK.",
   );
   if (!out || /^HEARTBEAT_OK\b/.test(out)) return "quiet";
   await deliver(out);
+  if (j.id === HEARTBEAT_ID) logSent(out);
   return "ok";
 }
 
