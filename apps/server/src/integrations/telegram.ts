@@ -5,6 +5,11 @@
 // anyone can find any bot, so every update from another chat is ignored.
 // Setup: `jarvis telegram` (writes TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID
 // into gitignored secrets/.env), then restart.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFile } from "node:child_process";
+import { JARVIS_DIR } from "../config.js";
 import { readSecrets } from "../services/env.js";
 import { sendTurn } from "../services/chatSessions.js";
 import { dispatchDelegate } from "../services/agents.js";
@@ -73,13 +78,50 @@ async function handleUpdate(u: any) {
     console.log(`[telegram] ignored message from non-owner chat ${chat}`);
     return;
   }
-  const text: string | undefined = msg.text;
+  let text: string | undefined = msg.text;
+  const voice = msg.voice ?? msg.audio;
+  if (!text && voice) {
+    if ((voice.duration ?? 0) > 300) {
+      await say("That voice note is over 5 minutes — record it as a call instead, or send a shorter one.");
+      return;
+    }
+    api("sendChatAction", { chat_id: ownerChat, action: "typing" }).catch(() => {});
+    const t = await transcribeVoice(voice.file_id);
+    if (!t) {
+      await say("Couldn't transcribe that voice note — is the whisper model installed? (jarvis setup)");
+      return;
+    }
+    await say(`\u{1F399} \u201c${t.slice(0, 300)}\u201d`);
+    text = t;
+  }
   if (!text) {
-    await say("I can only read text here so far — voice notes are on the roadmap.");
+    await say("I can read text and voice notes here — that message type isn't supported yet.");
     return;
   }
   api("sendChatAction", { chat_id: ownerChat, action: "typing" }).catch(() => {});
   await say(await runTurn(text));
+}
+
+// voice note → local whisper transcript. Download from Telegram, hand to
+// tools/transcribe-voice.sh (same model + ffmpeg path as call processing).
+async function transcribeVoice(fileId: string): Promise<string | null> {
+  try {
+    const info = await api("getFile", { file_id: fileId });
+    const fp = info?.result?.file_path;
+    if (!fp) return null;
+    const res = await fetch(`https://api.telegram.org/file/bot${token}/${fp}`);
+    if (!res.ok) return null;
+    const tmp = path.join(os.tmpdir(), `tg-voice-${Date.now()}${path.extname(fp) || ".oga"}`);
+    fs.writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
+    const out = await new Promise<string>((resolve) => {
+      execFile("/bin/bash", [path.join(JARVIS_DIR, "tools", "transcribe-voice.sh"), tmp],
+        { timeout: 180_000 }, (err, stdout) => resolve(err ? "" : String(stdout)));
+    });
+    fs.rmSync(tmp, { force: true });
+    return out.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 async function pollLoop() {
