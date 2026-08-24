@@ -292,20 +292,27 @@ export function OverviewPage() {
             <Card
               title="Today"
               tag={
-                <span className="flex items-center gap-2">
-                  {String(meetings.length || "—")}
+                <span className="flex items-center gap-1.5">
+                  {meetings.length > 0 && (
+                    <span className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-2 py-[1px] text-[9px] tracking-[1px] text-[var(--dim)]">
+                      {meetings.length} MEETING{meetings.length === 1 ? "" : "S"}
+                    </span>
+                  )}
                   <button
                     onClick={async (e) => {
-                      const el = e.currentTarget;
-                      el.classList.add("animate-spin");
+                      const el = e.currentTarget.querySelector("svg");
+                      el?.classList.add("animate-spin");
                       await fetch("/api/calendar/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
                       qc.invalidateQueries({ queryKey: ["calendar"] });
-                      el.classList.remove("animate-spin");
+                      el?.classList.remove("animate-spin");
                     }}
                     title="Resync the calendar feed now"
-                    className="text-[12px] leading-none text-[var(--dim)] hover:text-[var(--cyan)]"
+                    className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-[var(--line)] text-[var(--dim)] transition hover:border-[var(--cyan-3)] hover:text-[var(--cyan)]"
                   >
-                    ↻
+                    <svg viewBox="0 0 24 24" className="h-[11px] w-[11px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                      <path d="M21 3v6h-6" />
+                    </svg>
                   </button>
                 </span>
               }
