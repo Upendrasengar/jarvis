@@ -220,6 +220,41 @@ function Rail({ call }: { call: Call }) {
   );
 }
 
+// in-progress states get a real scene, not a lonely sentence: animated
+// equalizer, staged copy, and ghost cards where the notes will land
+function StatusScene({ tone, title, sub, extra }: {
+  tone: "red" | "amber"; title: string; sub: string; extra?: React.ReactNode;
+}) {
+  const color = tone === "red" ? "text-[var(--red)]" : "text-[var(--amber)]";
+  return (
+    <div className="mt-10">
+      <div className="flex flex-col items-center gap-3">
+        <div className={`flex h-12 items-center gap-[5px] ${color}`}>
+          {[0.9, 1.3, 0.7, 1.1, 1.5, 0.8, 1.2].map((d, i) => (
+            <span
+              key={i}
+              className="eqbar h-full w-[5px] rounded-full bg-current"
+              style={{ animationDelay: `${i * 0.12}s`, animationDuration: `${d}s` }}
+            />
+          ))}
+        </div>
+        <div className="font-sans text-[14px] font-semibold text-[var(--bright)]">{title}</div>
+        <div className="font-sans text-[12px] text-[var(--dim)]">{sub} {extra}</div>
+      </div>
+      <div className="mt-10 grid gap-4 opacity-50 xl:grid-cols-2">
+        {[3, 5].map((rows, k) => (
+          <div key={k} className="animate-pulse rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-5">
+            <div className="mb-4 h-[13px] w-[130px] rounded bg-[var(--surf-2)]" />
+            {Array.from({ length: rows }, (_, i) => (
+              <div key={i} className="mb-2.5 h-[10px] rounded bg-[var(--surf-2)]" style={{ width: `${88 - i * 9}%` }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: () => void }) {
   const toggle = useToggleItem();
   const del = useDeleteCall();
@@ -348,18 +383,23 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
           </div>
 
           {call.status === "recording" && (
-            <p className="mt-3 text-xs text-[var(--dim)]">
-              Recording in progress — both sides are being captured. Stop &amp; Save ends it
-              immediately; otherwise it stops ~30s after the call ends.
-            </p>
+            <StatusScene
+              tone="red"
+              title="Recording — both sides captured"
+              sub="Stop & Save ends it now; otherwise it stops ~30s after the call ends. Audio never leaves this machine."
+            />
           )}
-          {call.status === "processing" && (
-            <p className="mt-3 text-xs text-[var(--dim)]">
-              Transcribing locally and writing notes…{" "}
-              <a href={`/logs?src=call:${call.id}`} className="text-[var(--cyan)] hover:underline">
-                watch live progress →
-              </a>
-            </p>
+          {call.status === "processing" && !call.notes && (
+            <StatusScene
+              tone="amber"
+              title="Transcribing locally, then writing notes"
+              sub="Whisper runs on this machine — a long call can take a few minutes."
+              extra={
+                <a href={`/logs?src=call:${call.id}`} className="text-[var(--cyan)] hover:underline">
+                  watch live progress →
+                </a>
+              }
+            />
           )}
           {call.status === "failed" && (
             <div className="mb-4 mt-3 flex items-center gap-3">
