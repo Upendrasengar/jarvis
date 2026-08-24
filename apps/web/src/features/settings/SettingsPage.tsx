@@ -43,7 +43,9 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: "recording", label: "Call recording" },
   { id: "speaking", label: "Speaking voice" },
   { id: "reminders", label: "Reminders" },
+  { id: "memory", label: "Memory" },
   { id: "diagnostics", label: "Diagnostics" },
+  { id: "backup", label: "Backup & migrate" },
   { id: "tokens", label: "Token usage" },
   { id: "topics", label: "Topics" },
 ];
@@ -305,6 +307,153 @@ function TokensSection() {
   );
 }
 
+
+// core-memory editor: the .md files in memory/ that ride in every chat's
+// system prompt. Canonical stubs offered when missing; freeform files too.
+function MemorySection() {
+  const qc = useQueryClient();
+  const { data: files = [] } = useQuery<Array<{ name: string; missing: boolean; updated: number }>>({
+    queryKey: ["memoryFiles"],
+    queryFn: async () => (await fetch("/api/memory")).json(),
+  });
+  const [active, setActive] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [savedTick, setSavedTick] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const openFile = async (name: string) => {
+    const r = await (await fetch(`/api/memory/file?name=${encodeURIComponent(name)}`)).json();
+    setActive(name);
+    setDraft(r.md ?? "");
+  };
+  const save = async () => {
+    if (!active) return;
+    await fetch("/api/memory/file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: active, md: draft }),
+    }).catch(() => {});
+    qc.invalidateQueries({ queryKey: ["memoryFiles"] });
+    setSavedTick(true);
+    setTimeout(() => setSavedTick(false), 1800);
+  };
+  return (
+    <section className="mb-12">
+      <Heading
+        id="memory"
+        title="Memory"
+        desc="Jarvis's core memory — every markdown file here is loaded into the start of every conversation. about-me tells it who you are; active-projects drives the daily digest; HEARTBEAT.md is the background pulse's checklist. Add any file for facts that should persist."
+      />
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {files.map((f) => (
+          <button
+            key={f.name}
+            onClick={() => openFile(f.name)}
+            className={`rounded-full border px-3 py-[4px] font-sans text-[11.5px] transition ${
+              active === f.name
+                ? "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
+                : f.missing
+                  ? "border-dashed border-[var(--line-2)] text-[var(--dim)] hover:text-[var(--bright)]"
+                  : "border-[var(--line)] bg-[var(--surf-2)] text-[var(--text)] hover:border-[var(--cyan-3)]"}`}
+          >
+            {f.name}{f.missing ? " · create" : ""}
+          </button>
+        ))}
+        <button
+          onClick={() => setShowNew(true)}
+          className="rounded-full border border-[var(--line)] px-3 py-[4px] font-sans text-[11.5px] text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+        >＋ new file</button>
+      </div>
+      {active && (
+        <div>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            spellCheck={false}
+            className="h-[300px] w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--field)] p-4 font-mono text-[12.5px] leading-relaxed text-[var(--text)] outline-none focus:border-[var(--cyan-3)]"
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              onClick={save}
+              className="rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-4 py-1.5 text-[10px] tracking-wider text-[var(--cyan)] hover:bg-[var(--cyan-3)]"
+            >
+              SAVE {active}
+            </button>
+            {savedTick && <span className="text-xs text-[var(--green)]">✓ Saved — next conversation picks it up</span>}
+          </div>
+        </div>
+      )}
+      <PromptDialog
+        open={showNew}
+        title="New memory file"
+        placeholder="file-name.md"
+        onSubmit={(v) => {
+          const name = v.trim().endsWith(".md") ? v.trim() : v.trim() + ".md";
+          fetch("/api/memory/file", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, md: `# ${name.replace(/\.md$/, "")}\n\n` }),
+          }).then(() => { qc.invalidateQueries({ queryKey: ["memoryFiles"] }); openFile(name); });
+        }}
+        onClose={() => setShowNew(false)}
+      />
+    </section>
+  );
+}
+
+// export/import the whole personal state as one zip
+function BackupSection() {
+  const [importing, setImporting] = useState<string | null>(null);
+  const onImport = async (file: File) => {
+    setImporting("importing…");
+    try {
+      const r = await fetch("/api/backup/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/zip" },
+        body: file,
+      });
+      const j = await r.json();
+      setImporting(j.ok
+        ? `✓ merged ${Object.entries(j.merged).map(([k, v]) => `${k}: ${v}`).join(", ")} — run jarvis restart`
+        : `✕ ${j.error ?? "import failed"}`);
+    } catch (e) {
+      setImporting(`✕ ${String(e).slice(0, 80)}`);
+    }
+  };
+  return (
+    <section className="mb-12">
+      <Heading
+        id="backup"
+        title="Backup & migrate"
+        desc="One zip carries everything personal — memory, call notes and transcripts, digests, reminders, the brain vault (when it lives inside Jarvis), and your API keys. Raw call audio is excluded. Import it on another Jarvis to move in."
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <a
+          href="/api/backup/export"
+          className="rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-4 py-2 font-sans text-[12px] text-[var(--cyan)] no-underline hover:bg-[var(--cyan-3)]"
+        >
+          ⬇ Export backup zip
+        </a>
+        <label className="cursor-pointer rounded-lg border border-[var(--line)] px-4 py-2 font-sans text-[12px] text-[var(--text)] hover:border-[var(--cyan-3)]">
+          ⬆ Import backup zip
+          <input
+            type="file"
+            accept=".zip,application/zip"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }}
+          />
+        </label>
+        {importing && <span className="font-sans text-[11.5px] text-[var(--dim)]">{importing}</span>}
+      </div>
+      <p className="mt-2 font-sans text-[10.5px] text-[var(--amber)]">
+        The export contains secrets/.env (Telegram / calendar keys) — treat the zip like a password.
+      </p>
+      <p className="mt-1 font-sans text-[10.5px] text-[var(--dim)]">
+        Import merges: backup contents win on conflicts, existing extra files survive.
+      </p>
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const { data: settings } = useSettings();
   const { data: voices } = useVoices();
@@ -522,7 +671,11 @@ export function SettingsPage() {
 
           <RemindersSection />
 
+          <MemorySection />
+
           <TokensSection />
+
+          <BackupSection />
 
           <TopicsSection />
 
