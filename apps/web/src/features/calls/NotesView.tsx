@@ -85,6 +85,7 @@ export const NotesView = memo(
     // ↳-comment styling applies ONLY to indented bullets directly under a
     // checkbox; nested bullets elsewhere are ordinary list items
     let inCheckboxBlock = false;
+    let railColor = "";                     // active callout border, carried down the rail
     const lines = notes.split("\n");
 
     const editable = (lineIndex: number, prefix: string, className: string, content: string) =>
@@ -117,14 +118,16 @@ export const NotesView = memo(
     // one markdown line → one element; `section` tweaks list styling per card
     const renderLine = (line: string, i: number, section: string) => {
       if (i <= fmEnd) return null;                     // frontmatter — metadata, not prose
-      if (line.trim() === "") { inCheckboxBlock = false; return null; }
+      if (line.trim() === "") { inCheckboxBlock = false; railColor = ""; return null; }
       if (/^# /.test(line)) { inCheckboxBlock = false; return null; }
       if (/^\*\*Topics:\*\*/.test(line)) return null; // shown as chips in the header
+      const nextIsQuote = /^>/.test(lines[i + 1] ?? "");
       const co = line.match(/^>\s*\[!(\w+)\][+-]?\s*(.*)$/);
       if (co) {
         const meta = calloutMeta(co[1]);
+        railColor = meta.cls.split(" ")[0];
         return (
-          <div key={i} className={`mt-3 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pb-1 pt-2 ${meta.cls.split(" ")[0]}`}>
+          <div key={i} className={`mt-3 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pt-2 ${nextIsQuote ? "pb-1" : "rounded-b-lg pb-2 mb-3"} ${meta.cls.split(" ")[0]}`}>
             <span className={`text-[8.5px] tracking-[2px] ${meta.cls.split(" ")[1]}`}>{meta.label}</span>
             {co[2] && <span className="text-[12.5px] font-semibold text-[var(--bright)]">{editable(i, line.slice(0, line.length - co[2].length), "", co[2])}</span>}
           </div>
@@ -132,8 +135,10 @@ export const NotesView = memo(
       }
       const q = line.match(/^>\s?(.*)$/);
       if (q) {
+        const railCls = /^>/.test(lines[i - 1] ?? "") ? "" : "mt-3 rounded-t-lg pt-2";
+        const endCls = nextIsQuote ? "py-[3px]" : "rounded-b-lg pt-[3px] pb-2.5 mb-3";
         return (
-          <div key={i} className="border-l-2 border-[var(--line-2)] bg-[var(--surf-2)] px-3 py-[3px]">
+          <div key={i} className={`border-l-2 ${railColor || "border-[var(--line-2)]"} bg-[var(--surf-2)] px-3 ${endCls} ${railCls}`}>
             {q[1] ? editable(i, "> ", "", q[1]) : "\u00a0"}
           </div>
         );

@@ -90,6 +90,7 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
   // ↳-comment styling applies only to indented bullets directly under a
   // checkbox (an item's comment trail), not to ordinary nested lists
   let inCheckboxBlock = false;
+  let railColor = "";                        // active callout border, carried down the rail
   const { body, tags } = splitFrontmatter(md);
   return (
     <div className="max-w-[760px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
@@ -103,12 +104,15 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
         </div>
       )}
       {body.split("\n").map((line, i) => {
-        if (line.trim() === "") { inCheckboxBlock = false; return null; }
+        if (line.trim() === "") { inCheckboxBlock = false; railColor = ""; return null; }
+        if (/^-{3,}$/.test(line.trim())) return <hr key={i} className="my-4 border-[var(--line)]" />;
+        const nextIsQuote = /^>/.test(body.split("\n")[i + 1] ?? "");
         const co = line.match(/^>\s*\[!(\w+)\][+-]?\s*(.*)$/);
         if (co) {
           const meta = calloutMeta(co[1]);
+          railColor = meta.cls.split(" ")[0];
           return (
-            <div key={i} className={`mt-4 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pt-2 pb-1 ${meta.cls.split(" ")[0]}`}>
+            <div key={i} className={`mt-4 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pt-2 ${nextIsQuote ? "pb-1" : "rounded-b-lg pb-2 mb-3"} ${railColor}`}>
               <span className={`text-[8.5px] tracking-[2px] ${meta.cls.split(" ")[1]}`}>{meta.label}</span>
               {co[2] && <span className="text-[12.5px] font-semibold text-[var(--bright)]">{inline(co[2])}</span>}
             </div>
@@ -116,11 +120,13 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
         }
         const q = line.match(/^>\s?(.*)$/);
         if (q) {
-          // continuation of a callout (or a plain quote) — same rail
+          // continuation of a callout (or a plain quote) — same rail, and the
+          // last line closes the box instead of chopping flush
           const prev = body.split("\n")[i - 1] ?? "";
-          const railCls = /^>\s*\[!/.test(prev) || /^>/.test(prev) ? "" : "mt-4 rounded-t-lg";
+          const railCls = /^>/.test(prev) ? "" : "mt-4 rounded-t-lg pt-2";
+          const endCls = nextIsQuote ? "py-[3px]" : "rounded-b-lg pt-[3px] pb-2.5 mb-3";
           return (
-            <div key={i} className={`border-l-2 border-[var(--line-2)] bg-[var(--surf-2)] px-3 py-[3px] ${railCls}`}>
+            <div key={i} className={`border-l-2 ${railColor || "border-[var(--line-2)]"} bg-[var(--surf-2)] px-3 ${endCls} ${railCls}`}>
               {q[1] ? inline(q[1]) : "\u00a0"}
             </div>
           );
