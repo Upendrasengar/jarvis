@@ -43,6 +43,7 @@ const SECTIONS: Array<{ id: string; label: string }> = [
   { id: "recording", label: "Call recording" },
   { id: "speaking", label: "Speaking voice" },
   { id: "reminders", label: "Reminders" },
+  { id: "vault", label: "Vault" },
   { id: "memory", label: "Memory" },
   { id: "diagnostics", label: "Diagnostics" },
   { id: "backup", label: "Backup & migrate" },
@@ -454,6 +455,92 @@ function BackupSection() {
   );
 }
 
+
+// where the knowledge tree lives — the one folder holding Calls/Notes/
+// Digests/Topics/Memory as Obsidian markdown
+function VaultSection() {
+  const { data } = useQuery<{ dir: string | null; default: string }>({
+    queryKey: ["vault"],
+    queryFn: async () => (await fetch("/api/vault")).json(),
+  });
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const apply = async () => {
+    const p = (input.trim() || data?.default) ?? "";
+    if (!p) return;
+    setBusy("working…");
+    try {
+      const r = await fetch("/api/vault", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: p }),
+      });
+      const j = await r.json();
+      setBusy(j.ok ? `✓ ${j.note}` : `✕ ${j.error}`);
+    } catch (e) { setBusy(`✕ ${String(e).slice(0, 80)}`); }
+  };
+  return (
+    <section className="mb-12">
+      <Heading
+        id="vault"
+        title="Vault"
+        desc="One Obsidian-markdown tree holds everything Jarvis knows — calls, notes, digests, topics, memory. Point Obsidian at it, sync it with any service; call audio, keys, and runtime state stay on this machine and never enter it."
+      />
+      {data?.dir ? (
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+          <div className="text-[9px] tracking-[2px] text-[var(--dim)]">ACTIVE VAULT</div>
+          <div className="mt-1 break-all font-mono text-[12.5px] text-[var(--bright)]">{data.dir}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="New path (move the folder there first)…"
+              className="w-[320px] rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-[7px] font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan-3)]"
+            />
+            <button
+              onClick={apply}
+              disabled={!input.trim()}
+              className="rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-4 py-[7px] text-[10px] tracking-wider text-[var(--cyan)] hover:bg-[var(--cyan-3)] disabled:opacity-40"
+            >
+              UPDATE PATH
+            </button>
+            {busy && <span className="font-sans text-[11.5px] text-[var(--dim)]">{busy}</span>}
+          </div>
+          <p className="mt-2 font-sans text-[10.5px] text-[var(--dim)]">
+            To relocate: quit Jarvis is not needed — move the folder in Finder, then enter the new
+            path here. Jarvis restarts itself to follow it.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+          <div className="font-sans text-[12.5px] text-[var(--text)]">
+            You're on the classic split layout. Migrating moves your calls, digests, and memory
+            into one vault folder (existing content is merged, nothing is deleted).
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={data?.default ?? "~/Jarvis"}
+              className="w-[320px] rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-[7px] font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan-3)]"
+            />
+            <button
+              onClick={apply}
+              className="rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-4 py-[7px] text-[10px] tracking-wider text-[var(--cyan)] hover:bg-[var(--cyan-3)]"
+            >
+              MIGRATE TO VAULT
+            </button>
+            {busy && <span className="font-sans text-[11.5px] text-[var(--dim)]">{busy}</span>}
+          </div>
+          <p className="mt-2 font-sans text-[10.5px] text-[var(--dim)]">
+            Leave blank for the default. Point it at an existing Obsidian vault to graft Jarvis in.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const { data: settings } = useSettings();
   const { data: voices } = useVoices();
@@ -670,6 +757,8 @@ export function SettingsPage() {
           </section>
 
           <RemindersSection />
+
+          <VaultSection />
 
           <MemorySection />
 
