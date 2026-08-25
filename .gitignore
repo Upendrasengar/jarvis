@@ -30,3 +30,7 @@ __pycache__/
 
 # built app bundles (rebuilt by install.sh)
 tools/menubar/JarvisBar.app/
+
+# ship the vendored obsidian skills, keep local claude settings out
+.claude/*
+!.claude/skills/
