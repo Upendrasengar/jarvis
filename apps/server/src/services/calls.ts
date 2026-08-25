@@ -65,10 +65,12 @@ export function recState(): RecState {
 
 // Toggle the Nth "- [ ]" checkbox in both the reports copy and the vault copy.
 export function toggleCallItem(id: string, index: number): { ok: true } | { error: string } {
-  const files = [
+  // dedupe — in vault mode both paths can resolve to the same file, and
+  // toggling it twice flips the checkbox right back
+  const files = [...new Set([
     notesFileFor(id),
     path.join(BRAIN_CALLS_DIR, `call-${id}.md`),
-  ];
+  ])];
   let ok = false;
   for (const f of files) {
     try {
