@@ -112,6 +112,34 @@ PLIST
   else bad "JarvisBar.app build failed — see /tmp/jarvis-swift-err"; fi
 fi
 
+echo "── obsidian (optional — vault UI, indexed search, phone sync) ──"
+OBS_CLI_BIN="/Applications/Obsidian.app/Contents/MacOS/obsidian-cli"
+if command -v obsidian >/dev/null 2>&1; then
+  ok "obsidian CLI ($(obsidian version 2>/dev/null | head -1))"
+elif [[ -x "$OBS_CLI_BIN" ]]; then
+  # the app is installed; the CLI just isn't linked — do it
+  BINDIR="$(dirname "$(command -v brew 2>/dev/null || echo /usr/local/bin/brew)")"
+  if ln -sf "$OBS_CLI_BIN" "$BINDIR/obsidian" 2>/dev/null; then
+    ok "obsidian CLI enabled (linked from Obsidian.app)"
+  else warn "Obsidian app found but couldn't link its CLI — in Obsidian: Settings → General → Install command line tool"; fi
+elif [[ $CHECK_ONLY == 1 ]]; then
+  warn "Obsidian not installed — optional. Jarvis writes plain markdown and searches with grep either way; Obsidian adds the vault UI, indexed search, and mobile sync (brew install --cask obsidian)"
+else
+  if [ -t 0 ]; then
+    printf "Install Obsidian? Optional — Jarvis works without it, but it's the best way to browse your vault (y/N) "
+    read -r yn
+    case "$yn" in [Yy]*)
+      brew install --cask obsidian && [[ -x "$OBS_CLI_BIN" ]] \
+        && ln -sf "$OBS_CLI_BIN" "$(dirname "$(command -v brew)")/obsidian" 2>/dev/null \
+        && ok "Obsidian installed + CLI linked" || warn "installed — open Obsidian once, then rerun jarvis setup to link the CLI"
+      ;;
+    *) echo "  skipped — install later with: brew install --cask obsidian" ;;
+    esac
+  else
+    warn "Obsidian not installed (optional — brew install --cask obsidian)"
+  fi
+fi
+
 echo "── recording permissions (attributed to Jarvis Audio) ──"
 check_perms() {
   local rf; rf="$(mktemp)"

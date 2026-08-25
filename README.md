@@ -69,6 +69,11 @@ Claude Code session.
 Homebrew (recommended):
 
 ```bash
+# optional but recommended: Obsidian — the best UI for your Jarvis vault
+# (Jarvis writes plain markdown either way; jarvis setup links Obsidian's CLI
+# for fast indexed search when the app is installed)
+brew install --cask obsidian
+
 brew tap upendrasengar/jarvis
 brew trust upendrasengar/jarvis   # newer Homebrew requires trusting third-party taps once
 brew install jarvis
