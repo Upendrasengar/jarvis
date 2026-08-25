@@ -10,6 +10,7 @@
 // Action items / Open questions). Grouping is display-only: lines keep their
 // file order and indexes, so edits and checkbox toggles map back unchanged.
 import { Fragment, memo, useRef } from "react";
+import { calloutMeta } from "../../components/Markdown";
 import { ago, parseStamp } from "../../lib/time";
 
 function em(text: string, key: number) {
@@ -74,6 +75,13 @@ export const NotesView = memo(
   function NotesView({ notes, onToggle, onEditLine, onComment, cards = true }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
     let checkboxIndex = -1;
+    // frontmatter lines render as nothing but KEEP their indexes so inline
+    // edits still map to the right source line
+    let fmEnd = -1;
+    if (notes.startsWith("---\n")) {
+      const close = notes.indexOf("\n---", 3);
+      if (close > 0) fmEnd = notes.slice(0, close + 4).split("\n").length - 1;
+    }
     // ↳-comment styling applies ONLY to indented bullets directly under a
     // checkbox; nested bullets elsewhere are ordinary list items
     let inCheckboxBlock = false;
@@ -108,9 +116,28 @@ export const NotesView = memo(
 
     // one markdown line → one element; `section` tweaks list styling per card
     const renderLine = (line: string, i: number, section: string) => {
+      if (i <= fmEnd) return null;                     // frontmatter — metadata, not prose
       if (line.trim() === "") { inCheckboxBlock = false; return null; }
       if (/^# /.test(line)) { inCheckboxBlock = false; return null; }
       if (/^\*\*Topics:\*\*/.test(line)) return null; // shown as chips in the header
+      const co = line.match(/^>\s*\[!(\w+)\][+-]?\s*(.*)$/);
+      if (co) {
+        const meta = calloutMeta(co[1]);
+        return (
+          <div key={i} className={`mt-3 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pb-1 pt-2 ${meta.cls.split(" ")[0]}`}>
+            <span className={`text-[8.5px] tracking-[2px] ${meta.cls.split(" ")[1]}`}>{meta.label}</span>
+            {co[2] && <span className="text-[12.5px] font-semibold text-[var(--bright)]">{editable(i, line.slice(0, line.length - co[2].length), "", co[2])}</span>}
+          </div>
+        );
+      }
+      const q = line.match(/^>\s?(.*)$/);
+      if (q) {
+        return (
+          <div key={i} className="border-l-2 border-[var(--line-2)] bg-[var(--surf-2)] px-3 py-[3px]">
+            {q[1] ? editable(i, "> ", "", q[1]) : "\u00a0"}
+          </div>
+        );
+      }
       const h3 = line.match(/^### (.+)$/);
       if (h3) {
         inCheckboxBlock = false;

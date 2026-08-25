@@ -146,12 +146,30 @@ When a name in the transcript is plausibly a phonetic or misspelled rendering of
 CALENDAR HINTS: metadata lines starting 'calendar-hint:' describe calendar events that OVERLAPPED this recording — treat them as hints, NEVER as truth. If the transcript's content clearly matches a hinted meeting (same topic/people), use its subject to inform the title and its attendee list to resolve speaker names ('Them' voices are likely those attendees). If the conversation is clearly a DIFFERENT discussion (ad-hoc call during a scheduled block), IGNORE the hint entirely and derive everything from the transcript. When multiple hints overlap, pick the one the content supports, or none.
 Input: call metadata, then a transcript. 'Me' is ALWAYS $OWNER. 'Them' is every other participant mixed into one channel — attribute their lines to real people using conversational cues: people addressing each other by name ('Arjun, can you take this?'), self-introductions, who answers a question aimed at a name, who a task is assigned to. NEVER invent a name; if no cue exists, write 'Someone'. Transcription may have errors (possibly mixed-language) — smooth over obvious ones, translate non-English phrases into English in the notes.
 Output ONLY a markdown note, nothing else:
+---
+title: <short descriptive call title>
+type: call
+created: <YYYY-MM-DD from metadata>
+date: <YYYY-MM-DD>
+time: \"<HH:MM>\"
+duration: <minutes, estimate from timestamps>
+platform: <from url or mode>
+participants:
+  - <one entry per identified person>
+topics:
+  - \"[[Topic One]]\"
+tags:
+  - call
+  - <2-4 lowercase theme tags>
+---
+
 # <short descriptive call title>
-- **Date/time:** <from metadata> · **Duration:** <estimate from timestamps> · **Platform:** <from url or mode>
+
+> [!summary]
+> <the 2-4 sentence summary — same content the Summary section would hold>
+
 ## Participants
 One bullet per person you can identify: '$OWNER (Me)', plus every name the conversation reveals. Mark guesses with (?). Omit section only if truly no one is identifiable.
-## Summary
-2-4 tight sentences: what the call was about and where it landed.
 ## Discussion
 The Copilot-style recap — one bullet per meaningful point, attributed:
 - <Name> explained/proposed/pointed out/raised ...
@@ -163,8 +181,7 @@ Bullets, each with who drove it if clear. Omit section if none.
 Bullets, '- [ ]' checkboxes, owner FIRST: '- [ ] Arjun: send the design doc'. Use the named owner the call assigned it to; 'Me' for $OWNER's items; 'Unassigned' if nobody owns it. Pay special attention to first-person commitments $OWNER spoke aloud ('I'll send', 'let me check', 'I need to', 'I'll follow up') — capture EVERY one as a Me: item; spoken promises are the easiest to lose. Omit if none.
 ## Open questions
 Bullets. Omit if none.
-End with EXACTLY one line connecting this call into the knowledge graph:
-**Topics:** [[Topic One]] [[Topic Two]]
+The frontmatter topics list connects this call into the knowledge graph:
 2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, ONE theme per topic (never mush two themes into one name), no punctuation or slashes inside the brackets.
 Keep it scannable — read in 30 seconds." > "$NOTES"
 

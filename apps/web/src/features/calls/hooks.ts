@@ -6,6 +6,8 @@ import { api } from "../../lib/api";
 export function callTitle(c: Call): string {
   const m = c.notes.match(/^# (.+)$/m);
   if (m) return m[1];
+  const fm = c.notes.match(/^---\n[\s\S]*?^title:\s*"?([^"\n]+)"?$[\s\S]*?\n---/m);
+  if (fm) return fm[1].trim();
   return c.status === "recording" ? "Recording…" : "Call at " + c.started.slice(11, 16);
 }
 

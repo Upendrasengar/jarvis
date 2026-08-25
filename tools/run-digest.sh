@@ -102,7 +102,11 @@ for open items (the OPEN ACTION ITEMS ledger in the raw file is the \
 deterministic truth — always trust it over the previous digest). Then read \
 the call notes since that digest:$RECENT_CALLS (skip ones titled 'No speech \
 detected' or similar phantom/silent calls). Write $DIGESTS_DIR/digest-$DATE.md \
-following the Daily Project Digest format: a 2-4 sentence momentum summary \
+following the Daily Project Digest format — START the file with Obsidian \
+frontmatter: --- / title: Daily Digest — $DATE / type: digest / date: $DATE \
+/ tags: (digest + 2-4 lowercase project tags) / --- then '# Daily Digest — \
+$DATE'. Under '## Momentum' write the summary as an Obsidian callout: \
+'> [!summary]' followed by '> ' prefixed lines — a 2-4 sentence momentum summary \
 written AGAINST the previous digest — what moved since it, what is STILL \
 stalled and for how long, what's new (flag uncommitted work as at-risk), \
 a per-project bullet line, then — only if there \

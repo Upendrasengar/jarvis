@@ -9,7 +9,7 @@ import { ago, parseStamp } from "../lib/time";
 
 function callRefs(text: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /call-notes-(\d{4}-\d{2}-\d{2}-\d{4})(?:\.md)?/g;
+  const re = /call(?:-notes)?-(\d{4}-\d{2}-\d{2}-\d{4})(?:\.md)?/g;
   let last = 0, k = 0, m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
@@ -42,8 +42,35 @@ function ledgerLink(h3: string): string | null {
   const m = h3.match(/^(\S+?)(?:\.md)?(\s*\(.*\))?$/);
   if (!m) return null;
   const name = m[1];
-  if (name.startsWith("call-notes-")) return `/calls/${name.replace(/^call-notes-/, "")}`;
+  if (/^call(-notes)?-\d{4}-\d{2}-\d{2}-\d{4}$/.test(name)) return `/calls/${name.replace(/^call(-notes)?-/, "")}`;
   return `/notes/${encodeURIComponent(name)}`;
+}
+
+// Obsidian callouts: > [!type] Title — colored by intent
+const CALLOUT: Record<string, { label: string; cls: string }> = {
+  summary: { label: "SUMMARY", cls: "border-[var(--cyan-3)] text-[var(--cyan)]" },
+  note: { label: "NOTE", cls: "border-[var(--indigo-3)] text-[var(--indigo)]" },
+  info: { label: "INFO", cls: "border-[var(--indigo-3)] text-[var(--indigo)]" },
+  tip: { label: "TIP", cls: "border-[var(--green)] text-[var(--green)]" },
+  warning: { label: "WARNING", cls: "border-[rgba(255,201,92,.5)] text-[var(--amber)]" },
+  caution: { label: "CAUTION", cls: "border-[rgba(255,201,92,.5)] text-[var(--amber)]" },
+  important: { label: "IMPORTANT", cls: "border-[rgba(255,107,132,.5)] text-[var(--red)]" },
+  danger: { label: "DANGER", cls: "border-[rgba(255,107,132,.5)] text-[var(--red)]" },
+};
+export function calloutMeta(type: string) {
+  return CALLOUT[type.toLowerCase()] ?? { label: type.toUpperCase(), cls: "border-[var(--line-2)] text-[var(--dim)]" };
+}
+
+// YAML-lite frontmatter: strip it, keep tags for chips
+export function splitFrontmatter(md: string): { body: string; tags: string[] } {
+  const m = md.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!m) return { body: md, tags: [] };
+  const tags: string[] = [];
+  const tagBlock = m[1].match(/^tags:\s*\n((?:\s+-\s+.*\n?)+)/m);
+  if (tagBlock)
+    for (const t of tagBlock[1].split("\n"))
+      { const v = t.match(/-\s+(.+)/)?.[1]?.trim(); if (v) tags.push(v.replace(/^"|"$/g, "")); }
+  return { body: md.slice(m[0].length), tags };
 }
 
 type LedgerToggle = (source: string, line: string) => Promise<boolean>;
@@ -63,10 +90,41 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
   // ↳-comment styling applies only to indented bullets directly under a
   // checkbox (an item's comment trail), not to ordinary nested lists
   let inCheckboxBlock = false;
+  const { body, tags } = splitFrontmatter(md);
   return (
     <div className="max-w-[760px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
-      {md.split("\n").map((line, i) => {
+      {tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {tags.map((t) => (
+            <span key={t} className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-2 py-[2px] font-mono text-[9.5px] text-[var(--dim)]">
+              #{t}
+            </span>
+          ))}
+        </div>
+      )}
+      {body.split("\n").map((line, i) => {
         if (line.trim() === "") { inCheckboxBlock = false; return null; }
+        const co = line.match(/^>\s*\[!(\w+)\][+-]?\s*(.*)$/);
+        if (co) {
+          const meta = calloutMeta(co[1]);
+          return (
+            <div key={i} className={`mt-4 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pt-2 pb-1 ${meta.cls.split(" ")[0]}`}>
+              <span className={`text-[8.5px] tracking-[2px] ${meta.cls.split(" ")[1]}`}>{meta.label}</span>
+              {co[2] && <span className="text-[12.5px] font-semibold text-[var(--bright)]">{inline(co[2])}</span>}
+            </div>
+          );
+        }
+        const q = line.match(/^>\s?(.*)$/);
+        if (q) {
+          // continuation of a callout (or a plain quote) — same rail
+          const prev = body.split("\n")[i - 1] ?? "";
+          const railCls = /^>\s*\[!/.test(prev) || /^>/.test(prev) ? "" : "mt-4 rounded-t-lg";
+          return (
+            <div key={i} className={`border-l-2 border-[var(--line-2)] bg-[var(--surf-2)] px-3 py-[3px] ${railCls}`}>
+              {q[1] ? inline(q[1]) : "\u00a0"}
+            </div>
+          );
+        }
         const h1 = line.match(/^# (.+)$/);
         if (h1) return <h1 key={i} className="mb-3 mt-2 text-xl text-[var(--bright)]">{h1[1]}</h1>;
         const h2 = line.match(/^## (.+)$/);

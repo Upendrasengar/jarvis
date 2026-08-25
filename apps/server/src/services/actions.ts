@@ -16,9 +16,19 @@ let lastSignature = "";
 function notesFiles(): Array<{ file: string; source: string }> {
   const out: Array<{ file: string; source: string }> = [];
   try {
-    for (const f of fs.readdirSync(CALL_NOTES_DIR))
-      if (/^call-notes-[\w-]+\.md$/.test(f))
+    const seen = new Set<string>();
+    const files = fs.readdirSync(CALL_NOTES_DIR).sort();  // call-<x> before call-notes-<x>
+    for (const f of files.filter((x) => x.startsWith("call-notes-")))
+      seen.add(f.replace(/^call-notes-/, ""));
+    for (const f of files) {
+      if (/^call-notes-[\w-]+\.md$/.test(f)) {
         out.push({ file: path.join(CALL_NOTES_DIR, f), source: f.replace(/^call-notes-/, "").replace(/\.md$/, "") });
+      } else if (/^call-\d{4}-\d{2}-\d{2}-\d{4}\.md$/.test(f)) {
+        // Obsidian-converted naming; skip when a call-notes- twin exists
+        const stamp = f.replace(/^call-/, "");
+        if (!seen.has(stamp)) out.push({ file: path.join(CALL_NOTES_DIR, f), source: stamp.replace(/\.md$/, "") });
+      }
+    }
   } catch {}
   try {
     for (const f of fs.readdirSync(NOTES_DIR))

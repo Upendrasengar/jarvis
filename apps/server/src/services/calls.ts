@@ -8,6 +8,16 @@ import path from "node:path";
 import type { Call, RecState } from "@jarvis/shared";
 import { BRAIN_CALLS_DIR, CALLS_DIR, CALL_NOTES_DIR, MEMORY_DIR, VAULT_DIR } from "../config.js";
 
+// notes file resolution: our writer uses call-notes-<id>.md; Obsidian-
+// converted vaults often use call-<id>.md — read whichever exists,
+// write back to the one that does (default: call-notes-)
+export function notesFileFor(id: string): string {
+  const a = path.join(CALL_NOTES_DIR, `call-notes-${id}.md`);
+  if (fs.existsSync(a)) return a;
+  const b = path.join(CALL_NOTES_DIR, `call-${id}.md`);
+  return fs.existsSync(b) ? b : a;
+}
+
 const STALE_MS = 30 * 60e3;
 
 export function listCalls(): Call[] {
@@ -26,7 +36,7 @@ export function listCalls(): Call[] {
       .some((f) => fs.existsSync(path.join(sess, f)));
     let transcript = "", notes = "";
     try { transcript = fs.readFileSync(path.join(sess, "transcript.md"), "utf8"); } catch {}
-    try { notes = fs.readFileSync(path.join(CALL_NOTES_DIR, `call-notes-${d}.md`), "utf8"); } catch {}
+    try { notes = fs.readFileSync(notesFileFor(d), "utf8"); } catch {}
     // failed = the processor said so (FAILED.txt) or went silent 30+ min
     const failedMark = fs.existsSync(path.join(sess, "FAILED.txt"));
     let stale = false;
@@ -56,7 +66,7 @@ export function recState(): RecState {
 // Toggle the Nth "- [ ]" checkbox in both the reports copy and the vault copy.
 export function toggleCallItem(id: string, index: number): { ok: true } | { error: string } {
   const files = [
-    path.join(CALL_NOTES_DIR, `call-notes-${id}.md`),
+    notesFileFor(id),
     path.join(BRAIN_CALLS_DIR, `call-${id}.md`),
   ];
   let ok = false;
@@ -82,6 +92,7 @@ export function deleteCall(id: string): { ok: true } | { error: string } {
   } catch {}
   try { fs.rmSync(sess, { recursive: true, force: true }); } catch {}
   try { fs.rmSync(path.join(CALL_NOTES_DIR, `call-notes-${id}.md`), { force: true }); } catch {}
+  try { fs.rmSync(path.join(CALL_NOTES_DIR, `call-${id}.md`), { force: true }); } catch {}
   try { fs.rmSync(path.join(BRAIN_CALLS_DIR, `call-${id}.md`), { force: true }); } catch {}
   return { ok: true };
 }
@@ -89,7 +100,7 @@ export function deleteCall(id: string): { ok: true } | { error: string } {
 // Save edited notes. Vault mode: ONE canonical file in <vault>/Calls.
 // Legacy mode: reports file + brain copy stay in sync as before.
 export function updateCallNotes(id: string, notes: string): { ok: true } | { error: string } {
-  const notesFile = path.join(CALL_NOTES_DIR, `call-notes-${id}.md`);
+  const notesFile = notesFileFor(id);
   if (!fs.existsSync(notesFile)) return { error: "no notes exist for this call" };
   const body = notes.endsWith("\n") ? notes : notes + "\n";
   try {
