@@ -9,6 +9,7 @@
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
 #   jarvis bar        -> open the menu-bar icon (status + record controls)
+#   jarvis vault [path] -> migrate to the unified Obsidian vault (default ~/Jarvis)
 #   jarvis upgrade    -> update to the latest release and restart
 #   jarvis uninstall  -> remove Jarvis completely (asks about your data)
 #   jarvis "what do I know about X"  -> one-shot question
@@ -53,6 +54,9 @@ elif [[ "$1" == "setup" ]]; then
     case "$yn" in [Yy]*) bash tools/service.sh install ;; esac
   fi
   exit 0
+elif [[ "$1" == "vault" ]]; then
+  shift
+  bash tools/migrate-vault.sh "$@" && exec bash tools/services.sh restart
 elif [[ "$1" == "bar" ]]; then
   [[ -d tools/menubar/JarvisBar.app ]] || { echo "not built yet — run: jarvis setup"; exit 1; }
   exec open -g -a "$PWD/tools/menubar/JarvisBar.app"

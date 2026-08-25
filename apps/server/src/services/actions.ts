@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ActionItem } from "@jarvis/shared";
-import { REPORTS_DIR } from "../config.js";
+import { CALL_NOTES_DIR, REPORTS_DIR } from "../config.js";
 import { NOTES_DIR } from "./notes.js";
 import { db } from "../db/index.js";
 import { toggleCallItem } from "./calls.js";
@@ -16,9 +16,9 @@ let lastSignature = "";
 function notesFiles(): Array<{ file: string; source: string }> {
   const out: Array<{ file: string; source: string }> = [];
   try {
-    for (const f of fs.readdirSync(REPORTS_DIR))
+    for (const f of fs.readdirSync(CALL_NOTES_DIR))
       if (/^call-notes-[\w-]+\.md$/.test(f))
-        out.push({ file: path.join(REPORTS_DIR, f), source: f.replace(/^call-notes-/, "").replace(/\.md$/, "") });
+        out.push({ file: path.join(CALL_NOTES_DIR, f), source: f.replace(/^call-notes-/, "").replace(/\.md$/, "") });
   } catch {}
   try {
     for (const f of fs.readdirSync(NOTES_DIR))
@@ -161,7 +161,7 @@ export function commentAction(callId: string, index: number, text: string) {
   if (callId.startsWith("note:")) {
     targets.push(path.join(NOTES_DIR, callId.slice(5) + ".md"));
   } else {
-    targets.push(path.join(REPORTS_DIR, `call-notes-${callId}.md`));
+    targets.push(path.join(CALL_NOTES_DIR, `call-notes-${callId}.md`));
     targets.push(path.join(NOTES_DIR, "..", "Calls", `call-${callId}.md`));
   }
   let ok = false;

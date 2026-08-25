@@ -8,7 +8,7 @@ import path from "node:path";
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import { localOnly } from "../plugins/localOnly.js";
-import { MEMORY_DIR } from "../config.js";
+import { MEMORY_MD_DIR } from "../config.js";
 
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._ -]*\.md$/;
 
@@ -24,16 +24,16 @@ const CANON: Record<string, string> = {
 
 function safePath(name: string): string | null {
   if (!NAME_RE.test(name) || name.includes("..")) return null;
-  const p = path.join(MEMORY_DIR, name);
-  return path.dirname(p) === MEMORY_DIR ? p : null;
+  const p = path.join(MEMORY_MD_DIR, name);
+  return path.dirname(p) === MEMORY_MD_DIR ? p : null;
 }
 
 export function memoryFileRoutes(app: FastifyInstance) {
   app.get("/api/memory", async () => {
     let files: string[] = [];
-    try { files = fs.readdirSync(MEMORY_DIR).filter((f) => f.endsWith(".md")); } catch {}
+    try { files = fs.readdirSync(MEMORY_MD_DIR).filter((f) => f.endsWith(".md")); } catch {}
     const existing = files.sort().map((name) => {
-      const st = fs.statSync(path.join(MEMORY_DIR, name));
+      const st = fs.statSync(path.join(MEMORY_MD_DIR, name));
       return { name, size: st.size, updated: st.mtimeMs, missing: false };
     });
     const missing = Object.keys(CANON)
@@ -55,7 +55,7 @@ export function memoryFileRoutes(app: FastifyInstance) {
     if (!b.success) return reply.code(400).send({ error: "bad request" });
     const p = safePath(b.data.name);
     if (!p) return reply.code(400).send({ error: "bad name" });
-    fs.mkdirSync(MEMORY_DIR, { recursive: true });
+    fs.mkdirSync(MEMORY_MD_DIR, { recursive: true });
     fs.writeFileSync(p, b.data.md);
     return { ok: true };
   });

@@ -22,9 +22,7 @@ MODEL="$JARVIS_DIR/models/ggml-${PREF:-medium}.bin"
 [ -f "$MODEL" ] || MODEL="$JARVIS_DIR/models/ggml-small.en.bin"
 echo "whisper model: $MODEL"
 WHISPER="$(command -v whisper-cli || echo /opt/homebrew/bin/whisper-cli)"
-BRAIN_DIR="$(head -1 "$JARVIS_DIR/memory/settings/brain-dir.txt" 2>/dev/null || true)"
-BRAIN_DIR="${BRAIN_DIR:-$JARVIS_DIR/brain}"
-BRAIN_DIR="${BRAIN_DIR/#\~/$HOME}"
+source "$JARVIS_DIR/tools/paths.sh"
 VAULT_CALLS="$BRAIN_DIR/Calls"
 # Who "Me" is in the notes (memory/settings/owner.txt)
 OWNER="$(head -1 "$JARVIS_DIR/memory/settings/owner.txt" 2>/dev/null || true)"
@@ -108,7 +106,8 @@ python3 "$JARVIS_DIR/tools/merge-transcripts.py" \
 # sweep purges WAVs older than that. Nothing is deleted here — the raw
 # system.wav was already swapped for its small 16 kHz copy above.
 
-NOTES="$JARVIS_DIR/reports/call-notes-$STAMP.md"
+mkdir -p "$CALL_NOTES_DIR"
+NOTES="$CALL_NOTES_DIR/call-notes-$STAMP.md"
 
 # No speech at all → almost always a phantom detection (a Meet pre-join tab
 # left open holds the mic and looks like a call). Write a stub note, skip the
@@ -181,7 +180,11 @@ done
 
 # File a copy in the second brain so vault-search / recall can find it.
 mkdir -p "$VAULT_CALLS"
-cp "$NOTES" "$VAULT_CALLS/call-$STAMP.md"
+if [ -z "${VAULT_DIR:-}" ]; then
+  # legacy layout keeps its brain copy; vault mode already wrote the one file
+  mkdir -p "$VAULT_CALLS"
+  cp "$NOTES" "$VAULT_CALLS/call-$STAMP.md"
+fi
 
 echo "notes: $NOTES"
 echo "vault: $VAULT_CALLS/call-$STAMP.md"

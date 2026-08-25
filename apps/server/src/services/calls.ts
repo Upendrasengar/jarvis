@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Call, RecState } from "@jarvis/shared";
-import { BRAIN_CALLS_DIR, CALLS_DIR, MEMORY_DIR, REPORTS_DIR } from "../config.js";
+import { BRAIN_CALLS_DIR, CALLS_DIR, CALL_NOTES_DIR, MEMORY_DIR, VAULT_DIR } from "../config.js";
 
 const STALE_MS = 30 * 60e3;
 
@@ -26,7 +26,7 @@ export function listCalls(): Call[] {
       .some((f) => fs.existsSync(path.join(sess, f)));
     let transcript = "", notes = "";
     try { transcript = fs.readFileSync(path.join(sess, "transcript.md"), "utf8"); } catch {}
-    try { notes = fs.readFileSync(path.join(REPORTS_DIR, `call-notes-${d}.md`), "utf8"); } catch {}
+    try { notes = fs.readFileSync(path.join(CALL_NOTES_DIR, `call-notes-${d}.md`), "utf8"); } catch {}
     // failed = the processor said so (FAILED.txt) or went silent 30+ min
     const failedMark = fs.existsSync(path.join(sess, "FAILED.txt"));
     let stale = false;
@@ -56,7 +56,7 @@ export function recState(): RecState {
 // Toggle the Nth "- [ ]" checkbox in both the reports copy and the vault copy.
 export function toggleCallItem(id: string, index: number): { ok: true } | { error: string } {
   const files = [
-    path.join(REPORTS_DIR, `call-notes-${id}.md`),
+    path.join(CALL_NOTES_DIR, `call-notes-${id}.md`),
     path.join(BRAIN_CALLS_DIR, `call-${id}.md`),
   ];
   let ok = false;
@@ -81,23 +81,23 @@ export function deleteCall(id: string): { ok: true } | { error: string } {
     if (!/^ended:/m.test(meta)) return { error: "call is still recording" };
   } catch {}
   try { fs.rmSync(sess, { recursive: true, force: true }); } catch {}
-  try { fs.rmSync(path.join(REPORTS_DIR, `call-notes-${id}.md`), { force: true }); } catch {}
+  try { fs.rmSync(path.join(CALL_NOTES_DIR, `call-notes-${id}.md`), { force: true }); } catch {}
   try { fs.rmSync(path.join(BRAIN_CALLS_DIR, `call-${id}.md`), { force: true }); } catch {}
   return { ok: true };
 }
 
-// Save edited notes to BOTH homes — the reports file and the vault copy.
-// This is also how the two copies re-sync if they ever drift (e.g. a manual
-// Obsidian edit): the edited version becomes canonical everywhere, and the
-// actions index rebuilds from the file on its next read.
+// Save edited notes. Vault mode: ONE canonical file in <vault>/Calls.
+// Legacy mode: reports file + brain copy stay in sync as before.
 export function updateCallNotes(id: string, notes: string): { ok: true } | { error: string } {
-  const reportsFile = path.join(REPORTS_DIR, `call-notes-${id}.md`);
-  if (!fs.existsSync(reportsFile)) return { error: "no notes exist for this call" };
+  const notesFile = path.join(CALL_NOTES_DIR, `call-notes-${id}.md`);
+  if (!fs.existsSync(notesFile)) return { error: "no notes exist for this call" };
   const body = notes.endsWith("\n") ? notes : notes + "\n";
   try {
-    fs.writeFileSync(reportsFile, body);
-    fs.mkdirSync(BRAIN_CALLS_DIR, { recursive: true });
-    fs.writeFileSync(path.join(BRAIN_CALLS_DIR, `call-${id}.md`), body);
+    fs.writeFileSync(notesFile, body);
+    if (!VAULT_DIR) {
+      fs.mkdirSync(BRAIN_CALLS_DIR, { recursive: true });
+      fs.writeFileSync(path.join(BRAIN_CALLS_DIR, `call-${id}.md`), body);
+    }
     return { ok: true };
   } catch (e) {
     return { error: String(e).slice(0, 120) };

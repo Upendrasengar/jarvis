@@ -5,7 +5,7 @@
 // [[new]], so the graph consolidates instead of fragmenting.
 import fs from "node:fs";
 import path from "node:path";
-import { BRAIN_DIR, REPORTS_DIR } from "../config.js";
+import { BRAIN_DIR, CALL_NOTES_DIR, REPORTS_DIR } from "../config.js";
 
 const TOPICS_DIR = path.join(BRAIN_DIR, "Topics");
 
@@ -46,7 +46,7 @@ export function createTopic(name: string): { ok: true } | { error: string } {
 // every file that could carry [[topic]] wikilinks
 function linkableFiles(): string[] {
   const out: string[] = [];
-  for (const dir of [path.join(BRAIN_DIR, "Calls"), path.join(BRAIN_DIR, "Notes"), REPORTS_DIR]) {
+  for (const dir of [...new Set([path.join(BRAIN_DIR, "Calls"), path.join(BRAIN_DIR, "Notes"), CALL_NOTES_DIR])]) {
     try {
       for (const f of fs.readdirSync(dir))
         if (f.endsWith(".md")) out.push(path.join(dir, f));
