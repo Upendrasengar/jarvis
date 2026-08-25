@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import os from "node:os";
-import { JARVIS_DIR, MEMORY_DIR } from "../config.js";
+import { JARVIS_DIR, MEMORY_DIR, MEMORY_MD_DIR } from "../config.js";
 import { CLAUDE, WORKER_PATH } from "./env.js";
 
 const IDLE_MS = 15 * 60 * 1000;
@@ -40,9 +40,9 @@ function memoryBrief(): string {
   let budget = 8000;
   const parts: string[] = [];
   try {
-    for (const f of fs.readdirSync(MEMORY_DIR).filter((f) => f.endsWith(".md")).sort()) {
+    for (const f of fs.readdirSync(MEMORY_MD_DIR).filter((f) => f.endsWith(".md")).sort()) {
       let txt = "";
-      try { txt = fs.readFileSync(path.join(MEMORY_DIR, f), "utf8").trim(); } catch { continue; }
+      try { txt = fs.readFileSync(path.join(MEMORY_MD_DIR, f), "utf8").trim(); } catch { continue; }
       if (!txt) continue;
       const chunk = `--- memory/${f} ---\n${txt.slice(0, budget)}`;
       parts.push(chunk);

@@ -11,7 +11,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import type { FastifyInstance } from "fastify";
 import { localOnly } from "../plugins/localOnly.js";
-import { BRAIN_DIR, JARVIS_DIR } from "../config.js";
+import { BRAIN_DIR, JARVIS_DIR, VAULT_DIR } from "../config.js";
 
 const DIRS = ["memory", "reports", "data", "secrets"];
 const EXCLUDES = [
@@ -38,6 +38,13 @@ export function backupRoutes(app: FastifyInstance) {
       { cwd: JARVIS_DIR, timeout: 120_000 });
     if (r.status !== 0 || !fs.existsSync(out))
       return reply.code(500).send({ error: `zip failed: ${String(r.stderr).slice(0, 200)}` });
+    // vault mode: the knowledge tree lives outside JARVIS_DIR — append it
+    if (VAULT_DIR && fs.existsSync(VAULT_DIR)) {
+      const vdirs = ["Calls", "Notes", "Digests", "Topics", "Memory"].filter((d) => fs.existsSync(path.join(VAULT_DIR!, d)));
+      const r2 = spawnSync("zip", ["-r", "-q", out, ...vdirs], { cwd: VAULT_DIR, timeout: 120_000 });
+      if (r2.status !== 0)
+        return reply.code(500).send({ error: "zip failed on vault tree" });
+    }
 
     reply.header("Content-Type", "application/zip");
     reply.header("Content-Disposition", `attachment; filename="jarvis-backup-${stamp}.zip"`);
@@ -65,8 +72,11 @@ export function backupRoutes(app: FastifyInstance) {
         if (!fs.statSync(src).isDirectory()) continue;
         // only known top-level dirs are merged — a hostile zip can't write
         // outside them, and rsync keeps extra local files
-        if (![...DIRS, "brain"].includes(d)) continue;
-        const dst = path.join(JARVIS_DIR, d);
+        const VDIRS = ["Calls", "Notes", "Digests", "Topics", "Memory"];
+        if (![...DIRS, "brain", ...VDIRS].includes(d)) continue;
+        if (VDIRS.includes(d) && !VAULT_DIR)
+          return reply.code(400).send({ error: "this backup uses the vault layout — run `jarvis vault` here first, then import again" });
+        const dst = VDIRS.includes(d) ? path.join(VAULT_DIR!, d) : path.join(JARVIS_DIR, d);
         fs.mkdirSync(dst, { recursive: true });
         const rs = spawnSync("rsync", ["-a", src + "/", dst + "/"], { timeout: 120_000 });
         if (rs.status === 0) {

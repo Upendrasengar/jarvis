@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFile } from "node:child_process";
-import { JARVIS_DIR, MEMORY_DIR, CALLS_DIR, setting } from "../config.js";
+import { CALLS_DIR, JARVIS_DIR, MEMORY_DIR, MEMORY_MD_DIR, setting } from "../config.js";
 import { sendTurn } from "../services/chatSessions.js";
 import { listActions } from "../services/actions.js";
 
@@ -294,7 +294,7 @@ If nothing qualifies: HEARTBEAT_OK
 `;
 
 function ensureHeartbeat() {
-  const md = path.join(MEMORY_DIR, "HEARTBEAT.md");
+  const md = path.join(MEMORY_MD_DIR, "HEARTBEAT.md");
   try { if (!fs.existsSync(md)) fs.writeFileSync(md, DEFAULT_HEARTBEAT_MD); } catch {}
   const db = load();
   if (db.jobs.some((j) => j.id === HEARTBEAT_ID)) return;
@@ -319,7 +319,7 @@ export function startReminders() {
   ensureHeartbeat();
   // heartbeat prompt follows the file — re-read at every start
   try {
-    const md = fs.readFileSync(path.join(MEMORY_DIR, "HEARTBEAT.md"), "utf8");
+    const md = fs.readFileSync(path.join(MEMORY_MD_DIR, "HEARTBEAT.md"), "utf8");
     const db = load();
     const hb = db.jobs.find((j) => j.id === HEARTBEAT_ID);
     if (hb && hb.payload.kind === "agentTurn" && hb.payload.prompt !== md) {

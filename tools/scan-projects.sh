@@ -6,10 +6,11 @@
 set -uo pipefail
 
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LIST="$JARVIS_DIR/memory/active-projects.md"
+source "$JARVIS_DIR/tools/paths.sh"
+LIST="$MEMORY_MD_DIR/active-projects.md"
 SINCE="${1:-yesterday}"
 DATE="$(date +%Y-%m-%d)"
-OUT="$JARVIS_DIR/reports/raw-$DATE.md"
+OUT="$DIGESTS_DIR/raw-$DATE.md"
 
 # Match commits from your git identity as "mine". memory/settings/git-author.txt
 # may hold a regex covering all your identities; falls back to git user.name,

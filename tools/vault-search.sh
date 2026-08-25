@@ -19,9 +19,7 @@ if [[ -f "$CONF" ]]; then
   done < "$CONF"
 fi
 JARVIS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BRAIN_DIR="$(head -1 "$JARVIS_DIR/memory/settings/brain-dir.txt" 2>/dev/null || true)"
-BRAIN_DIR="${BRAIN_DIR:-$JARVIS_DIR/brain}"
-BRAIN_DIR="${BRAIN_DIR/#\~/$HOME}"
+source "$JARVIS_DIR/tools/paths.sh"
 VAULTS+=("$BRAIN_DIR")
 QUERY="${*:-}"
 [[ -z "$QUERY" ]] && { echo "usage: vault-search.sh <query>"; exit 1; }

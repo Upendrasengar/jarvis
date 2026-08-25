@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Stats } from "@jarvis/shared";
-import { REPORTS_DIR } from "../config.js";
+import { DIGESTS_DIR } from "../config.js";
 import { buildGraph } from "./graph.js";
 import { listProjects } from "./projects.js";
 
@@ -17,9 +17,9 @@ export function buildStats(): Stats {
   let commits = 0;
   let activity: string[] = [];
   try {
-    const rf = fs.readdirSync(REPORTS_DIR).filter((x) => x.startsWith("raw-")).sort().pop();
+    const rf = fs.readdirSync(DIGESTS_DIR).filter((x) => x.startsWith("raw-")).sort().pop();
     if (rf) {
-      const raw = fs.readFileSync(path.join(REPORTS_DIR, rf), "utf8");
+      const raw = fs.readFileSync(path.join(DIGESTS_DIR, rf), "utf8");
       const lines = raw.split("\n").filter((l) => /^\s+- .*\(.*ago/.test(l));
       commits = lines.length;
       activity = lines.slice(0, 8).map((l) => l.replace(/^\s+- /, "").trim());

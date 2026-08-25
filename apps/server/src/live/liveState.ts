@@ -4,7 +4,7 @@
 // and the notes files; debounced so a burst of writes is one message.
 import fs from "node:fs";
 import type { WebSocket } from "@fastify/websocket";
-import { BRAIN_DIR, CALLS_DIR, REPORTS_DIR } from "../config.js";
+import { BRAIN_DIR, CALLS_DIR, CALL_NOTES_DIR, DIGESTS_DIR, REPORTS_DIR } from "../config.js";
 import path from "node:path";
 
 const clients = new Set<WebSocket>();
@@ -38,7 +38,7 @@ function onFsEvent() {
 }
 
 export function startWatching() {
-  for (const dir of [CALLS_DIR, REPORTS_DIR, path.join(BRAIN_DIR, "Notes")]) {
+  for (const dir of [...new Set([CALLS_DIR, CALL_NOTES_DIR, DIGESTS_DIR, path.join(BRAIN_DIR, "Notes")])]) {
     try {
       fs.watch(dir, { recursive: true }, onFsEvent);
     } catch {

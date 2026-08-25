@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { JARVIS_DIR, REPORTS_DIR, setting } from "../config.js";
+import { DIGESTS_DIR, JARVIS_DIR, REPORTS_DIR, setting } from "../config.js";
 
 const CHECK_MS = 5 * 60_000;
 let running = false;
@@ -23,7 +23,7 @@ function check() {
   const hour = Number(setting("digest-hour") ?? 8);
   const now = new Date();
   if (now.getHours() < hour) return;
-  const target = path.join(REPORTS_DIR, `digest-${localDate(now)}.md`);
+  const target = path.join(DIGESTS_DIR, `digest-${localDate(now)}.md`);
   if (fs.existsSync(target)) return;
 
   running = true;

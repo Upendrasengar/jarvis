@@ -34,11 +34,28 @@ export function setting(name: string): string | null {
   }
 }
 
+// ── THE VAULT: one unified Obsidian-markdown tree for everything Jarvis
+// knows — Calls/ Notes/ Digests/ Topics/ Memory/. Opt-in via
+// memory/settings/vault-dir.txt (or JARVIS_VAULT env); unset = the legacy
+// split layout (reports/ + brain/) keeps working untouched. Runtime state
+// (audio sessions, db, logs, secrets, settings) NEVER moves into the vault
+// — it stays machine-local under JARVIS_DIR.
+function resolveVault(): string | null {
+  const v = process.env.JARVIS_VAULT ?? setting("vault-dir");
+  return v ? v.replace(/^~(?=$|\/)/, os.homedir()) : null;
+}
+export const VAULT_DIR = resolveVault();
+
+// knowledge locations — vault tree when configured, legacy spots otherwise
+export const CALL_NOTES_DIR = VAULT_DIR ? path.join(VAULT_DIR, "Calls") : REPORTS_DIR;
+export const DIGESTS_DIR = VAULT_DIR ? path.join(VAULT_DIR, "Digests") : REPORTS_DIR;
+export const MEMORY_MD_DIR = VAULT_DIR ? path.join(VAULT_DIR, "Memory") : MEMORY_DIR;
+
 // The brain: Jarvis's own growing knowledge vault (markdown; Obsidian-
 // compatible). Defaults to brain/ inside the repo (gitignored user data);
 // point memory/settings/brain-dir.txt at an existing vault to graft Jarvis
 // onto your second brain.
-export const BRAIN_DIR = setting("brain-dir") ?? path.join(JARVIS_DIR, "brain");
+export const BRAIN_DIR = VAULT_DIR ?? setting("brain-dir") ?? path.join(JARVIS_DIR, "brain");
 export const BRAIN_CALLS_DIR = path.join(BRAIN_DIR, "Calls");
 
 // Optional: a vault holding one page per project powers the Projects tab.
