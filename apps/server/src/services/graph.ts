@@ -17,8 +17,14 @@ export function buildGraph(): Graph {
     try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of ents) {
       const p = path.join(dir, e.name);
-      if (e.isDirectory()) walk(p, group);
-      else if (e.name.endsWith(".md")) {
+      // vault housekeeping dirs stay out of the knowledge graph: daily
+      // digests are a timeline (84 date-nodes = noise), Memory is prompt
+      // config, dotdirs are Obsidian's own
+      if (e.isDirectory()) {
+        if (e.name === "Digests" || e.name === "Memory" || e.name.startsWith(".")) continue;
+        walk(p, group);
+      }
+      else if (e.name.endsWith(".md") && !/^(digest|raw)-\d{4}-/.test(e.name)) {
         const title = path.basename(p, ".md");
         const txt = fs.readFileSync(p, "utf8");
         // status: inactive in frontmatter hides the page (and its links)
