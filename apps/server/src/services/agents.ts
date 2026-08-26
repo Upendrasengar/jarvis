@@ -163,7 +163,8 @@ export function spawnAsk(task: string, sessionId = "") {
     "SELF-KNOWLEDGE: for questions about Jarvis's OWN capabilities, configuration, or integrations (calendar, telegram, reminders, recording), NEVER answer from vault notes or memory — they describe past states. Check the LIVE system: data/calendar.json (enabled+fetchedAt), data/reminders.json, curl the local API, and `grep -o '^[A-Z_]*=' secrets/.env` for which integrations are configured (names only — NEVER read or print secret values). Old notes saying a feature is 'parked' or 'planned' are outdated the moment these files say otherwise.",
     ...OBSIDIAN_CLI_LINES(),
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, use \`obsidian backlinks file=\"X\"\` (fallback: grep the vaults for the literal text [[X]], e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
-    "End your reply with a line 'ANSWER:' then 1-4 plain sentences a voice assistant can read aloud (no markdown, lists, or code).",
+    "End your reply with a line 'ANSWER:' then the answer for the SCREEN — markdown welcome (**bold**, '- ' bullet lists, [[wikilinks]]), concise, max ~12 lines.",
+    "Then a line 'SPOKEN:' with 1-3 plain sentences a voice assistant reads aloud (no markdown, lists, or code).",
     "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
     "SOURCES: /calls/<id> /notes/<id> ...",
     "where <id> for calls is the YYYY-MM-DD-HHMM stamp from call-notes-<id>.md (or Calls/call-<id>.md), and for notes is the Notes/ filename without .md (URL-encode spaces as %20). List ONLY files you actually used, space-separated, max 6.",
@@ -178,7 +179,7 @@ export function spawnAsk(task: string, sessionId = "") {
   child.on("close", (code) => {
     rec.status = code === 0 ? "done" : "failed";
     const m = rec.log.join("\n").match(/ANSWER:\s*([\s\S]*)$/i);
-    rec.answer = (m ? m[1] : rec.log.slice(-4).join(" ")).trim().slice(0, 800);
+    rec.answer = (m ? m[1] : rec.log.slice(-4).join(" ")).trim().slice(0, 1600);
     rec.summary = rec.answer.slice(0, 120);
     rec.finished = Date.now();
     recordResult(rec.sessionId, rec.task, rec.answer);

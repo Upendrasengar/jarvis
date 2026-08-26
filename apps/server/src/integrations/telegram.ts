@@ -35,6 +35,13 @@ async function api(method: string, payload: Record<string, unknown> = {}): Promi
 }
 
 // Telegram caps messages at 4096 chars — chunk on line boundaries
+// chat replies now carry a screen (markdown) part + a SPOKEN: line; the
+// phone surface reads best with the tight spoken form
+function spokenForm(t: string): string {
+  const m = t.match(/^SPOKEN:\s*(.+)$/im);
+  return m ? m[1].trim() : t;
+}
+
 async function say(text: string) {
   const t = text.trim();
   if (!t) return;
@@ -99,7 +106,7 @@ async function handleUpdate(u: any) {
     return;
   }
   api("sendChatAction", { chat_id: ownerChat, action: "typing" }).catch(() => {});
-  await say(await runTurn(text));
+  await say(spokenForm(await runTurn(text)));
 }
 
 // voice note → local whisper transcript. Download from Telegram, hand to
@@ -150,7 +157,7 @@ export function startTelegram() {
   // result to the phone instead of leaving dead air after "On it"
   onEvent((e: any) => {
     if (e?.type === "worker-result" && e?.sessionId === SESSION)
-      runTurn(DELIVER_PROMPT).then(say).catch(() => {});
+      runTurn(DELIVER_PROMPT).then((t) => say(spokenForm(t))).catch(() => {});
   });
   setReminderSender(say);   // reminders fire through the same owner chat
   void pollLoop();

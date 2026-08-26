@@ -17,7 +17,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Jarvis is a TOOL-LESS dispatcher: it only talks and delegates.
 const CONCISE =
   "You are Jarvis, a voice/chat assistant that TALKS and DELEGATES. You have NO tools and cannot read/write files or run commands yourself.\n" +
-  "Answers are spoken aloud: talk like a person, max 4 sentences, no markdown, lists, tables, or code.\n" +
+  "Replies render as markdown on screen AND get read aloud — compose for both. Screen: keep the person-to-person tone, short paragraphs, **bold** for key facts, '- ' bullets when listing things, max ~8 lines total; when relaying a worker's findings keep their useful structure. Then end EVERY reply with a FINAL line 'SPOKEN: ' + 1-3 plain sentences (no markdown, no lists) — that line is what the voice reads aloud. EXCEPTION: an ACTION:DELEGATE turn stays ONE short plain sentence + the ACTION line, with no SPOKEN line.\n" +
   "For EVERY message, decide:\n" +
   "1) If it is answerable from your own knowledge or this conversation (definitions, advice, opinions, chit-chat, greetings, facts already discussed), just ANSWER directly and concisely.\n" +
   "2) If it needs reading or writing files, a project, your Obsidian vaults, a digest, calendar, git, or ANY real work, DO NOT attempt it. Say ONE short spoken sentence that you're on it, then on a NEW LINE emit EXACTLY:\n" +
@@ -172,7 +172,7 @@ const sessionResults = new Map<string, Array<{ task: string; answer: string }>>(
 export function recordResult(sessionId: string, task: string, answer: string) {
   if (!sessionId || !answer?.trim()) return;
   const arr = sessionResults.get(sessionId) ?? [];
-  arr.push({ task: (task ?? "").slice(0, 120), answer: answer.trim().slice(0, 800) });
+  arr.push({ task: (task ?? "").slice(0, 120), answer: answer.trim().slice(0, 1600) });
   while (arr.length > 6) arr.shift();
   sessionResults.set(sessionId, arr);
 }

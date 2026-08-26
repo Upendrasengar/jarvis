@@ -6,10 +6,22 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
+import { Markdown } from "../../components/Markdown";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
 
 // "SOURCES: /calls/x /notes/y" (from recall workers) renders as link chips
+// replies carry a screen part (markdown) and a final "SPOKEN: ..." line for
+// the voice — the bubble hides the spoken line, the TTS reads only it
+function splitSpoken(t: string): { display: string; spoken: string } {
+  const m = t.match(/^SPOKEN:\s*(.+)$/im);
+  if (!m) return { display: t, spoken: t };
+  return {
+    display: t.replace(/^SPOKEN:.*$/im, "").replace(/\n{3,}/g, "\n\n").trim(),
+    spoken: m[1].trim(),
+  };
+}
+
 function splitSources(t: string): { body: string; sources: { to: string; kind: "call" | "note"; label: string }[] } {
   const m = t.match(/^SOURCES:\s*(.+)$/im);
   if (!m) return { body: t, sources: [] };
@@ -103,7 +115,7 @@ export function ChatPage() {
     onReply((text) => {
       if (!speak && !voiceTurn.current) return;
       voiceTurn.current = false;
-      void speakAloud(text);
+      void speakAloud(splitSpoken(splitSources(text).body).spoken);
     });
   }, [speak, onReply]);
 
@@ -249,7 +261,8 @@ export function ChatPage() {
               {(() => {
                 if (!m.t) return <span className="blip text-[var(--dim)]">…</span>;
                 const { body, sources } = splitSources(m.t);
-                return (<>{body}<SourceChips sources={sources} /></>);
+                const { display } = splitSpoken(body);
+                return (<><Markdown md={display} /><SourceChips sources={sources} /></>);
               })()}
             </div>
           </Fragment>);
