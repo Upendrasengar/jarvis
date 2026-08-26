@@ -66,10 +66,10 @@ export function TagChips({ md, onChange }: { md: string; onChange: (next: string
     <>
       {tags.map((t) => (
         <span key={t}
-          className="group flex items-center rounded-full border border-[rgba(52,211,153,.4)] bg-[rgba(52,211,153,.07)] px-[10px] py-[3px] text-[10px] text-[#2fb886]">
+          className="group flex items-center rounded-md border border-[var(--line)] bg-[var(--surf-2)] px-[7px] py-[3px] font-mono text-[9.5px] text-[var(--green)]">
           <button onClick={() => navigate(`/brain?focus=${encodeURIComponent(`tag:${t}`)}`)}
-            title={`Show #${t} in the brain graph`} className="hover:underline">
-            #{t}
+            title={`Show #${t} in the brain graph`} className="hover:text-[var(--bright)]">
+            <span className="opacity-40">#</span>{t}
           </button>
           <button onClick={() => onChange(removeTagMd(md, t))} title={`Remove #${t}`}
             className="ml-1 hidden text-[var(--dim)] hover:text-[var(--red)] group-hover:inline">
@@ -88,7 +88,7 @@ export function TagChips({ md, onChange }: { md: string; onChange: (next: string
             }}
             onBlur={() => { setQ(""); setOpen(false); }}
             placeholder="tag-name"
-            className="w-[110px] rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-[10px] py-[3px] text-[10px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[rgba(52,211,153,.5)]"
+            className="w-[110px] rounded-md border border-[var(--line)] bg-[var(--surf-2)] px-[7px] py-[3px] font-mono text-[9.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--green)]"
           />
           <datalist id="jarvis-all-tags">
             {all.filter((t) => !tags.includes(t)).map((t) => <option key={t} value={t} />)}
@@ -96,8 +96,8 @@ export function TagChips({ md, onChange }: { md: string; onChange: (next: string
         </>
       ) : (
         <button onClick={() => setOpen(true)}
-          className="rounded-full border border-[var(--line)] px-[10px] py-[3px] text-[10px] text-[var(--dim)] hover:border-[rgba(52,211,153,.6)] hover:text-[#2fb886]">
-          ＋ tag
+          className="rounded-md border border-dashed border-[var(--line)] px-[7px] py-[3px] font-mono text-[9.5px] text-[var(--dim)] hover:border-[var(--green)] hover:text-[var(--green)]">
+          + tag
         </button>
       )}
     </>
