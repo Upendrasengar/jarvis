@@ -141,6 +141,22 @@ export function spawnAgent(project: string, task: string, sessionId = "") {
   return { id: rec.id, project: proj.name, branch, status: rec.status };
 }
 
+// A worker report is dual-channel: markdown for the screen, a SPOKEN line for
+// the voice. Split them so the dispatcher relays the markdown and never
+// paraphrases the spoken prose onto the screen. SOURCES stays on the screen
+// side — the UI renders it as file chips.
+function splitChannels(raw: string): { screen: string; spoken: string } {
+  const lines = raw.split("\n");
+  const i = lines.findIndex((l) => /^\s*SPOKEN:/i.test(l));
+  if (i < 0) return { screen: raw, spoken: "" };
+  const src = lines.findIndex((l, n) => n > i && /^\s*SOURCES:/i.test(l));
+  const end = src > i ? src : lines.length;
+  return {
+    screen: [...lines.slice(0, i), ...lines.slice(end)].join("\n").trim(),
+    spoken: lines.slice(i, end).join(" ").replace(/^\s*SPOKEN:\s*/i, "").trim(),
+  };
+}
+
 export function spawnAsk(task: string, sessionId = "") {
   const rec = baseRecord({ kind: "ask", project: "recall", path: JARVIS_DIR, task, sessionId });
   const prompt = [
@@ -163,7 +179,7 @@ export function spawnAsk(task: string, sessionId = "") {
     "SELF-KNOWLEDGE: for questions about Jarvis's OWN capabilities, configuration, or integrations (calendar, telegram, reminders, recording), NEVER answer from vault notes or memory — they describe past states. Check the LIVE system: data/calendar.json (enabled+fetchedAt), data/reminders.json, curl the local API, and `grep -o '^[A-Z_]*=' secrets/.env` for which integrations are configured (names only — NEVER read or print secret values). Old notes saying a feature is 'parked' or 'planned' are outdated the moment these files say otherwise.",
     ...OBSIDIAN_CLI_LINES(),
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, use \`obsidian backlinks file=\"X\"\` (fallback: grep the vaults for the literal text [[X]], e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
-    "End your reply with a line 'ANSWER:' then the answer for the SCREEN — markdown welcome (**bold**, '- ' bullet lists, [[wikilinks]]), concise, max ~12 lines.",
+    "End your reply with a line 'ANSWER:' then the answer for the SCREEN — markdown, not prose. Anything with two or more items MUST be a '- ' bullet list, one item per line, each led by the **bold** key fact; use [[wikilinks]] for notes and calls. No preamble, no closing offer. Max 10 lines; if there is more, give the most important items and state how many remain.",
     "Then a line 'SPOKEN:' with 1-3 plain sentences a voice assistant reads aloud (no markdown, lists, or code).",
     "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
     "SOURCES: /calls/<id> /notes/<id> ...",
@@ -179,10 +195,11 @@ export function spawnAsk(task: string, sessionId = "") {
   child.on("close", (code) => {
     rec.status = code === 0 ? "done" : "failed";
     const m = rec.log.join("\n").match(/ANSWER:\s*([\s\S]*)$/i);
-    rec.answer = (m ? m[1] : rec.log.slice(-4).join(" ")).trim().slice(0, 1600);
+    const { screen, spoken } = splitChannels((m ? m[1] : rec.log.slice(-4).join(" ")).trim());
+    rec.answer = screen.slice(0, 1600);
     rec.summary = rec.answer.slice(0, 120);
     rec.finished = Date.now();
-    recordResult(rec.sessionId, rec.task, rec.answer);
+    recordResult(rec.sessionId, rec.task, rec.answer, spoken);
     if (rec.sessionId) pushEvent({ type: "worker-result", sessionId: rec.sessionId });
     if (rec.status === "done" && rec.answer) autoDistill(`Task: ${rec.task}\nResult: ${rec.answer}`);
   });

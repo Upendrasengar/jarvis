@@ -17,7 +17,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Jarvis is a TOOL-LESS dispatcher: it only talks and delegates.
 const CONCISE =
   "You are Jarvis, a voice/chat assistant that TALKS and DELEGATES. You have NO tools and cannot read/write files or run commands yourself.\n" +
-  "Replies render as markdown on screen AND get read aloud — compose for both. Screen: keep the person-to-person tone, short paragraphs, **bold** for key facts, '- ' bullets when listing things, max ~8 lines total; when relaying a worker's findings keep their useful structure. Then end EVERY reply with a FINAL line 'SPOKEN: ' + 1-3 plain sentences (no markdown, no lists) — that line is what the voice reads aloud. EXCEPTION: an ACTION:DELEGATE turn stays ONE short plain sentence + the ACTION line, with no SPOKEN line.\n" +
+  "Your reply has TWO SEPARATE CHANNELS — do not blend them.\n" +
+  "SCREEN (everything before the SPOKEN line): real markdown, terse, skimmable. No preamble, no throat-clearing, no closing offer. ANY answer that carries two or more items — action items, findings, updates, people, options — MUST be a '- ' bullet list, one item per line, each starting with the **bold** key fact. NEVER restate a list as a paragraph. Use prose only for a genuinely single-fact answer, and then at most two sentences. HARD CAP: 10 lines and ~120 words on screen — cut detail rather than run long; if there is more, give the top items and say how many remain. When relaying a worker's findings, keep their markdown structure — relay, don't re-narrate.\n" +
+  "VOICE: end EVERY reply with a FINAL line 'SPOKEN: ' + 1-3 plain sentences (no markdown, no lists). That line alone is read aloud, so ALL conversational phrasing belongs there and none of it on screen. EXCEPTION: an ACTION:DELEGATE turn stays ONE short plain sentence + the ACTION line, with no SPOKEN line.\n" +
   "For EVERY message, decide:\n" +
   "1) If it is answerable from your own knowledge or this conversation (definitions, advice, opinions, chit-chat, greetings, facts already discussed), just ANSWER directly and concisely.\n" +
   "2) If it needs reading or writing files, a project, your Obsidian vaults, a digest, calendar, git, or ANY real work, DO NOT attempt it. Say ONE short spoken sentence that you're on it, then on a NEW LINE emit EXACTLY:\n" +
@@ -167,12 +169,19 @@ export function getSession(sessionId: string): Session {
 }
 
 // Worker results waiting to be folded into a session's next message.
-const sessionResults = new Map<string, Array<{ task: string; answer: string }>>();
+// The worker already formatted its answer for the screen (markdown) and for
+// the voice (its SPOKEN line) — keep the two apart, or the dispatcher
+// paraphrases the spoken prose and the screen loses every bullet.
+const sessionResults = new Map<string, Array<{ task: string; answer: string; spoken: string }>>();
 
-export function recordResult(sessionId: string, task: string, answer: string) {
+export function recordResult(sessionId: string, task: string, answer: string, spoken = "") {
   if (!sessionId || !answer?.trim()) return;
   const arr = sessionResults.get(sessionId) ?? [];
-  arr.push({ task: (task ?? "").slice(0, 120), answer: answer.trim().slice(0, 1600) });
+  arr.push({
+    task: (task ?? "").slice(0, 120),
+    answer: answer.trim().slice(0, 1600),
+    spoken: (spoken ?? "").trim().slice(0, 600),
+  });
   while (arr.length > 6) arr.shift();
   sessionResults.set(sessionId, arr);
 }
@@ -181,8 +190,11 @@ export function withPendingContext(sessionId: string, message: string): string {
   const arr = sessionResults.get(sessionId);
   if (!arr?.length) return message;
   sessionResults.delete(sessionId);
-  const ctx = arr.map((r) => `- (${r.task}) ${r.answer}`).join("\n");
-  return `[Background — results just returned by workers you dispatched. Use these to answer if relevant; do NOT re-delegate what's already answered here:\n${ctx}\n]\n\nUser: ${message}`;
+  const ctx = arr.map((r) =>
+    `--- worker result (${r.task}) ---\n${r.answer}` +
+    (r.spoken ? `\n--- that worker's voice line ---\n${r.spoken}` : "")).join("\n\n");
+  return `[Background — results just returned by workers you dispatched.\n` +
+    `RELAY the worker markdown to the screen essentially AS-IS: keep its bullets, **bold**, and [[wikilinks]], trim only what does not answer the question. Do NOT rewrite it into paragraphs and do NOT expand the voice line into your screen answer. Reproduce any SOURCES: line verbatim as your final line. Condense the voice line into your own SPOKEN line. Do NOT re-delegate what is already answered here:\n${ctx}\n]\n\nUser: ${message}`;
 }
 
 export function sendTurn(
