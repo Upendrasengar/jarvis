@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
-import { BRAIN_DIR, JARVIS_DIR, PORT, setting } from "../config.js";
+import { BRAIN_DIR, JARVIS_DIR, PORT, VAULT_DIR, setting } from "../config.js";
 import { readSecrets } from "./env.js";
 import { CLAUDE, WORKER_PATH, readVaults, setVoice } from "./env.js";
 import { recordResult } from "./chatSessions.js";
@@ -147,8 +147,13 @@ export function spawnAsk(task: string, sessionId = "") {
       `Trust this API over notes/digests for what is ON the calendar; notes still matter for context.`,
     ] : []),
     "SELF-KNOWLEDGE: for questions about Jarvis's OWN capabilities, configuration, or integrations (calendar, telegram, reminders, recording), NEVER answer from vault notes or memory — they describe past states. Check the LIVE system: data/calendar.json (enabled+fetchedAt), data/reminders.json, curl the local API, and `grep -o '^[A-Z_]*=' secrets/.env` for which integrations are configured (names only — NEVER read or print secret values). Old notes saying a feature is 'parked' or 'planned' are outdated the moment these files say otherwise.",
-    "OBSIDIAN SKILLS: the obsidian-markdown and obsidian-cli skills are installed in this repo — when reading or writing vault .md files follow obsidian-markdown's conventions (frontmatter, wikilinks, callouts), and when the Obsidian app is running prefer obsidian-cli's indexed search over grep (fall back to tools/vault-search.sh when it isn't).",
-    "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, grep the vaults for the literal text [[X]] (e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
+    `OBSIDIAN CLI — TRY IT FIRST for vault lookups${VAULT_DIR ? ` (vault name: "${VAULT_DIR.split("/").pop()}")` : ""}. The \`obsidian\` CLI is installed and its index understands frontmatter, tags and wikilinks:`,
+    `  obsidian vault=<name> search query="..." limit=10   — indexed full-text search`,
+    `  obsidian vault=<name> backlinks file="X"            — every note linking to [[X]]`,
+    `  obsidian vault=<name> tags sort=count counts        — tag inventory`,
+    `  obsidian vault=<name> read file="X"                 — read a note by wikilink name`,
+    `It needs the Obsidian app to be open: if a command errors or returns nothing, fall back to grep / tools/vault-search.sh ONCE — do not keep retrying the CLI. When reading or writing vault .md files follow the obsidian-markdown skill's conventions (frontmatter, wikilinks, callouts).`,
+    "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, use \`obsidian backlinks file=\"X\"\` (fallback: grep the vaults for the literal text [[X]], e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
     "End your reply with a line 'ANSWER:' then 1-4 plain sentences a voice assistant can read aloud (no markdown, lists, or code).",
     "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
     "SOURCES: /calls/<id> /notes/<id> ...",
