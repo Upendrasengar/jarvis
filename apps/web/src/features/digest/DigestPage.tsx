@@ -208,24 +208,28 @@ function LedgerBuckets({ actions, triage, onToggle }: {
     );
   };
 
-  const Section = ({ label, tone, items, done = false }: {
-    label: string; tone: string; items: any[]; done?: boolean;
-  }) =>
-    items.length ? (
+  const Section = ({ label, tone, items, done = false, startCollapsed = false }: {
+    label: string; tone: string; items: any[]; done?: boolean; startCollapsed?: boolean;
+  }) => {
+    const [collapsed, setCollapsed] = useState(startCollapsed);
+    return items.length ? (
       <div className="mb-5">
-        <div className={`mb-2 text-[10px] uppercase tracking-[2px] ${tone}`}>
+        <button onClick={() => setCollapsed(!collapsed)}
+          className={`mb-2 flex items-center gap-1.5 text-[10px] uppercase tracking-[2px] ${tone}`}>
+          <span className="text-[8px]">{collapsed ? "▸" : "▾"}</span>
           {label} <span className="text-[var(--dim)]">· {items.length}</span>
-        </div>
-        {items.map((a) => <Item key={idKey(a)} a={a} done={done} />)}
+        </button>
+        {!collapsed && items.map((a) => <Item key={idKey(a)} a={a} done={done} />)}
       </div>
     ) : null;
+  };
 
   return (
     <div className="mb-6">
       <Section label="Likely overdue" tone="text-[var(--red)]" items={overdue} />
       <Section label="Ageing" tone="text-[var(--amber)]" items={ageing} />
       <Section label="Open" tone="text-[var(--dim)]" items={rest} />
-      <Section label="Cleared this week" tone="text-[var(--green)]" items={cleared} done />
+      <Section label="Cleared this week" tone="text-[var(--green)]" items={cleared} done startCollapsed />
       {!open.length && !cleared.length && (
         <div className="font-sans text-[12.5px] text-[var(--dim)]">All clear.</div>
       )}
