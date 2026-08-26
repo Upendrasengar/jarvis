@@ -103,6 +103,13 @@ html.light body {
 @keyframes blip { 50% { opacity: 0.4; } }
 .blip { animation: blip 1.1s infinite; }
 
+/* Tailwind v4's preflight leaves buttons on the arrow cursor — every
+   button here is clickable, so all of them get the hand */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
 /* .chk — the ledger checkbox: soft rounded square, cyan fill when done */
 input.chk {
   appearance: none;
