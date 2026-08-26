@@ -465,6 +465,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
           ) : call.notes ? (
             <div className="mt-6">
               <NotesView
+                noteId={call.id}
                 notes={call.notes}
                 onToggle={(index) => toggle.mutate({ id: call.id, index })}
                 onComment={setCommentFor}

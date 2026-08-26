@@ -241,6 +241,7 @@ export function NotesPage() {
             ) : doc ? (
               <>
                 <NotesView
+                  noteId={selected ?? undefined}
                   cards={false}
                   notes={doc.md.replace(/^---\n[\s\S]*?\n---\n?/, "")}
                   onToggle={toggleItem}

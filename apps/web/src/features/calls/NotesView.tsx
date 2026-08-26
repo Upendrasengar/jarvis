@@ -9,7 +9,7 @@
 // (Summary and Participants up top, Discussion full-width, then Decisions /
 // Action items / Open questions). Grouping is display-only: lines keep their
 // file order and indexes, so edits and checkbox toggles map back unchanged.
-import { Fragment, memo, useRef } from "react";
+import { Fragment, memo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { calloutMeta } from "../../components/Markdown";
 import { ago, parseStamp } from "../../lib/time";
@@ -75,6 +75,10 @@ function domToMd(el: HTMLElement): string {
 
 type Props = {
   notes: string;
+  // Identity of the note being shown. The editing guard below may only skip
+  // renders WITHIN one note — switching to a different call or note must
+  // always re-render, or the body freezes on the previous one.
+  noteId?: string;
   onToggle: (index: number) => void;
   onEditLine?: (lineIndex: number, newLine: string) => void;
   onComment?: (index: number) => void;
@@ -102,6 +106,10 @@ let editingNow = false;
 export const NotesView = memo(
   function NotesView({ notes, onToggle, onEditLine, onComment, cards = true }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
+    // A line that still has focus when this unmounts never fires onBlur, so
+    // the flag stayed true and every later render was skipped — the symptom
+    // was picking another call and getting the previous call's notes.
+    useEffect(() => () => { editingNow = false; }, []);
     let checkboxIndex = -1;
     // frontmatter lines render as nothing but KEEP their indexes so inline
     // edits still map to the right source line
@@ -317,6 +325,9 @@ export const NotesView = memo(
       </div>
     );
   },
-  // skip re-renders entirely while the user is typing in a line
-  (prev, next) => (editingNow ? true : prev.notes === next.notes),
+  // Skip re-renders while the user is typing in a line — but ONLY within the
+  // same note. A different noteId always renders, so a stuck editing flag can
+  // no longer freeze the pane on a stale call.
+  (prev, next) =>
+    prev.noteId === next.noteId && (editingNow ? true : prev.notes === next.notes),
 );
