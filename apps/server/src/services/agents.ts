@@ -228,6 +228,7 @@ export function spawnNote(content: string, opts: { sessionId?: string; auto?: bo
     `"""`, content, `"""`, ``,
     `Rules:`,
     `- Write ONLY inside ${BRAIN_DIR}. Create or update the most relevant .md file; organize by topic with clear filenames.`,
+    `- ROUTING, and get this right: ${BRAIN_DIR}/Memory/ is Jarvis's OWN small facts about its owner and its own configuration (who they are, their team, active projects, integration settings) — every file there is injected into every conversation's system prompt, so nothing over ~2KB belongs in it. ANY knowledge about the owner's work — a project, a topic, a context dump, meeting substance, research — goes in ${BRAIN_DIR}/Notes/ instead, however important it seems. When in doubt, Notes/.`,
     `- The user's own notes live in ${BRAIN_DIR}/Notes/ (one .md per topic; frontmatter: title, created, optional 'call: <call-id>'; '- [ ]' lines become tracked action items). When the user asks to create/update MY NOTE about something, work there.`,
     `- NEVER invent a 'call:' value. Write that key ONLY when you have listed ${BRAIN_DIR}/Calls/ and are copying the exact stem of a file you saw there (Calls/call-<stamp>.md -> 'call: call-<stamp>'). If no such file exists, OMIT the key entirely — a note claiming a call that never happened is worse than a note with no link.`,
     `- Append as a short dated bullet; keep it tidy and Obsidian-style ([[links]] where natural). Don't duplicate facts already there.`,

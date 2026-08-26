@@ -40,20 +40,41 @@ const CONCISE =
 // Core memory rides in the system prompt: small owner-facts files the
 // dispatcher may answer from directly (identity, team, active projects).
 // Read at spawn — a recycled session picks up edits.
+// Core memory is a budget, and it used to be spent in whatever order readdir
+// happened to sort. One oversized file (a 22KB context dump landed here once)
+// could truncate to the whole budget and `break`, evicting every file after
+// it — including about-me.md, which CLAUDE.md calls load-bearing. Two rules
+// now: the load-bearing files are read FIRST, and anything too big to be an
+// owner-fact is skipped outright rather than eating the budget.
+const MEMORY_BUDGET = 8000;
+const PER_FILE_CAP = 4000;
+const LOAD_BEARING = ["about-me.md", "active-projects.md"];
+
 function memoryBrief(): string {
-  let budget = 8000;
+  let budget = MEMORY_BUDGET;
   const parts: string[] = [];
+  const skipped: string[] = [];
   try {
-    for (const f of fs.readdirSync(MEMORY_MD_DIR).filter((f) => f.endsWith(".md")).sort()) {
+    const all = fs.readdirSync(MEMORY_MD_DIR).filter((f) => f.endsWith(".md")).sort();
+    const ordered = [
+      ...LOAD_BEARING.filter((f) => all.includes(f)),
+      ...all.filter((f) => !LOAD_BEARING.includes(f)),
+    ];
+    for (const f of ordered) {
       let txt = "";
       try { txt = fs.readFileSync(path.join(MEMORY_MD_DIR, f), "utf8").trim(); } catch { continue; }
       if (!txt) continue;
-      const chunk = `--- memory/${f} ---\n${txt.slice(0, budget)}`;
+      // Too big to be an owner-fact — it is knowledge, and knowledge belongs
+      // in Notes/ where recall reads it, not in every system prompt.
+      if (txt.length > PER_FILE_CAP) { skipped.push(`${f} (${txt.length})`); continue; }
+      const chunk = `--- memory/${f} ---\n${txt}`;
+      if (chunk.length > budget) { skipped.push(`${f} (no budget left)`); continue; }
       parts.push(chunk);
       budget -= chunk.length;
-      if (budget <= 0) break;
     }
   } catch {}
+  if (skipped.length)
+    console.warn(`[memory] skipped ${skipped.length} file(s) over the core-memory budget: ${skipped.join(", ")}`);
   return parts.length ? `\n\n=== CORE MEMORY (owner facts — answer from these directly) ===\n${parts.join("\n\n")}` : "";
 }
 
