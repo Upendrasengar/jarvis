@@ -332,9 +332,9 @@ export function DigestPage() {
                 <div className="font-sans text-xs font-semibold text-[var(--bright)]">
                   {DAYS[new Date(d.date + "T12:00:00").getDay()]} · {d.date}
                 </div>
-                <div className="mt-[2px] flex items-center gap-2 text-[10px] text-[var(--dim)]">
-                  {latest && <span className="h-[7px] w-[7px] rounded-full bg-[var(--green)]" />}
-                  {latest ? "latest" : "daily digest"}
+                <div className="mt-[2px] flex items-start gap-2 font-sans text-[10.5px] leading-snug text-[var(--dim)]">
+                  {latest && <span className="mt-[3px] h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--green)]" />}
+                  <span className="line-clamp-2">{(d as any).hook || (latest ? "latest" : "daily digest")}</span>
                 </div>
               </button>
             </div>

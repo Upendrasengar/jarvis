@@ -24,7 +24,7 @@ export const RecState = z.union([
 ]);
 export type RecState = z.infer<typeof RecState>;
 
-export const DigestEntry = z.object({ date: z.string() });
+export const DigestEntry = z.object({ date: z.string(), hook: z.string().optional() });
 export type DigestEntry = z.infer<typeof DigestEntry>;
 
 export const Digest = z.object({ md: z.string() });
