@@ -10,6 +10,7 @@
 // Action items / Open questions). Grouping is display-only: lines keep their
 // file order and indexes, so edits and checkbox toggles map back unchanged.
 import { Fragment, memo, useRef } from "react";
+import { Link } from "react-router-dom";
 import { calloutMeta } from "../../components/Markdown";
 import { ago, parseStamp } from "../../lib/time";
 
@@ -23,9 +24,35 @@ function em(text: string, key: number) {
   );
 }
 
+// Obsidian [[target|label]] — rendered as a real link; data-md carries the
+// original markdown so domToMd can round-trip it through an inline edit
+function wiki(text: string, keyBase: number) {
+  const out: React.ReactNode[] = [];
+  const re = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  let last = 0, k = 0, m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(em(text.slice(last, m.index), keyBase * 100 + k++));
+    const target = m[1].trim();
+    const label = (m[2] ?? target).trim();
+    const call = target.match(/^call(?:-notes)?-(\d{4}-\d{2}-\d{2}-\d{4})$/);
+    out.push(
+      <Link key={`w${keyBase}-${k++}`} data-md={m[0]} contentEditable={false}
+        to={call ? `/calls/${call[1]}` : "/brain"}
+        className={call
+          ? "text-[var(--cyan)] underline decoration-dotted underline-offset-2 hover:text-[var(--bright)]"
+          : "rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[7px] py-[1px] text-[11px] text-[var(--indigo)] hover:border-[var(--indigo)]"}>
+        {label}
+      </Link>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(em(text.slice(last), keyBase * 100 + k++));
+  return <Fragment>{out}</Fragment>;
+}
+
 function inline(text: string) {
   return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
-    i % 2 ? <b key={i} className="text-[var(--bright)]">{part}</b> : em(part, i),
+    i % 2 ? <b key={i} className="text-[var(--bright)]">{wiki(part, i)}</b> : wiki(part, i),
   );
 }
 
@@ -35,6 +62,7 @@ function domToMd(el: HTMLElement): string {
   el.childNodes.forEach((n) => {
     if (n.nodeType === Node.TEXT_NODE) out += n.textContent ?? "";
     else if (n instanceof HTMLElement) {
+      if (n.dataset.md) { out += n.dataset.md; return; }
       const inner = domToMd(n);
       out +=
         n.tagName === "B" || n.tagName === "STRONG" ? `**${inner}**`
@@ -137,9 +165,11 @@ export const NotesView = memo(
       if (q) {
         const railCls = /^>/.test(lines[i - 1] ?? "") ? "" : "mt-3 rounded-t-lg pt-2";
         const endCls = nextIsQuote ? "py-[3px]" : "rounded-b-lg pt-[3px] pb-2.5 mb-3";
+        const qi = q[1].match(/^- (.*)$/);
         return (
           <div key={i} className={`border-l-2 ${railColor || "border-[var(--line-2)]"} bg-[var(--surf-2)] px-3 ${endCls} ${railCls}`}>
-            {q[1] ? editable(i, "> ", "", q[1]) : "\u00a0"}
+            {qi ? <span className="flex gap-2"><span className="text-[var(--dim)]">•</span><span>{editable(i, "> - ", "", qi[1])}</span></span>
+                : q[1] ? editable(i, "> ", "", q[1]) : "\u00a0"}
           </div>
         );
       }

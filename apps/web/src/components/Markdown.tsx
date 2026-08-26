@@ -28,11 +28,41 @@ function callRefs(text: string): ReactNode[] {
   return out;
 }
 
+// Obsidian [[target|label]] / [[target]] — call targets open the call page,
+// anything else is a topic and opens the brain graph
+function wikiLinks(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  let last = 0, k = 0, m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(...callRefs(text.slice(last, m.index)));
+    const target = m[1].trim();
+    const label = (m[2] ?? target).trim();
+    const call = target.match(/^call(?:-notes)?-(\d{4}-\d{2}-\d{2}-\d{4})$/);
+    out.push(
+      call ? (
+        <Link key={`w${k++}`} to={`/calls/${call[1]}`}
+          className="text-[var(--cyan)] underline decoration-dotted underline-offset-2 hover:text-[var(--bright)]">
+          {label}
+        </Link>
+      ) : (
+        <Link key={`w${k++}`} to="/brain"
+          className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[7px] py-[1px] text-[11px] text-[var(--indigo)] hover:border-[var(--indigo)]">
+          {label}
+        </Link>
+      ),
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...callRefs(text.slice(last)));
+  return out;
+}
+
 function inline(text: string) {
   return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
     i % 2
-      ? <b key={i} className="text-[var(--bright)]">{callRefs(part)}</b>
-      : <Fragment key={i}>{callRefs(part)}</Fragment>,
+      ? <b key={i} className="text-[var(--bright)]">{wikiLinks(part)}</b>
+      : <Fragment key={i}>{wikiLinks(part)}</Fragment>,
   );
 }
 
@@ -125,9 +155,11 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
           const prev = body.split("\n")[i - 1] ?? "";
           const railCls = /^>/.test(prev) ? "" : "mt-4 rounded-t-lg pt-2";
           const endCls = nextIsQuote ? "py-[3px]" : "rounded-b-lg pt-[3px] pb-2.5 mb-3";
+          const qi = q[1].match(/^- (.*)$/);
           return (
             <div key={i} className={`border-l-2 ${railColor || "border-[var(--line-2)]"} bg-[var(--surf-2)] px-3 ${endCls} ${railCls}`}>
-              {q[1] ? inline(q[1]) : "\u00a0"}
+              {qi ? <span className="flex gap-2"><span className="text-[var(--dim)]">•</span><span>{inline(qi[1])}</span></span>
+                  : q[1] ? inline(q[1]) : "\u00a0"}
             </div>
           );
         }
