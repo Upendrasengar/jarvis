@@ -72,7 +72,7 @@ export function TagChips({ md, onChange }: { md: string; onChange: (next: string
             <span className="opacity-40">#</span>{t}
           </button>
           <button onClick={() => onChange(removeTagMd(md, t))} title={`Remove #${t}`}
-            className="ml-1 hidden text-[var(--dim)] hover:text-[var(--red)] group-hover:inline">
+            className="ml-1 w-[9px] text-[var(--dim)] opacity-0 hover:text-[var(--red)] group-hover:opacity-100">
             ×
           </button>
         </span>

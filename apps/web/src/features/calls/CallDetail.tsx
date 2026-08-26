@@ -223,7 +223,7 @@ function Rail({ call }: { call: Call }) {
             <button
               onClick={() => removeTopic(t)}
               title={`Unlink ${t} from this call`}
-              className="ml-1 hidden text-[var(--dim)] hover:text-[var(--red)] group-hover:inline"
+              className="ml-1 inline-block w-[9px] text-[var(--dim)] opacity-0 hover:text-[var(--red)] group-hover:opacity-100"
             >
               ×
             </button>
