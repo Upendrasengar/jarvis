@@ -2,7 +2,7 @@
 // Shared chat transport — used by the chat page (visible conversation) and
 // the header voice bar (background conversation from any tab). Handles the
 // SSE stream and the ACTION:DELEGATE protocol in one place.
-export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number };
+export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number; id?: string };
 
 const TX_KEY = (sid: string) => "jarvis_tx_" + sid;
 const DELEGATE_RE = /ACTION:DELEGATE\s*(\{[\s\S]*?\})\s*/;
@@ -73,36 +73,42 @@ export async function streamChatTurn(
     } catch {}
   };
 
+  // The turn flag gates worker-result delivery. It used to be cleared only on
+  // the happy path, so ONE failed fetch or aborted stream left it stuck true
+  // for the life of the page and every later answer was silently dropped.
   (window as any)._jarvisTurnActive = true;
-  const r = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, sessionId, images }),
-  });
-  if (!r.ok || !r.body) throw new Error(`chat → ${r.status}`);
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, sessionId, images }),
+    });
+    if (!r.ok || !r.body) throw new Error(`chat → ${r.status}`);
 
-  const reader = r.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let i: number;
-    while ((i = buf.indexOf("\n\n")) >= 0) {
-      const chunk = buf.slice(0, i);
-      buf = buf.slice(i + 2);
-      const ev = chunk.match(/^event: (\w+)$/m)?.[1] ?? "message";
-      const data = chunk.match(/^data: (.*)$/m)?.[1];
-      if (data === undefined) continue;
-      if (ev === "err") { onText?.(JSON.parse(data)); continue; }
-      if (ev === "done") continue;
-      full += JSON.parse(data);
-      maybeDelegate();
-      maybeRemind();
-      onText?.(visible() || "…");
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let i: number;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        const ev = chunk.match(/^event: (\w+)$/m)?.[1] ?? "message";
+        const data = chunk.match(/^data: (.*)$/m)?.[1];
+        if (data === undefined) continue;
+        if (ev === "err") { onText?.(JSON.parse(data)); continue; }
+        if (ev === "done") continue;
+        full += JSON.parse(data);
+        maybeDelegate();
+        maybeRemind();
+        onText?.(visible() || "…");
+      }
     }
+  } finally {
+    (window as any)._jarvisTurnActive = false;
   }
-  (window as any)._jarvisTurnActive = false;
   return visible() || (delegated ? "On it." : "");
 }

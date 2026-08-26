@@ -31,17 +31,18 @@ export function useChatStream(sessionId: string) {
   const send = useCallback(async (message: string, images: ChatImage[] = []) => {
     if (!message.trim() || streaming) return;
     setStreaming(true);
+    // The reply bubble carries its own id. It used to be addressed as "the
+    // last message", so a worker answer arriving mid-turn — the typewriter
+    // keeps animating after the stream closes — was overwritten by the ack
+    // text and vanished from the live view.
+    const replyId = crypto.randomUUID ? crypto.randomUUID() : `r${Date.now()}`;
     setMessages((m) => [
       ...m,
       { c: "me", t: message, ts: Date.now(), ...(images.length ? { imgs: images.map((i) => i.thumb) } : {}) },
-      { c: "jarvis", t: "", ts: Date.now() },
+      { c: "jarvis", t: "", ts: Date.now(), id: replyId },
     ]);
     const setLast = (t: string) =>
-      setMessages((m) => {
-        const copy = m.slice();
-        copy[copy.length - 1] = { ...copy[copy.length - 1], c: "jarvis", t };
-        return copy;
-      });
+      setMessages((m) => m.map((msg) => (msg.id === replyId ? { ...msg, c: "jarvis", t } : msg)));
     const tw = makeTypewriter(setLast);
     try {
       const finalText = await streamChatTurn(sessionId, message, tw.feed, images.map((i) => i.full));

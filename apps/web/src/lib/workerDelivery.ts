@@ -29,8 +29,11 @@ export function useWorkerDelivery() {
 
     const deliver = async () => {
       if ((window as any)._jarvisTurnActive) {
-        if (retries++ < 3) setTimeout(deliver, 4000);
-        else { pending = false; retries = 0; }
+        // Giving up here used to LOSE the answer: it stayed parked server-side
+        // and the user saw only "Let me check." until they reloaded. Back off
+        // instead of dropping it — a long turn is not a reason to discard.
+        retries++;
+        setTimeout(deliver, Math.min(4000 * retries, 20000));
         return;
       }
       pending = false;
