@@ -11,7 +11,10 @@ import { speak } from "./tts";
 
 const DELIVER_PROMPT =
   "Your worker just came back — the results are in the background block above. " +
-  "Give me the answer now, short and spoken-friendly. Do not re-delegate.";
+  "Deliver the answer now, both channels: the SCREEN part relays the worker's " +
+  "markdown as-is (bullets stay bullets, one line per item, no preamble and no " +
+  "closing offer), then the final SPOKEN line carries the spoken-friendly " +
+  "summary. Do not re-delegate.";
 
 export function useWorkerDelivery() {
   useEffect(() => {

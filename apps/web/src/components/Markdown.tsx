@@ -58,11 +58,25 @@ function wikiLinks(text: string): ReactNode[] {
   return out;
 }
 
-function inline(text: string) {
+function bold(text: string) {
   return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
     i % 2
       ? <b key={i} className="text-[var(--bright)]">{wikiLinks(part)}</b>
       : <Fragment key={i}>{wikiLinks(part)}</Fragment>,
+  );
+}
+
+// `inline code` — paths and commands came through with literal backticks
+// until this existed. Runs OUTSIDE bold/wikilinks: code spans are literal.
+function inline(text: string) {
+  return text.split(/`([^`]+)`/g).map((part, i) =>
+    i % 2
+      ? (
+        <code key={i} className="rounded border border-[var(--line-2)] bg-[var(--surf-2)] px-[5px] py-[1px] font-mono text-[0.92em] text-[var(--cyan)]">
+          {part}
+        </code>
+      )
+      : <Fragment key={i}>{bold(part)}</Fragment>,
   );
 }
 
