@@ -4,7 +4,7 @@
 // display (node size, link width, labels, arrows), forces (repel, distance).
 // Control state persists in localStorage.
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph3D from "3d-force-graph";
 import SpriteText from "three-spritetext";
 
@@ -116,8 +116,11 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 export function BrainPage() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState("loading…");
-  const [ctl, setCtl] = useState<Controls>(loadControls);
+  const [params] = useSearchParams();
+  const focus = params.get("focus") ?? "";
+  const [ctl, setCtl] = useState<Controls>(() => ({ ...loadControls(), search: focus }));
   const [vaults, setVaults] = useState<string[]>([]);
+  useEffect(() => { if (focus) setCtl((c) => ({ ...c, search: focus })); }, [focus]);
   const [panelOpen, setPanelOpen] = useState(true);
   const navigate = useNavigate();
   const graphRef = useRef<any>(null);
@@ -288,7 +291,7 @@ export function BrainPage() {
     <div className="relative h-full overflow-hidden">
       <div className="absolute left-5 top-4 z-[5]">
         <div className="font-bold tracking-[2px] text-[var(--indigo)] [font-family:var(--display)] [text-shadow:0_0_14px_var(--indigo-3)]">
-          KRONOS · SECOND BRAIN
+          JARVIS · SECOND BRAIN
         </div>
         <div className="text-[11px] text-[var(--dim)]">{stats}</div>
       </div>

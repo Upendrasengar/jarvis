@@ -46,7 +46,7 @@ function wikiLinks(text: string): ReactNode[] {
           {label}
         </Link>
       ) : (
-        <Link key={`w${k++}`} to="/brain"
+        <Link key={`w${k++}`} to={`/brain?focus=${encodeURIComponent(target)}`}
           className="rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[7px] py-[1px] text-[11px] text-[var(--indigo)] hover:border-[var(--indigo)]">
           {label}
         </Link>

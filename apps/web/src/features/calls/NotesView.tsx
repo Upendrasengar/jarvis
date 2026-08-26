@@ -37,7 +37,7 @@ function wiki(text: string, keyBase: number) {
     const call = target.match(/^call(?:-notes)?-(\d{4}-\d{2}-\d{2}-\d{4})$/);
     out.push(
       <Link key={`w${keyBase}-${k++}`} data-md={m[0]} contentEditable={false}
-        to={call ? `/calls/${call[1]}` : "/brain"}
+        to={call ? `/calls/${call[1]}` : `/brain?focus=${encodeURIComponent(target)}`}
         className={call
           ? "text-[var(--cyan)] underline decoration-dotted underline-offset-2 hover:text-[var(--bright)]"
           : "rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-[7px] py-[1px] text-[11px] text-[var(--indigo)] hover:border-[var(--indigo)]"}>

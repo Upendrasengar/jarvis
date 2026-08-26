@@ -161,14 +161,26 @@ function Rail({ call }: { call: Call }) {
   const overdue = Object.entries(triage?.deadlines ?? {}).filter(
     ([k, d]) => k.startsWith(`${call.id}|`) && d < today,
   ).length;
-  const topics = [...new Set([...call.notes.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]))];
+  // topic = a [[target]] that isn't a call ref and isn't a dated note slug —
+  // labels ([[t|label]]) are display-only, the target is the topic name
+  const topics = [...new Set(
+    [...call.notes.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)]
+      .map((m) => m[1].trim())
+      .filter((t) => !/^call(-notes)?-\d/.test(t) && !/\d{4}-\d{2}-\d{2}/.test(t)),
+  )];
   const save = useUpdateNotes();
   const qc = useQueryClient();
   const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const addTopic = (t: string) => {
     if (topics.includes(t)) return;
     let notes = call.notes;
-    if (/^\*\*Topics:\*\*/m.test(notes)) notes = notes.replace(/^(\*\*Topics:\*\*.*)$/m, `$1 [[${t}]]`);
+    if (/^topics:\s*$/m.test(notes.split(/^---$/m)[1] ?? "") || /^topics:/m.test(notes.slice(0, notes.indexOf("\n---", 3) + 1)))
+      // frontmatter topics list — insert right under the "topics:" key
+      notes = notes.replace(/^topics:\s*\n/m, `topics:\n  - "[[${t}]]"\n`);
+    else if (/^## Related\s*$/m.test(notes))
+      notes = notes.replace(/^(## Related\s*\n)/m, `$1- [[${t}]]\n`);
+    else if (/^\*\*Topics:\*\*/m.test(notes))
+      notes = notes.replace(/^(\*\*Topics:\*\*.*)$/m, `$1 [[${t}]]`);
     else notes = notes.trimEnd() + `\n\n**Topics:** [[${t}]]\n`;
     save.mutate({ id: call.id, notes });
     fetch("/api/topics", {
@@ -178,8 +190,12 @@ function Rail({ call }: { call: Call }) {
     }).then(() => qc.invalidateQueries({ queryKey: ["topics"] })).catch(() => {});
   };
   const removeTopic = (t: string) => {
-    const notes = call.notes.replace(/^(\*\*Topics:\*\*.*)$/m,
-      (line) => line.replace(new RegExp(`\\s*\\[\\[${esc(t)}\\]\\]`), ""));
+    const ref = `\\[\\[${esc(t)}(?:\\|[^\\]]*)?\\]\\]`;
+    const notes = call.notes
+      // whole-line list entries: frontmatter '  - "[[t]]"' and Related '- [[t]]'
+      .replace(new RegExp(`^\\s*- "?${ref}"?\\s*\\n`, "gm"), "")
+      // inline on a legacy **Topics:** line
+      .replace(/^(\*\*Topics:\*\*.*)$/m, (line) => line.replace(new RegExp(`\\s*${ref}`), ""));
     if (notes !== call.notes) save.mutate({ id: call.id, notes });
   };
   return (
