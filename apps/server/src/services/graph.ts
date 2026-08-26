@@ -35,6 +35,17 @@ export function buildGraph(): Graph {
           const target = raw.replace(/\[\[|\]\]/g, "").split("|")[0].trim();
           links.push({ source: title, target });
         }
+        // frontmatter tags become #tag nodes — a second clustering axis
+        // (kind: #design, #process) orthogonal to topics (what: project names)
+        const fm = txt.match(/^---\n([\s\S]*?)\n---/);
+        if (fm) {
+          const block = fm[1].match(/^tags:\s*\n((?:[ \t]+-[ \t]+.*\n?)*)/m);
+          const inlineList = fm[1].match(/^tags:\s*\[([^\]]*)\]/m);
+          const tags = block
+            ? [...block[1].matchAll(/-[ \t]+(.+)/g)].map((m) => m[1].trim().replace(/^["']|["']$/g, ""))
+            : inlineList ? inlineList[1].split(",").map((t) => t.trim()).filter(Boolean) : [];
+          for (const t of tags) if (t) links.push({ source: title, target: `#${t.replace(/^#/, "")}` });
+        }
       }
     }
   };
@@ -42,10 +53,17 @@ export function buildGraph(): Graph {
   roots.add(PROJECTS_VAULT);
   for (const dir of roots) walk(dir, path.basename(dir));
   for (const l of links) {
-    if (!nodes.has(l.target)) nodes.set(l.target, { id: l.target, group: "ref", deg: 0 });
+    if (!nodes.has(l.target))
+      nodes.set(l.target, { id: l.target, group: l.target.startsWith("#") ? "tag" : "ref", deg: 0 });
     const s = nodes.get(l.source);
     if (s) s.deg++;
     nodes.get(l.target)!.deg++;
   }
-  return { nodes: [...nodes.values()], links };
+  // singleton tags (one note) are noise, not structure — keep tags that
+  // actually connect things
+  const weak = new Set([...nodes.values()].filter((n) => n.group === "tag" && n.deg < 2).map((n) => n.id));
+  return {
+    nodes: [...nodes.values()].filter((n) => !weak.has(n.id)),
+    links: links.filter((l) => !weak.has(l.target)),
+  };
 }

@@ -37,6 +37,7 @@ const palette = () =>
 type Controls = {
   search: string;
   orphans: boolean;     // show notes with no links
+  tags: boolean;        // show #tag nodes from frontmatter
   hiddenGroups: string[];   // vaults toggled off in the Filters section
   nodeSize: number;     // 1..8
   linkWidth: number;    // 0..3
@@ -47,7 +48,7 @@ type Controls = {
   linkDist: number;     // 10..150
 };
 const DEFAULTS: Controls = {
-  search: "", orphans: true, hiddenGroups: [], nodeSize: 3, linkWidth: 1,
+  search: "", orphans: true, tags: false, hiddenGroups: [], nodeSize: 3, linkWidth: 1,
   labelSize: 1, arrows: false, motion: true, repel: 70, linkDist: 40,
 };
 const STORE_KEY = "jarvis_brain_controls";
@@ -60,6 +61,11 @@ const idOf = (x: any) => (typeof x === "object" && x !== null ? x.id : x);
 
 function filterData(data: any, ctl: Controls) {
   let nodes = data.nodes as any[];
+  // "tag:design" (or "tag:#design") targets the tag node itself; a tag: search
+  // shows tag nodes even when the Tags toggle is off
+  const rawQ = ctl.search.trim().toLowerCase();
+  const tagQ = rawQ.startsWith("tag:") ? "#" + rawQ.slice(4).replace(/^#/, "") : "";
+  if (!ctl.tags && !tagQ) nodes = nodes.filter((n) => n.group !== "tag");
   if (ctl.hiddenGroups.length) {
     const hidden = new Set(ctl.hiddenGroups);
     // "ref" nodes belong to no vault — they survive as long as any vault shows
@@ -70,7 +76,7 @@ function filterData(data: any, ctl: Controls) {
     for (const l of data.links) { linked.add(idOf(l.source)); linked.add(idOf(l.target)); }
     nodes = nodes.filter((n) => linked.has(n.id));
   }
-  const q = ctl.search.trim().toLowerCase();
+  const q = tagQ || rawQ;
   if (q) {
     const hits = new Set(nodes.filter((n) => String(n.id).toLowerCase().includes(q)).map((n) => n.id));
     const keep = new Set(hits);
@@ -132,6 +138,7 @@ export function BrainPage() {
 
   const colorFor = (g: string) =>
     g === "ref" ? palRef.current.ref
+      : g === "tag" ? "#34d399"
       : palRef.current.series[(rankRef.current.get(g) ?? 0) % palRef.current.series.length];
 
   const makeSprite = (n: any) => {
@@ -174,7 +181,7 @@ export function BrainPage() {
       dataRef.current = data;
       const counts: Record<string, number> = {};
       for (const n of data.nodes)
-        if (n.group !== "ref") counts[n.group] = (counts[n.group] ?? 0) + 1;
+        if (n.group !== "ref" && n.group !== "tag") counts[n.group] = (counts[n.group] ?? 0) + 1;
       const ordered = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
       rankRef.current = new Map(ordered.map((g, i) => [g, i]));
       setVaults(ordered);
@@ -264,7 +271,7 @@ export function BrainPage() {
 
   // apply control changes to the live graph (re-layout only when the node
   // set actually changes — slider moves shouldn't reshuffle the universe)
-  const prevFilter = useRef({ search: ctl.search, orphans: ctl.orphans, hidden: ctl.hiddenGroups.join() });
+  const prevFilter = useRef({ search: ctl.search, orphans: ctl.orphans, tags: ctl.tags, hidden: ctl.hiddenGroups.join() });
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify({ ...ctl, search: "" }));
     const g = graphRef.current;
@@ -277,8 +284,8 @@ export function BrainPage() {
     g.d3Force("link")?.distance(ctl.linkDist);
     const hidden = ctl.hiddenGroups.join();
     if (prevFilter.current.search !== ctl.search || prevFilter.current.orphans !== ctl.orphans ||
-        prevFilter.current.hidden !== hidden) {
-      prevFilter.current = { search: ctl.search, orphans: ctl.orphans, hidden };
+        prevFilter.current.tags !== ctl.tags || prevFilter.current.hidden !== hidden) {
+      prevFilter.current = { search: ctl.search, orphans: ctl.orphans, tags: ctl.tags, hidden };
       if (dataRef.current) g.graphData(filterData(dataRef.current, ctl));
     }
     g.d3ReheatSimulation();
@@ -313,10 +320,11 @@ export function BrainPage() {
             <input
               value={ctl.search}
               onChange={(e) => set({ search: e.target.value })}
-              placeholder="Search notes…"
+              placeholder="Search notes… (tag:design)"
               className="w-full rounded-md border border-[var(--line)] bg-[var(--surf-2)] px-2 py-1 text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--indigo-3)]"
             />
             <Toggle label="Orphans" value={ctl.orphans} onChange={(v) => set({ orphans: v })} />
+            <Toggle label="Tags" value={ctl.tags} onChange={(v) => set({ tags: v })} />
             {vaults.length > 1 && (
               <div className="space-y-1">
                 <div className="text-[9px] tracking-[2px] text-[var(--dim)]">VAULTS</div>
