@@ -143,6 +143,7 @@ export function BrainPage() {
   const focus = params.get("focus") ?? "";
   const [ctl, setCtl] = useState<Controls>(() => ({ ...loadControls(), search: focus }));
   const [vaults, setVaults] = useState<string[]>([]);
+  const [sel, setSel] = useState<{ id: string; group: string; path?: string; deg?: number } | null>(null);
   useEffect(() => { if (focus) setCtl((c) => ({ ...c, search: focus })); }, [focus]);
   const [panelOpen, setPanelOpen] = useState(true);
   const navigate = useNavigate();
@@ -231,26 +232,11 @@ export function BrainPage() {
         .linkDirectionalParticles(1)
         .linkDirectionalParticleWidth(1.4)
         .linkDirectionalParticleColor(() => pal.particle)
-        .onNodeClick((n: any) => {
-          // clicking a node asks Jarvis about it — with enough context that
-          // the ask-worker goes straight to the node's page and its wikilink
-          // cluster instead of guessing what "X" refers to
-          const where = n.path
-            ? `Its page is at ${n.path}.`
-            : `It has no page of its own — only links point to it.`;
-          sessionStorage.setItem(
-            "jarvis_pending",
-            JSON.stringify({
-              text:
-                `Tell me about "${n.id}" from my knowledge graph. ${where} ` +
-                `Read that page and search my vaults for the literal text [[${n.id}]] ` +
-                `to gather every call and note linking to it, then give me the full picture: ` +
-                `what it is, recent activity, open action items.`,
-              voice: false,
-            }),
-          );
-          navigate("/chat");
-        });
+        .onNodeClick((n: any) =>
+          // select → the readout card offers the type-appropriate actions;
+          // navigation only happens when one is chosen
+          setSel({ id: n.id, group: n.group, path: n.path, deg: n.deg }))
+        .onBackgroundClick(() => setSel(null));
       graph.d3Force("charge")?.strength(-c.repel);
       graph.d3Force("link")?.distance(c.linkDist);
       graphRef.current = graph;
@@ -311,8 +297,71 @@ export function BrainPage() {
 
   const set = (patch: Partial<Controls>) => setCtl((c) => ({ ...c, ...patch }));
 
+  // readout actions — routes by node kind
+  const selKind = !sel ? "" :
+    sel.group === "tag" ? "tag" :
+    /^call(-notes)?-\d{4}-\d{2}-\d{2}-\d{4}$/.test(sel.id) ? "call" :
+    sel.path?.includes("/Notes/") ? "note" :
+    sel.path?.includes("/Topics/") ? "topic" :
+    sel.group === "ref" ? "ref" : "note-ish";
+  const openSel = () => {
+    if (!sel) return;
+    if (selKind === "call") navigate(`/calls/${sel.id.replace(/^call(-notes)?-/, "")}`);
+    else navigate(`/notes/${encodeURIComponent(sel.id)}`);
+  };
+  const focusSel = () => {
+    if (!sel) return;
+    set({ search: selKind === "tag" ? `tag:${sel.id.replace(/^#/, "")}` : sel.id });
+    setSel(null);
+  };
+  const askSel = () => {
+    if (!sel) return;
+    const text = selKind === "tag"
+      ? `Tell me about the ${sel.id} tag from my knowledge graph. Search my vault ` +
+        `for notes whose frontmatter tags include "${sel.id.replace(/^#/, "")}", then ` +
+        `give me the full picture: what this theme covers, recent activity, open action items.`
+      : `Tell me about "${sel.id}" from my knowledge graph. ` +
+        (sel.path ? `Its page is at ${sel.path}. ` : `It has no page of its own — only links point to it. `) +
+        `Read that page and search my vaults for the literal text [[${sel.id}]] ` +
+        `to gather every call and note linking to it, then give me the full picture: ` +
+        `what it is, recent activity, open action items.`;
+    sessionStorage.setItem("jarvis_pending", JSON.stringify({ text, voice: false }));
+    navigate("/chat");
+  };
+
   return (
     <div className="relative h-full overflow-hidden">
+      {sel && (
+        <div className="absolute bottom-6 left-5 z-[6] w-[240px] rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-3 [box-shadow:var(--shadow)]">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="text-[9px] tracking-[2px] text-[var(--dim)]">
+                {selKind === "tag" ? "TAG" : selKind === "call" ? "CALL" : selKind === "topic" ? "TOPIC"
+                  : selKind === "note" ? "NOTE" : "NODE"}
+                {typeof sel.deg === "number" ? ` · ${sel.deg} LINKS` : ""}
+              </div>
+              <div className="truncate text-[13px] font-semibold text-[var(--bright)]" title={sel.id}>{sel.id}</div>
+            </div>
+            <button onClick={() => setSel(null)} className="text-[var(--dim)] hover:text-[var(--red)]">×</button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(selKind === "call" || selKind === "note" || selKind === "note-ish") && (
+              <button onClick={openSel}
+                className="rounded-full border border-[var(--cyan-3)] px-[10px] py-[3px] text-[10px] text-[var(--cyan)] hover:border-[var(--cyan)]">
+                OPEN
+              </button>
+            )}
+            <button onClick={focusSel}
+              className="rounded-full border border-[var(--indigo-3)] px-[10px] py-[3px] text-[10px] text-[var(--indigo)] hover:border-[var(--indigo)]">
+              FOCUS
+            </button>
+            <button onClick={askSel}
+              className="rounded-full border border-[var(--line)] px-[10px] py-[3px] text-[10px] text-[var(--text)] hover:border-[var(--bright)]">
+              ASK JARVIS
+            </button>
+          </div>
+        </div>
+      )}
       <div className="absolute left-5 top-4 z-[5]">
         <div className="font-bold tracking-[2px] text-[var(--indigo)] [font-family:var(--display)] [text-shadow:0_0_14px_var(--indigo-3)]">
           JARVIS · SECOND BRAIN
