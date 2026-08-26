@@ -208,7 +208,11 @@ export function spawnAsk(task: string, sessionId = "") {
     rec.finished = Date.now();
     recordResult(rec.sessionId, rec.task, rec.answer, spoken);
     if (rec.sessionId) pushEvent({ type: "worker-result", sessionId: rec.sessionId });
-    if (rec.status === "done" && rec.answer) autoDistill(`Task: ${rec.task}\nResult: ${rec.answer}`);
+    // No auto-distill here on purpose. A read-only lookup is a QUESTION, not
+    // a durable fact — firing a note worker on every one of them spawned a
+    // fresh topic page per question and turned the vault into chat exhaust.
+    // Notes are written when the owner asks for one (ACTION:DELEGATE type
+    // "note"), and only then.
   });
   return { id: rec.id, kind: "ask", status: rec.status };
 }
@@ -224,7 +228,8 @@ export function spawnNote(content: string, opts: { sessionId?: string; auto?: bo
     `"""`, content, `"""`, ``,
     `Rules:`,
     `- Write ONLY inside ${BRAIN_DIR}. Create or update the most relevant .md file; organize by topic with clear filenames.`,
-    `- The user's own notes live in ${BRAIN_DIR}/Notes/ (one .md per topic; frontmatter: title, created, optional 'call: <call-id>' when tied to a recorded call; '- [ ]' lines become tracked action items). When the user asks to create/update MY NOTE about something, work there.`,
+    `- The user's own notes live in ${BRAIN_DIR}/Notes/ (one .md per topic; frontmatter: title, created, optional 'call: <call-id>'; '- [ ]' lines become tracked action items). When the user asks to create/update MY NOTE about something, work there.`,
+    `- NEVER invent a 'call:' value. Write that key ONLY when you have listed ${BRAIN_DIR}/Calls/ and are copying the exact stem of a file you saw there (Calls/call-<stamp>.md -> 'call: call-<stamp>'). If no such file exists, OMIT the key entirely — a note claiming a call that never happened is worse than a note with no link.`,
     `- Append as a short dated bullet; keep it tidy and Obsidian-style ([[links]] where natural). Don't duplicate facts already there.`,
     `- Connect notes into the topic graph: Topics/ holds hub pages ([[Claims]], [[DAP]] etc.) — add matching [[Topic]] wikilinks when the note clearly belongs to an existing topic.`,
     `- If it's trivial, transient, or not worth remembering, write NOTHING and reply exactly: SKIP`,
