@@ -13,7 +13,11 @@ import { BRAIN_DIR, JARVIS_DIR, PORT, VAULT_DIR, setting } from "../config.js";
 import { readSecrets } from "./env.js";
 import { CLAUDE, WORKER_PATH, readVaults, setVoice } from "./env.js";
 import { recordResult } from "./chatSessions.js";
+import { SCREEN_FORMAT } from "@jarvis/shared";
 import { pushEvent } from "../live/liveState.js";
+
+// How much of a worker report survives into the chat context.
+const ANSWER_CAP = 4000;
 
 export type AgentRecord = {
   id: string;
@@ -179,7 +183,8 @@ export function spawnAsk(task: string, sessionId = "") {
     "SELF-KNOWLEDGE: for questions about Jarvis's OWN capabilities, configuration, or integrations (calendar, telegram, reminders, recording), NEVER answer from vault notes or memory — they describe past states. Check the LIVE system: data/calendar.json (enabled+fetchedAt), data/reminders.json, curl the local API, and `grep -o '^[A-Z_]*=' secrets/.env` for which integrations are configured (names only — NEVER read or print secret values). Old notes saying a feature is 'parked' or 'planned' are outdated the moment these files say otherwise.",
     ...OBSIDIAN_CLI_LINES(),
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, use \`obsidian backlinks file=\"X\"\` (fallback: grep the vaults for the literal text [[X]], e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
-    "End your reply with a line 'ANSWER:' then the answer for the SCREEN — markdown, not prose. Anything with two or more items MUST be a '- ' bullet list, one item per line, each led by the **bold** key fact; use [[wikilinks]] for notes and calls. No preamble, no closing offer. Max 10 lines; if there is more, give the most important items and state how many remain.",
+    "End your reply with a line 'ANSWER:' then the answer for the SCREEN, formatted exactly as follows.",
+    SCREEN_FORMAT,
     "Then a line 'SPOKEN:' with 1-3 plain sentences a voice assistant reads aloud (no markdown, lists, or code).",
     "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
     "SOURCES: /calls/<id> /notes/<id> ...",
@@ -196,7 +201,9 @@ export function spawnAsk(task: string, sessionId = "") {
     rec.status = code === 0 ? "done" : "failed";
     const m = rec.log.join("\n").match(/ANSWER:\s*([\s\S]*)$/i);
     const { screen, spoken } = splitChannels((m ? m[1] : rec.log.slice(-4).join(" ")).trim());
-    rec.answer = screen.slice(0, 1600);
+    // 1600 was set when answers were flat prose; structured ones are longer
+    // and were getting guillotined mid-sentence.
+    rec.answer = screen.slice(0, ANSWER_CAP);
     rec.summary = rec.answer.slice(0, 120);
     rec.finished = Date.now();
     recordResult(rec.sessionId, rec.task, rec.answer, spoken);

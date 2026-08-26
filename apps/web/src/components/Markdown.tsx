@@ -265,8 +265,22 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
             </div>
           );
         }
-        const li = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)$/);
-        if (li) { inCheckboxBlock = false; return <li key={i} className="ml-5 mb-1">{inline(li[1])}</li>; }
+        // Nested bullets: the indent used to be matched and thrown away, so a
+        // two-level list rendered as one flat level and every answer read as
+        // a wall. Depth now drives the margin and the marker.
+        const li = line.match(/^([ \t]*)(?:[-*]|\d+\.)\s+(.*)$/);
+        if (li) {
+          inCheckboxBlock = false;
+          const cols = li[1].replace(/\t/g, "  ").length;
+          const depth = Math.min(Math.floor(cols / 2), 3);
+          const indent = ["ml-5", "ml-10", "ml-[60px]", "ml-20"][depth];
+          const marker = depth === 0 ? "" : "list-[circle]";
+          return (
+            <li key={i} className={`mb-1 ${indent} ${marker} marker:text-[var(--dim)]`}>
+              {inline(li[2])}
+            </li>
+          );
+        }
         inCheckboxBlock = false;
         return <p key={i} className="mb-2">{inline(line)}</p>;
       })}

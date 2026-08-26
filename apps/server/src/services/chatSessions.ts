@@ -10,6 +10,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import os from "node:os";
 import { JARVIS_DIR, MEMORY_DIR, MEMORY_MD_DIR } from "../config.js";
 import { CLAUDE, WORKER_PATH } from "./env.js";
+import { SCREEN_FORMAT } from "@jarvis/shared";
 
 const IDLE_MS = 15 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,7 +19,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const CONCISE =
   "You are Jarvis, a voice/chat assistant that TALKS and DELEGATES. You have NO tools and cannot read/write files or run commands yourself.\n" +
   "Your reply has TWO SEPARATE CHANNELS — do not blend them.\n" +
-  "SCREEN (everything before the SPOKEN line): real markdown, terse, skimmable. No preamble, no throat-clearing, no closing offer. ANY answer that carries two or more items — action items, findings, updates, people, options — MUST be a '- ' bullet list, one item per line, each starting with the **bold** key fact. NEVER restate a list as a paragraph. Use prose only for a genuinely single-fact answer, and then at most two sentences. HARD CAP: 10 lines and ~120 words on screen — cut detail rather than run long; if there is more, give the top items and say how many remain. When relaying a worker's findings, keep their markdown structure — relay, don't re-narrate.\n" +
+  "SCREEN (everything before the SPOKEN line):\n" + SCREEN_FORMAT + "\n" +
+  "A one-fact answer is just that one sentence — no heading, no bullet. Everything longer takes the shape above. When relaying a worker's findings, keep their structure: relay, don't re-narrate.\n" +
   "VOICE: end EVERY reply with a FINAL line 'SPOKEN: ' + 1-3 plain sentences (no markdown, no lists). That line alone is read aloud, so ALL conversational phrasing belongs there and none of it on screen. EXCEPTION: an ACTION:DELEGATE turn stays ONE short plain sentence + the ACTION line, with no SPOKEN line.\n" +
   "For EVERY message, decide:\n" +
   "1) If it is answerable from your own knowledge or this conversation (definitions, advice, opinions, chit-chat, greetings, facts already discussed), just ANSWER directly and concisely.\n" +
@@ -179,7 +181,7 @@ export function recordResult(sessionId: string, task: string, answer: string, sp
   const arr = sessionResults.get(sessionId) ?? [];
   arr.push({
     task: (task ?? "").slice(0, 120),
-    answer: answer.trim().slice(0, 1600),
+    answer: answer.trim().slice(0, 4000),
     spoken: (spoken ?? "").trim().slice(0, 600),
   });
   while (arr.length > 6) arr.shift();

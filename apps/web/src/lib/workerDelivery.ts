@@ -8,13 +8,15 @@
 import { useEffect } from "react";
 import { appendTranscript, currentSessionId, streamChatTurn } from "./chatTransport";
 import { speak } from "./tts";
+import { SCREEN_FORMAT } from "@jarvis/shared";
 
 const DELIVER_PROMPT =
   "Your worker just came back — the results are in the background block above. " +
-  "Deliver the answer now, both channels: the SCREEN part relays the worker's " +
-  "markdown as-is (bullets stay bullets, one line per item, no preamble and no " +
-  "closing offer), then the final SPOKEN line carries the spoken-friendly " +
-  "summary. Do not re-delegate.";
+  "Deliver the answer now, both channels. SCREEN: relay the worker's markdown, " +
+  "keeping its headings, nesting, and bold intact — if it arrived as one dense " +
+  "level, break the packed lines apart into '## Section' groups with nested " +
+  "'  - ' children, one fact per line.\n" + SCREEN_FORMAT + "\n" +
+  "Then the final SPOKEN line carries the spoken summary. Do not re-delegate.";
 
 export function useWorkerDelivery() {
   useEffect(() => {
