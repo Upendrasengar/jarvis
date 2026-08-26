@@ -61,11 +61,13 @@ const idOf = (x: any) => (typeof x === "object" && x !== null ? x.id : x);
 
 function filterData(data: any, ctl: Controls) {
   let nodes = data.nodes as any[];
-  // "tag:design" (or "tag:#design") targets the tag node itself; a tag: search
-  // shows tag nodes even when the Tags toggle is off
-  const rawQ = ctl.search.trim().toLowerCase();
-  const tagQ = rawQ.startsWith("tag:") ? "#" + rawQ.slice(4).replace(/^#/, "") : "";
-  if (!ctl.tags && !tagQ) nodes = nodes.filter((n) => n.group !== "tag");
+  // space-separated terms AND together, Obsidian-style: each is either
+  // "tag:design" (matches notes carrying that tag; shows the tag node even
+  // when the Tags toggle is off) or plain text (id substring)
+  const terms = ctl.search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const tagTerms = terms.filter((t) => t.startsWith("tag:")).map((t) => "#" + t.slice(4).replace(/^#/, ""));
+  const textTerms = terms.filter((t) => !t.startsWith("tag:"));
+  if (!ctl.tags && !tagTerms.length) nodes = nodes.filter((n) => n.group !== "tag");
   if (ctl.hiddenGroups.length) {
     const hidden = new Set(ctl.hiddenGroups);
     // "ref" nodes belong to no vault — they survive as long as any vault shows
@@ -76,13 +78,28 @@ function filterData(data: any, ctl: Controls) {
     for (const l of data.links) { linked.add(idOf(l.source)); linked.add(idOf(l.target)); }
     nodes = nodes.filter((n) => linked.has(n.id));
   }
-  const q = tagQ || rawQ;
-  if (q) {
-    const hits = new Set(nodes.filter((n) => String(n.id).toLowerCase().includes(q)).map((n) => n.id));
+  if (terms.length) {
+    // notes carrying EVERY tag term (per-tag membership from the link table)
+    const taggedSets = tagTerms.map((tq) => {
+      const set = new Set<string>();
+      for (const l of data.links) if (String(idOf(l.target)).toLowerCase() === tq) set.add(idOf(l.source));
+      return set;
+    });
+    const hits = new Set(
+      nodes.filter((n) => {
+        const id = String(n.id).toLowerCase();
+        if (tagTerms.includes(id)) return true;               // the tag nodes themselves
+        if (!textTerms.every((t) => id.includes(t))) return false;
+        return taggedSets.every((set) => set.has(n.id));
+      }).map((n) => n.id),
+    );
     const keep = new Set(hits);
-    for (const l of data.links) {          // matches + one-hop neighborhood
-      if (hits.has(idOf(l.source))) keep.add(idOf(l.target));
-      if (hits.has(idOf(l.target))) keep.add(idOf(l.source));
+    // matches + one-hop neighborhood — but with 2+ tags, don't expand through
+    // the tag nodes, or the union of both tags floods the intersection
+    const expandFrom = (id: string) => !(tagTerms.length > 1 && String(id).startsWith("#"));
+    for (const l of data.links) {
+      if (hits.has(idOf(l.source)) && expandFrom(idOf(l.source))) keep.add(idOf(l.target));
+      if (hits.has(idOf(l.target)) && expandFrom(idOf(l.target))) keep.add(idOf(l.source));
     }
     nodes = nodes.filter((n) => keep.has(n.id));
   }
@@ -320,7 +337,7 @@ export function BrainPage() {
             <input
               value={ctl.search}
               onChange={(e) => set({ search: e.target.value })}
-              placeholder="Search notes… (tag:design)"
+              placeholder="Search… tag:design tag:team"
               className="w-full rounded-md border border-[var(--line)] bg-[var(--surf-2)] px-2 py-1 text-[11.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--indigo-3)]"
             />
             <Toggle label="Orphans" value={ctl.orphans} onChange={(v) => set({ orphans: v })} />
