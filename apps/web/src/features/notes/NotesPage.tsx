@@ -11,6 +11,7 @@ import * as S from "@jarvis/shared";
 import { NotesView } from "../calls/NotesView";
 import { copyNotes } from "../calls/copyNotes";
 import { PromptDialog } from "../../components/PromptDialog";
+import { TagChips } from "../../components/TagChips";
 
 function useNotes() {
   return useQuery({
@@ -212,10 +213,12 @@ export function NotesPage() {
               </span>
             </div>
 
-            <div className="mb-5 mt-3 flex flex-wrap gap-2">
+            <div className="mb-5 mt-3 flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-[10px] py-[3px] text-[10px] text-[var(--dim)]">
                 updated {ago(meta.updated)}
               </span>
+              <TagChips md={mdRef.current} onChange={(next) =>
+                save.mutate({ nid: meta.id, md: next }, { onSuccess: () => { mdRef.current = next; invalidate(); } })} />
               {meta.call && (
                 <Link
                   to={`/calls/${meta.call}`}

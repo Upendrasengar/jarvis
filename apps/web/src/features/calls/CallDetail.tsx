@@ -10,6 +10,7 @@ import { PromptDialog } from "../../components/PromptDialog";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SS from "@jarvis/shared";
+import { TagChips } from "../../components/TagChips";
 
 const STATE: Record<string, { label: string; cls: string }> = {
   recording: { label: "RECORDING", cls: "text-[var(--red)] blip" },
@@ -229,6 +230,10 @@ function Rail({ call }: { call: Call }) {
           </span>
         ))}
         <TopicPicker linked={topics} onPick={addTopic} />
+      </div>
+      <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">TAGS</div>
+      <div className="mb-6 flex flex-wrap gap-2">
+        <TagChips md={call.notes} onChange={(md) => save.mutate({ id: call.id, notes: md })} />
       </div>
       <div className="mb-2 text-[9px] tracking-[2px] text-[var(--dim)]">NOTES</div>
       <LinkedNotes callId={call.id} />

@@ -168,11 +168,16 @@ export function BrainPage() {
     const s = selRef.current;
     return !s || id === s.id || neighRef.current.has(id);
   };
-  const nodeCol = (n: any) => (lit(n.id) ? colorFor(n.group) : "rgba(128,128,140,0.10)");
+  const nodeCol = (n: any) => (lit(n.id) ? colorFor(n.group) : "rgba(138,140,158,0.35)");
   const linkCol = (l: any) => {
     const s = selRef.current;
     if (!s) return palRef.current.link;
-    return idOf(l.source) === s.id || idOf(l.target) === s.id ? "#7c83ff" : "rgba(128,128,140,0.04)";
+    return idOf(l.source) === s.id || idOf(l.target) === s.id ? "#7c83ff" : "rgba(138,140,158,0.14)";
+  };
+  const arrowLen = (l: any) => {
+    const s = selRef.current;
+    if (s && (idOf(l.source) === s.id || idOf(l.target) === s.id)) return 5.5;
+    return ctlRef.current.arrows ? 3.5 : 0;
   };
   const linkW = (l: any) => {
     const s = selRef.current;
@@ -251,7 +256,7 @@ export function BrainPage() {
         .linkColor(linkCol)
         .linkOpacity(0.4)
         .linkWidth(linkW)
-        .linkDirectionalArrowLength(c.arrows ? 3.5 : 0)
+        .linkDirectionalArrowLength(arrowLen)
         .linkDirectionalArrowRelPos(1)
         .linkDirectionalParticles(1)
         .linkDirectionalParticleWidth(1.4)
@@ -305,7 +310,7 @@ export function BrainPage() {
     if (!g) return;
     g.nodeRelSize(ctl.nodeSize)
       .linkWidth(linkW)
-      .linkDirectionalArrowLength(ctl.arrows ? 3.5 : 0)
+      .linkDirectionalArrowLength(arrowLen)
       .nodeThreeObject((n: any) => makeSprite(n));
     g.d3Force("charge")?.strength(-ctl.repel);
     g.d3Force("link")?.distance(ctl.linkDist);
@@ -333,6 +338,7 @@ export function BrainPage() {
       ?.nodeColor(nodeCol)
       .linkColor(linkCol)
       .linkWidth(linkW)
+      .linkDirectionalArrowLength(arrowLen)
       .nodeThreeObject((n: any) => makeSprite(n));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel]);

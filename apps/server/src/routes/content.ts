@@ -23,6 +23,8 @@ export function contentRoutes(app: FastifyInstance) {
     return r;
   });
   app.get("/api/graph", async () => buildGraph());
+  app.get("/api/tags", async () =>
+    buildGraph().nodes.filter((n) => n.group === "tag").map((n) => String(n.id).slice(1)).sort());
   app.get("/api/stats", async () => buildStats());
   app.get("/api/health", async () => ({ ok: true, server: "fastify" }));
 }
