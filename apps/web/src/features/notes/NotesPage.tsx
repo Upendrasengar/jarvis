@@ -132,7 +132,7 @@ export function NotesPage() {
   return (
     <div className="flex h-full">
       <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] p-3">
-        <h2 className="px-1 pt-1 text-[18px] font-semibold text-[var(--bright)] [font-family:var(--display)]">Notes</h2>
+        <h2 className="px-1 pt-1 text-[18px] font-medium text-[var(--text)] [font-family:var(--display)]">Notes</h2>
         <button
           onClick={newNote}
           className="w-full rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] py-2 text-[10px] tracking-[1.5px] text-[var(--cyan)] hover:bg-[var(--cyan-3)]"
@@ -155,7 +155,7 @@ export function NotesPage() {
                 : "border-transparent hover:bg-[var(--surf-2)]"
             }`}
           >
-            <div className="truncate font-sans text-xs font-semibold text-[var(--bright)]">{n.title}</div>
+            <div className="truncate font-sans text-xs font-medium text-[var(--text)]">{n.title}</div>
             <div className="mt-[3px] flex items-center gap-2 text-[10px] text-[var(--dim)]">
               {ago(n.updated)}
               {n.call && <span className="text-[var(--cyan)]">· from call</span>}

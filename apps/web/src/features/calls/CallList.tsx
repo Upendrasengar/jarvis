@@ -52,7 +52,7 @@ export function CallList({
   return (
     <aside className="flex w-[300px] min-w-[300px] flex-col gap-2 overflow-auto border-r border-[var(--line)] bg-[var(--surf)] p-3">
       <div className="flex items-center justify-between px-1 pt-1">
-        <h2 className="text-[18px] font-semibold text-[var(--bright)] [font-family:var(--display)]">Calls</h2>
+        <h2 className="text-[18px] font-medium text-[var(--text)] [font-family:var(--display)]">Calls</h2>
         {!anyRecording && (
           <button
             onClick={() => start.mutate()}
@@ -107,7 +107,7 @@ export function CallList({
           return (
             <div key={c.id}>
               {header && (
-                <div className="mb-2 mt-3 rounded-md bg-[var(--surf-2)] px-3 py-[6px] text-[9.5px] font-semibold uppercase tracking-[2px] text-[var(--text)]">
+                <div className="mb-2 mt-3 rounded-md bg-[var(--surf-2)] px-3 py-[6px] text-[9.5px] font-medium uppercase tracking-[2px] text-[var(--dim)]">
                   {dayLabel(header)}
                 </div>
               )}
@@ -127,7 +127,7 @@ export function CallList({
                   )}
                   <span className="shrink-0 text-[9.5px] text-[var(--dim)]">{c.started.slice(11, 16)}</span>
                 </div>
-                <div className="mt-[6px] font-sans text-[12.5px] font-semibold leading-snug text-[var(--bright)]">
+                <div className="mt-[6px] font-sans text-[12.5px] font-medium leading-snug text-[var(--text)]">
                   {callTitle(c)}
                 </div>
                 <div className="mt-[6px] text-[9.5px] text-[var(--dim)]">
