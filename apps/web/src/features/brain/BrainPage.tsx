@@ -154,16 +154,40 @@ export function BrainPage() {
   const palRef = useRef(palette());
   const rankRef = useRef(new Map<string, number>());
 
+  // selection highlight (Obsidian-style): the picked node keeps its color,
+  // neighbors stay lit, everything else fades to a ghost
+  const selRef = useRef<{ id: string } | null>(null);
+  const neighRef = useRef<Set<string>>(new Set());
+
   const colorFor = (g: string) =>
     g === "ref" ? palRef.current.ref
       : g === "tag" ? "#34d399"
       : palRef.current.series[(rankRef.current.get(g) ?? 0) % palRef.current.series.length];
 
+  const lit = (id: string) => {
+    const s = selRef.current;
+    return !s || id === s.id || neighRef.current.has(id);
+  };
+  const nodeCol = (n: any) => (lit(n.id) ? colorFor(n.group) : "rgba(128,128,140,0.10)");
+  const linkCol = (l: any) => {
+    const s = selRef.current;
+    if (!s) return palRef.current.link;
+    return idOf(l.source) === s.id || idOf(l.target) === s.id ? "#7c83ff" : "rgba(128,128,140,0.04)";
+  };
+  const linkW = (l: any) => {
+    const s = selRef.current;
+    const base = ctlRef.current.linkWidth;
+    if (!s) return base;
+    return idOf(l.source) === s.id || idOf(l.target) === s.id ? base + 0.8 : base * 0.4;
+  };
+
   const makeSprite = (n: any) => {
     if (ctlRef.current.labelSize <= 0) return null as any;   // labels off
+    if (!lit(n.id)) return null as any;                      // faded nodes lose labels too
     const s = new SpriteText(n.id);
     s.color = colorFor(n.group);
-    s.textHeight = (2.6 + Math.min(n.deg ?? 0, 16) * 0.4) * ctlRef.current.labelSize;
+    const em = selRef.current && n.id === selRef.current.id ? 1.35 : 1;
+    s.textHeight = (2.6 + Math.min(n.deg ?? 0, 16) * 0.4) * ctlRef.current.labelSize * em;
     s.fontWeight = "600";
     s.position.set(0, -(5 + Math.min(n.deg ?? 0, 14) * 0.6), 0);
     s.material.depthWrite = false;
@@ -182,8 +206,8 @@ export function BrainPage() {
       palRef.current = palette();
       graphRef.current
         ?.backgroundColor(palRef.current.bg)
-        .nodeColor((n: any) => colorFor(n.group))
-        .linkColor(() => palRef.current.link)
+        .nodeColor(nodeCol)
+        .linkColor(linkCol)
         .linkDirectionalParticleColor(() => palRef.current.particle)
         .nodeThreeObject((n: any) => makeSprite(n));
     });
@@ -218,15 +242,15 @@ export function BrainPage() {
         .height(wrap.clientHeight)
         .graphData(filterData(data, c))
         .backgroundColor(pal.bg)
-        .nodeColor((n: any) => colorFor(n.group))
+        .nodeColor(nodeCol)
         .nodeRelSize(c.nodeSize)
         .nodeVal((n: any) => 0.6 + Math.min(n.deg ?? 0, 14) * 0.4)
         .nodeOpacity(0.9)
         .nodeThreeObjectExtend(true)
         .nodeThreeObject((n: any) => makeSprite(n))
-        .linkColor(() => pal.link)
+        .linkColor(linkCol)
         .linkOpacity(0.4)
-        .linkWidth(c.linkWidth)
+        .linkWidth(linkW)
         .linkDirectionalArrowLength(c.arrows ? 3.5 : 0)
         .linkDirectionalArrowRelPos(1)
         .linkDirectionalParticles(1)
@@ -280,7 +304,7 @@ export function BrainPage() {
     const g = graphRef.current;
     if (!g) return;
     g.nodeRelSize(ctl.nodeSize)
-      .linkWidth(ctl.linkWidth)
+      .linkWidth(linkW)
       .linkDirectionalArrowLength(ctl.arrows ? 3.5 : 0)
       .nodeThreeObject((n: any) => makeSprite(n));
     g.d3Force("charge")?.strength(-ctl.repel);
@@ -294,6 +318,24 @@ export function BrainPage() {
     g.d3ReheatSimulation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctl]);
+
+  // restyle on selection change — no re-layout, just colors/labels/widths
+  useEffect(() => {
+    selRef.current = sel;
+    const nb = new Set<string>();
+    if (sel && dataRef.current)
+      for (const l of dataRef.current.links) {
+        if (idOf(l.source) === sel.id) nb.add(idOf(l.target));
+        if (idOf(l.target) === sel.id) nb.add(idOf(l.source));
+      }
+    neighRef.current = nb;
+    graphRef.current
+      ?.nodeColor(nodeCol)
+      .linkColor(linkCol)
+      .linkWidth(linkW)
+      .nodeThreeObject((n: any) => makeSprite(n));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel]);
 
   const set = (patch: Partial<Controls>) => setCtl((c) => ({ ...c, ...patch }));
 
