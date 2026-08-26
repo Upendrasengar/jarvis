@@ -85,6 +85,17 @@ export function resolveProject(name: string): { name: string; path: string } | n
   return null;
 }
 
+// vault-lookup doctrine shared by every worker that might read the owner's
+// notes: Obsidian CLI first (indexed), one fallback, no retry loops
+const OBSIDIAN_CLI_LINES = () => [
+  `OBSIDIAN CLI — TRY IT FIRST for vault lookups${VAULT_DIR ? ` (vault name: "${VAULT_DIR.split("/").pop()}")` : ""}. The \`obsidian\` CLI is installed and its index understands frontmatter, tags and wikilinks:`,
+  `  obsidian vault=<name> search query="..." limit=10   — indexed full-text search`,
+  `  obsidian vault=<name> backlinks file="X"            — every note linking to [[X]]`,
+  `  obsidian vault=<name> tags sort=count counts        — tag inventory`,
+  `  obsidian vault=<name> read file="X"                 — read a note by wikilink name`,
+  `It needs the Obsidian app to be open: if a command errors or returns nothing, fall back to grep / tools/vault-search.sh ONCE — do not keep retrying the CLI. When reading or writing vault .md files follow the obsidian-markdown skill's conventions (frontmatter, wikilinks, callouts).`,
+];
+
 export function spawnAgent(project: string, task: string, sessionId = "") {
   const proj = resolveProject(project);
   if (!proj) return { error: `project not found: ${project}` };
@@ -106,11 +117,14 @@ export function spawnAgent(project: string, task: string, sessionId = "") {
     `  leaving it on your agent branch breaks the owner's next commit).`,
     `- When finished, end your response with a section "SUMMARY:" containing: what you changed,`,
     `  files touched, whether build/tests pass, and the branch name. Keep it under 8 lines.`,
+    `If the task needs context from the owner's notes (past calls, decisions, specs):`,
+    ...OBSIDIAN_CLI_LINES(),
     `Work now and report.`,
   ].join("\n");
 
+  const vaultDirs = readVaults(BRAIN_DIR).flatMap((d) => ["--add-dir", d]);
   const child = spawn(CLAUDE, ["-p", prompt, "--model", "sonnet",
-    "--add-dir", proj.path, "--dangerously-skip-permissions"],
+    "--add-dir", proj.path, ...vaultDirs, "--dangerously-skip-permissions"],
     { cwd: proj.path, env: { ...process.env, PATH: WORKER_PATH }, stdio: ["ignore", "pipe", "pipe"] });
   attach(rec, child);
   child.on("close", (code) => {
@@ -147,12 +161,7 @@ export function spawnAsk(task: string, sessionId = "") {
       `Trust this API over notes/digests for what is ON the calendar; notes still matter for context.`,
     ] : []),
     "SELF-KNOWLEDGE: for questions about Jarvis's OWN capabilities, configuration, or integrations (calendar, telegram, reminders, recording), NEVER answer from vault notes or memory — they describe past states. Check the LIVE system: data/calendar.json (enabled+fetchedAt), data/reminders.json, curl the local API, and `grep -o '^[A-Z_]*=' secrets/.env` for which integrations are configured (names only — NEVER read or print secret values). Old notes saying a feature is 'parked' or 'planned' are outdated the moment these files say otherwise.",
-    `OBSIDIAN CLI — TRY IT FIRST for vault lookups${VAULT_DIR ? ` (vault name: "${VAULT_DIR.split("/").pop()}")` : ""}. The \`obsidian\` CLI is installed and its index understands frontmatter, tags and wikilinks:`,
-    `  obsidian vault=<name> search query="..." limit=10   — indexed full-text search`,
-    `  obsidian vault=<name> backlinks file="X"            — every note linking to [[X]]`,
-    `  obsidian vault=<name> tags sort=count counts        — tag inventory`,
-    `  obsidian vault=<name> read file="X"                 — read a note by wikilink name`,
-    `It needs the Obsidian app to be open: if a command errors or returns nothing, fall back to grep / tools/vault-search.sh ONCE — do not keep retrying the CLI. When reading or writing vault .md files follow the obsidian-markdown skill's conventions (frontmatter, wikilinks, callouts).`,
+    ...OBSIDIAN_CLI_LINES(),
     "TOPIC GRAPH: calls and notes carry [[Topic]] wikilinks; hub pages live in the brain vault's Topics/ folder. For 'related to X' / 'everything about X' questions, use \`obsidian backlinks file=\"X\"\` (fallback: grep the vaults for the literal text [[X]], e.g. grep -rl \"[[Claims]]\") and read those files — that is the curated cluster, more precise than keyword search.",
     "End your reply with a line 'ANSWER:' then 1-4 plain sentences a voice assistant can read aloud (no markdown, lists, or code).",
     "If the answer draws on specific call notes or notes, add ONE final line after those sentences:",
