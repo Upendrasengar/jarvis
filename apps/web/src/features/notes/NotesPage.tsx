@@ -4,7 +4,7 @@
 // language as calls: sidebar/detail, click-any-line editing, raw EDIT, COPY,
 // auto-save toast. Jarvis's note-workers write to the same folder, so
 // "Jarvis, update my note about X" lands here live.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
@@ -41,12 +41,23 @@ function ago(ms: number): string {
 
 export function NotesPage() {
   const { data: notes = [] } = useNotes();
+  const [filter, setFilter] = useState("");
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const selected = notes.find((n) => n.id === id)?.id ?? notes[0]?.id ?? null;
   const { data: doc } = useNote(selected);
   const meta = notes.find((n) => n.id === selected);
+  // Display-only filter. `selected` above is deliberately computed from the
+  // FULL list: narrowing the sidebar must not close the note you are reading.
+  const visible = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter((n) =>
+      n.title.toLowerCase().includes(q) ||
+      n.preview.toLowerCase().includes(q) ||
+      n.id.toLowerCase().includes(q));
+  }, [notes, filter]);
 
   const [draft, setDraft] = useState<string | null>(null);
   const [armed, setArmed] = useState(false);
@@ -139,13 +150,27 @@ export function NotesPage() {
         >
           ＋ NEW NOTE
         </button>
+        {notes.length > 0 && (
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search notes…"
+            aria-label="Search notes"
+            className="w-full rounded-xl border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+          />
+        )}
         {notes.length === 0 && (
           <div className="mt-8 text-center text-[11px] text-[var(--dim)]">
             No notes yet.<br /><br />
             Create one here, or tell Jarvis:<br />"make a note about…"
           </div>
         )}
-        {notes.map((n) => (
+        {notes.length > 0 && visible.length === 0 && (
+          <div className="mt-8 text-center text-[11px] text-[var(--dim)]">
+            No notes match “{filter.trim()}”.
+          </div>
+        )}
+        {visible.map((n) => (
           <button
             key={n.id}
             onClick={() => navigate(`/notes/${n.id}`)}
