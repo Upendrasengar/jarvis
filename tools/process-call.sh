@@ -185,6 +185,35 @@ The frontmatter topics list connects this call into the knowledge graph:
 2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, ONE theme per topic (never mush two themes into one name), no punctuation or slashes inside the brackets.
 Keep it scannable — read in 30 seconds." > "$NOTES"
 
+# The model writes this file directly, and roughly one note in a hundred comes
+# back with the frontmatter opened but never closed — which makes every reader
+# treat the YAML as body and dump it on screen. Close it deterministically
+# before anything else touches the file; a script can be certain where the
+# block ends, a prompt cannot.
+python3 - "$NOTES" <<'FM' || true
+import sys
+p = sys.argv[1]
+try:
+    t = open(p, encoding="utf8").read()
+except Exception:
+    raise SystemExit(0)
+if not t.startswith("---\n"):
+    raise SystemExit(0)
+lines = t.split("\n")
+if any(l.strip() == "---" for l in lines[1:]):
+    raise SystemExit(0)                      # already well-formed
+# YAML runs until the note body starts: the H1 or the summary callout.
+body = next((i for i, l in enumerate(lines) if i > 0 and (l.startswith("# ") or l.startswith("> "))), None)
+if body is None:
+    raise SystemExit(0)                      # no recognisable body — leave it alone
+end = body
+while end > 1 and not lines[end - 1].strip():
+    end -= 1                                 # don't strand blank lines inside the block
+lines[end:end] = ["---", ""]
+open(p, "w", encoding="utf8").write("\n".join(lines))
+sys.stderr.write("[process-call] repaired unterminated frontmatter\n")
+FM
+
 # Topic hubs: create a stub page for any topic the notes reference, so each
 # theme is a real node in the brain graph (and gets backlinks in Obsidian).
 mkdir -p "$TOPICS_DIR"

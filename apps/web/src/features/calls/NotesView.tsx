@@ -117,6 +117,14 @@ export const NotesView = memo(
     if (notes.startsWith("---\n")) {
       const close = notes.indexOf("\n---", 3);
       if (close > 0) fmEnd = notes.slice(0, close + 4).split("\n").length - 1;
+      else {
+        // Unterminated frontmatter — hide the YAML run rather than dumping it
+        // as prose. Line indexes are preserved either way, so inline edits and
+        // checkbox toggles still map to the right source line.
+        const ls = notes.split("\n");
+        const body = ls.findIndex((l, i) => i > 0 && (l.startsWith("# ") || l.startsWith("> ")));
+        if (body > 0) fmEnd = body - 1;
+      }
     }
     // ↳-comment styling applies ONLY to indented bullets directly under a
     // checkbox; nested bullets elsewhere are ordinary list items

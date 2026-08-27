@@ -107,7 +107,17 @@ export function calloutMeta(type: string) {
 
 // YAML-lite frontmatter: strip it, keep tags for chips
 export function splitFrontmatter(md: string): { body: string; tags: string[] } {
-  const m = md.match(/^---\n([\s\S]*?)\n---\n?/);
+  let m = md.match(/^---\n([\s\S]*?)\n---\n?/);
+  // Unterminated frontmatter: the generator occasionally omits the closing
+  // ---, and without this the whole YAML block renders as prose. Recover by
+  // treating everything before the first heading/callout as frontmatter.
+  if (!m && md.startsWith("---\n")) {
+    const body = md.search(/^(#|> )/m);
+    if (body > 0) {
+      const head = md.slice(4, body).replace(/\n+$/, "");
+      m = [md.slice(0, body), head] as unknown as RegExpMatchArray;
+    }
+  }
   if (!m) return { body: md, tags: [] };
   const tags: string[] = [];
   const tagBlock = m[1].match(/^tags:\s*\n((?:\s+-\s+.*\n?)+)/m);
