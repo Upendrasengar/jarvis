@@ -12,6 +12,21 @@ JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${JARVIS_UI_PORT:-$(head -1 "$JARVIS_DIR/memory/settings/port.txt" 2>/dev/null | tr -cd '0-9')}"
 PORT="${PORT:-4321}"
 
+# Node precedence: JARVIS_NODE env > memory/settings/node-bin.txt > PATH.
+# The Homebrew wrapper sets JARVIS_NODE; running from a clone there is no
+# wrapper, so without the setting a Homebrew node ahead of nvm on PATH boots
+# an ABI the native modules were not built for and better-sqlite3 refuses to
+# load. The failure is a stack trace at startup, not a hint, so name it.
+NODE_BIN="${JARVIS_NODE:-}"
+if [ -z "$NODE_BIN" ]; then
+  NODE_BIN="$(head -1 "$JARVIS_DIR/memory/settings/node-bin.txt" 2>/dev/null | tr -d '[:space:]')"
+  if [ -n "$NODE_BIN" ] && [ ! -x "$NODE_BIN" ]; then
+    echo "warning: memory/settings/node-bin.txt points at a missing binary ($NODE_BIN) — falling back to PATH" >&2
+    NODE_BIN=""
+  fi
+fi
+NODE_BIN="${NODE_BIN:-node}"
+
 watch_pid()  { pgrep -f "bash.*call-watch\.sh" | head -1; }
 server_pid() { lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1; }
 ui_up()      { curl -s "http://localhost:$PORT/api/health" >/dev/null 2>&1; }
@@ -40,13 +55,18 @@ start() {
     # JARVIS_NODE (set by the Homebrew wrapper) pins the exact node the
     # native modules were built against — PATH order must never decide this
     (cd "$JARVIS_DIR/apps/server" && \
-      JARVIS_API_PORT="$PORT" nohup "${JARVIS_NODE:-node}" node_modules/tsx/dist/cli.mjs src/index.ts \
+      JARVIS_API_PORT="$PORT" nohup "$NODE_BIN" node_modules/tsx/dist/cli.mjs src/index.ts \
         >> "$JARVIS_DIR/reports/api.log" 2>&1 &)
     for _ in $(seq 1 15); do ui_up && break; sleep 1; done
     if ui_up; then
       echo "server:     started → http://localhost:$PORT"
     else
       echo "server:     FAILED — check reports/api.log"
+      if grep -q "NODE_MODULE_VERSION" "$JARVIS_DIR/reports/api.log" 2>/dev/null; then
+        echo "            cause: this node ($("$NODE_BIN" -v 2>/dev/null)) is not the one the native"
+        echo "            modules were built against. Point Jarvis at the right one:"
+        echo "              echo /path/to/node > memory/settings/node-bin.txt"
+      fi
     fi
   fi
   open "http://localhost:$PORT" 2>/dev/null || true
