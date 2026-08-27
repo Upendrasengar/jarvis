@@ -19,6 +19,7 @@ import { noteRoutes } from "./routes/notes.js";
 import { reminderRoutes } from "./routes/reminders.js";
 import { memoryFileRoutes } from "./routes/memoryFiles.js";
 import { backupRoutes } from "./routes/backup.js";
+import { attachmentRoutes } from "./routes/attachments.js";
 import { addClient, startWatching } from "./live/liveState.js";
 import { startWatchdog } from "./integrations/watchdog.js";
 import { startTelegram } from "./integrations/telegram.js";
@@ -53,6 +54,7 @@ noteRoutes(app);
 reminderRoutes(app);
 memoryFileRoutes(app);
 backupRoutes(app);
+attachmentRoutes(app);
 
 // Serve the built React app when it exists (production). SPA fallback: any
 // non-API GET renders index.html and the client router takes over.

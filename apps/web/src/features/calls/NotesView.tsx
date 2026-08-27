@@ -12,6 +12,7 @@
 import { Fragment, memo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { calloutMeta } from "../../components/Markdown";
+import { CodeBlock, Embed, IMAGE_RE, Table } from "../../components/blocks";
 import { ago, parseStamp } from "../../lib/time";
 
 function em(text: string, key: number) {
@@ -28,12 +29,18 @@ function em(text: string, key: number) {
 // original markdown so domToMd can round-trip it through an inline edit
 function wiki(text: string, keyBase: number) {
   const out: React.ReactNode[] = [];
-  const re = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  // the leading ! is part of the match so an embed never leaves a stray "!"
+  const re = /(!?)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
   let last = 0, k = 0, m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(em(text.slice(last, m.index), keyBase * 100 + k++));
-    const target = m[1].trim();
-    const label = (m[2] ?? target).trim();
+    const target = m[2].trim();
+    const label = (m[3] ?? target).trim();
+    if (m[1] === "!" && IMAGE_RE.test(target)) {
+      out.push(<Embed key={`e${keyBase}-${k++}`} name={target} alt={label} />);
+      last = m.index + m[0].length;
+      continue;
+    }
     const call = target.match(/^call(?:-notes)?-(\d{4}-\d{2}-\d{2}-\d{4})$/);
     out.push(
       <Link key={`w${keyBase}-${k++}`} data-md={m[0]} contentEditable={false}
@@ -54,6 +61,16 @@ function inline(text: string) {
   return text.split(/\*\*([^*]+)\*\*/g).map((part, i) =>
     i % 2 ? <b key={i} className="text-[var(--bright)]">{wiki(part, i)}</b> : wiki(part, i),
   );
+}
+
+// a line that is nothing but an image — Obsidian embed or plain markdown
+export function imageOnly(line: string): { name: string; alt: string } | null {
+  const t = line.trim();
+  const wl = t.match(/^!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+  if (wl && IMAGE_RE.test(wl[1].trim())) return { name: wl[1].trim(), alt: (wl[2] ?? "").trim() };
+  const md = t.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+  if (md && IMAGE_RE.test(md[2])) return { name: md[2], alt: md[1] };
+  return null;
 }
 
 // contentEditable DOM → markdown: keep **bold**, flatten everything else
@@ -161,9 +178,50 @@ export const NotesView = memo(
         <span className={className}>{inline(content)}</span>
       );
 
+    // Code fences and tables span SEVERAL source lines, but the renderer's
+    // contract is one element per line. So the block renders at its FIRST
+    // line and every other line of it returns null — the array keeps its
+    // length and every index still points at its own source line.
+    const blockAt = new Map<number, { kind: "code"; lang: string; body: string[] } | { kind: "table"; rows: string[] }>();
+    const swallowed = new Set<number>();
+    for (let i = 0; i < lines.length; i++) {
+      if (swallowed.has(i) || i <= fmEnd) continue;
+      const fence = lines[i].match(/^\s*```(\w*)\s*$/);
+      if (fence) {
+        const body: string[] = [];
+        let j = i + 1;
+        for (; j < lines.length && !/^\s*```\s*$/.test(lines[j]); j++) body.push(lines[j]);
+        blockAt.set(i, { kind: "code", lang: fence[1], body });
+        for (let k = i + 1; k <= Math.min(j, lines.length - 1); k++) swallowed.add(k);
+        i = j;
+        continue;
+      }
+      // a table is a pipe row followed by a |---|---| separator
+      if (/^\s*\|/.test(lines[i]) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? "")) {
+        const rows = [lines[i]];
+        let j = i + 2;
+        for (; j < lines.length && /^\s*\|/.test(lines[j]); j++) rows.push(lines[j]);
+        blockAt.set(i, { kind: "table", rows });
+        for (let k = i + 1; k < j; k++) swallowed.add(k);
+        i = j - 1;
+      }
+    }
+
     // one markdown line → one element; `section` tweaks list styling per card
     const renderLine = (line: string, i: number, section: string) => {
       if (i <= fmEnd) return null;                     // frontmatter — metadata, not prose
+      if (swallowed.has(i)) {
+        // The checkbox index is ORDINAL and the server counts every "- [ ]"
+        // in the file, so a checkbox hidden inside a code fence must still
+        // advance the counter or every toggle after it targets the wrong line.
+        if (/^\s*- \[( |x)\] /.test(line)) checkboxIndex++;
+        return null;                                   // consumed by a block below
+      }
+      const img = imageOnly(line);
+      if (img) return <Embed key={i} name={img.name} alt={img.alt} />;
+      const blk = blockAt.get(i);
+      if (blk?.kind === "code") return <CodeBlock key={i} lang={blk.lang} body={blk.body} />;
+      if (blk?.kind === "table") return <Table key={i} rows={blk.rows} inline={inline} />;
       if (line.trim() === "") { inCheckboxBlock = false; railColor = ""; return null; }
       if (/^# /.test(line)) { inCheckboxBlock = false; return null; }
       if (/^\*\*Topics:\*\*/.test(line)) return null; // shown as chips in the header

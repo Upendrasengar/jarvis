@@ -6,6 +6,7 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ago, parseStamp } from "../lib/time";
+import { CodeBlock, Embed, IMAGE_RE, Table } from "./blocks";
 
 function callRefs(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -32,12 +33,17 @@ function callRefs(text: string): ReactNode[] {
 // anything else is a topic and opens the brain graph
 function wikiLinks(text: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+  const re = /(!?)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
   let last = 0, k = 0, m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(...callRefs(text.slice(last, m.index)));
-    const target = m[1].trim();
-    const label = (m[2] ?? target).trim();
+    const target = m[2].trim();
+    const label = (m[3] ?? target).trim();
+    if (m[1] === "!" && IMAGE_RE.test(target)) {
+      out.push(<Embed key={`e${k++}`} name={target} alt={label} />);
+      last = m.index + m[0].length;
+      continue;
+    }
     const call = target.match(/^call(?:-notes)?-(\d{4}-\d{2}-\d{2}-\d{4})$/);
     out.push(
       call ? (
@@ -127,6 +133,47 @@ export function splitFrontmatter(md: string): { body: string; tags: string[] } {
   return { body: md.slice(m[0].length), tags };
 }
 
+type Block =
+  | { kind: "code"; lang: string; body: string[] }
+  | { kind: "table"; rows: string[] };
+
+// Code fences and tables span several lines. They render at their FIRST line
+// and the rest are swallowed, so the one-element-per-line shape is unchanged.
+export function mapBlocks(lines: string[]): { at: Map<number, Block>; swallowed: Set<number> } {
+  const at = new Map<number, Block>();
+  const swallowed = new Set<number>();
+  for (let i = 0; i < lines.length; i++) {
+    const fence = lines[i].match(/^\s*```(\w*)\s*$/);
+    if (fence) {
+      const bodyLines: string[] = [];
+      let j = i + 1;
+      for (; j < lines.length && !/^\s*```\s*$/.test(lines[j]); j++) bodyLines.push(lines[j]);
+      at.set(i, { kind: "code", lang: fence[1], body: bodyLines });
+      for (let k = i + 1; k <= Math.min(j, lines.length - 1); k++) swallowed.add(k);
+      i = j;
+      continue;
+    }
+    if (/^\s*\|/.test(lines[i]) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] ?? "")) {
+      const rows = [lines[i]];
+      let j = i + 2;
+      for (; j < lines.length && /^\s*\|/.test(lines[j]); j++) rows.push(lines[j]);
+      at.set(i, { kind: "table", rows });
+      for (let k = i + 1; k < j; k++) swallowed.add(k);
+      i = j - 1;
+    }
+  }
+  return { at, swallowed };
+}
+
+export function imageOnlyLine(line: string): { name: string; alt: string } | null {
+  const t = line.trim();
+  const wl = t.match(/^!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/);
+  if (wl && IMAGE_RE.test(wl[1].trim())) return { name: wl[1].trim(), alt: (wl[2] ?? "").trim() };
+  const md = t.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+  if (md && IMAGE_RE.test(md[2])) return { name: md[2], alt: md[1] };
+  return null;
+}
+
 type LedgerToggle = (source: string, line: string) => Promise<boolean>;
 type LedgerState = (source: string, line: string) => boolean | undefined;
 type LedgerTitle = (source: string) => string | undefined;
@@ -146,6 +193,7 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
   let inCheckboxBlock = false;
   let railColor = "";                        // active callout border, carried down the rail
   const { body, tags } = splitFrontmatter(md);
+  const blocks = mapBlocks(body.split("\n"));
   return (
     <div className="max-w-[760px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
       {tags.length > 0 && (
@@ -158,6 +206,12 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
         </div>
       )}
       {body.split("\n").map((line, i) => {
+        if (blocks.swallowed.has(i)) return null;
+        const blk = blocks.at.get(i);
+        if (blk?.kind === "code") return <CodeBlock key={i} lang={blk.lang} body={blk.body} />;
+        if (blk?.kind === "table") return <Table key={i} rows={blk.rows} inline={inline} />;
+        const only = imageOnlyLine(line);
+        if (only) return <Embed key={i} name={only.name} alt={only.alt} />;
         if (line.trim() === "") { inCheckboxBlock = false; railColor = ""; return null; }
         if (/^-{3,}$/.test(line.trim())) return <hr key={i} className="my-4 border-[var(--line)]" />;
         const nextIsQuote = /^>/.test(body.split("\n")[i + 1] ?? "");

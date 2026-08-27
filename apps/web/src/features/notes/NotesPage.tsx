@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
 import { NotesView } from "../calls/NotesView";
+import { pasteImagesInto } from "../../lib/pasteImage";
 import { copyNotes } from "../calls/copyNotes";
 import { PromptDialog } from "../../components/PromptDialog";
 import { TagChips } from "../../components/TagChips";
@@ -264,7 +265,15 @@ export function NotesPage() {
                 />
               </div>
             ) : doc ? (
-              <>
+              <div
+                onPaste={async (e) => {
+                  const next = await pasteImagesInto(e, mdRef.current);
+                  if (!next) return;                     // no image — normal paste
+                  e.preventDefault();
+                  mdRef.current = next;
+                  if (selected) save.mutate({ nid: selected, md: next });
+                }}
+              >
                 <NotesView
                   noteId={selected ?? undefined}
                   cards={false}
@@ -282,7 +291,7 @@ export function NotesPage() {
                   Click any line to edit. <code>- [ ]</code> lines appear in your Actions inbox.
                   Jarvis can update this note too — it lives in your vault.
                 </div>
-              </>
+              </div>
             ) : null}
 
             {toast && (
