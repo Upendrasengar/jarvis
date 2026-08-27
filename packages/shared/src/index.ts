@@ -6,6 +6,17 @@ import { z } from "zod";
 
 export { SCREEN_FORMAT } from "./replyFormat.js";
 
+// An @-mention in the chat box. The chat carries the REFERENCE, never the
+// file's content — inlining a note into the prompt is how the core-memory
+// budget got blown. The server resolves these to exact paths and the worker
+// reads the file.
+export const ChatRef = z.object({
+  kind: z.enum(["note", "call"]),
+  id: z.string().min(1).max(200),
+  title: z.string().min(1).max(300),
+});
+export type ChatRef = z.infer<typeof ChatRef>;
+
 export const CallStatus = z.enum(["recording", "processing", "done", "failed", "empty"]);
 export type CallStatus = z.infer<typeof CallStatus>;
 

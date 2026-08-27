@@ -1,18 +1,48 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Chat (SSE via warm sessions), delegation, agents, warmup, and TTS.
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
+import { ChatRef } from "@jarvis/shared";
 import { getSession, sendTurn } from "../services/chatSessions.js";
 import { agentList, agentLog, agentStop, dispatchDelegate, spawnAgent } from "../services/agents.js";
 import { currentVoiceId, readSecrets, CLAUDE } from "../services/env.js";
 import { localOnly } from "../plugins/localOnly.js";
+import { NOTES_DIR } from "../services/notes.js";
+import { notesFileFor } from "../services/calls.js";
 
 const ChatBody = z.object({
   message: z.string().min(1),
   sessionId: z.string().default(""),
   // pasted screenshots as data URLs — capped at 4 images, ~7MB each encoded
   images: z.array(z.string().max(7_000_000)).max(4).optional(),
+  // @-mentioned notes/calls, resolved to paths below
+  refs: z.array(ChatRef).max(8).optional(),
 });
+
+// Turn @-mentions into exact paths for the dispatcher to hand its worker.
+// Deliberately does NOT read the files: the dispatcher has no tools and no
+// budget for note bodies — the worker opens them. A ref whose file is missing
+// is passed through as such rather than silently dropped, so Jarvis can say so
+// instead of inventing an answer.
+function refBlock(refs: ChatRef[] | undefined): string {
+  if (!refs?.length) return "";
+  const lines = refs.map((r) => {
+    const p = r.kind === "call" ? notesFileFor(r.id) : path.join(NOTES_DIR, `${r.id}.md`);
+    return fs.existsSync(p)
+      ? `- ${r.kind} "${r.title}" → ${p}`
+      : `- ${r.kind} "${r.title}" → (file not found: ${p})`;
+  });
+  return (
+    "[REFERENCED BY THE OWNER — they picked these explicitly in the message box, " +
+    "so the reference is already resolved. These are EXACT paths: when you delegate, " +
+    "put the path in the task and tell the worker to read that file. Never search for " +
+    "them by name and never substitute a different file.\n" +
+    lines.join("\n") +
+    "\n]\n\n"
+  );
+}
 const DelegateBody = z.object({
   type: z.string().optional(),
   project: z.string().optional(),
@@ -34,7 +64,8 @@ export function chatRoutes(app: FastifyInstance) {
     });
 
     let emitted = false;
-    const r = sendTurn(body.data.sessionId, body.data.message, {
+    const withRefs = refBlock(body.data.refs) + body.data.message;
+    const r = sendTurn(body.data.sessionId, withRefs, {
       onText: (t) => { emitted = true; try { res.write(`data: ${JSON.stringify(t)}\n\n`); } catch {} },
       onDone: (finalText) => {
         if (!emitted && finalText?.trim())

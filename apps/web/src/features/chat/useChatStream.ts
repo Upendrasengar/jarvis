@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   loadTranscript, saveTranscript, streamChatTurn, type Msg,
 } from "../../lib/chatTransport";
+import type { ChatRef } from "@jarvis/shared";
 import type { ChatImage } from "../../lib/image";
 import { makeTypewriter } from "../../lib/typewriter";
 
@@ -28,7 +29,7 @@ export function useChatStream(sessionId: string) {
 
   const onReply = useCallback((fn: (text: string) => void) => { lastReply.current = fn; }, []);
 
-  const send = useCallback(async (message: string, images: ChatImage[] = []) => {
+  const send = useCallback(async (message: string, images: ChatImage[] = [], refs: ChatRef[] = []) => {
     if (!message.trim() || streaming) return;
     setStreaming(true);
     // The reply bubble carries its own id. It used to be addressed as "the
@@ -45,7 +46,7 @@ export function useChatStream(sessionId: string) {
       setMessages((m) => m.map((msg) => (msg.id === replyId ? { ...msg, c: "jarvis", t } : msg)));
     const tw = makeTypewriter(setLast);
     try {
-      const finalText = await streamChatTurn(sessionId, message, tw.feed, images.map((i) => i.full));
+      const finalText = await streamChatTurn(sessionId, message, tw.feed, images.map((i) => i.full), refs);
       await tw.finish(finalText || "(no reply)");
       if (finalText) lastReply.current(finalText);
     } catch (e) {

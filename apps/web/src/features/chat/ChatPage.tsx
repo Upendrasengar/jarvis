@@ -7,6 +7,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { Markdown } from "../../components/Markdown";
+import { MentionMenu } from "./MentionMenu";
+import { liveRefs, refToken, useMentions, type Mention } from "./useMentions";
+import type { ChatRef } from "@jarvis/shared";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
 
@@ -97,6 +100,49 @@ export function ChatPage() {
   const [pendingImgs, setPendingImgs] = useState<ChatImage[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
 
+  // @-mentions. `refs` is the authoritative list; the text token only mirrors
+  // it so the sentence reads naturally. Menu state is real component state —
+  // a module-level flag here would strand the menu open across renders.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [refs, setRefs] = useState<ChatRef[]>([]);
+  const [mentionAt, setMentionAt] = useState<number | null>(null); // caret index of the "@"
+  const [mentionQ, setMentionQ] = useState("");
+  const [mentionI, setMentionI] = useState(0);
+  const { search } = useMentions();
+  const hits = mentionAt === null ? [] : search(mentionQ);
+  const menuOpen = mentionAt !== null && hits.length > 0;
+
+  const closeMenu = () => { setMentionAt(null); setMentionQ(""); setMentionI(0); };
+
+  // Reads the text left of the caret for a trailing "@query". Bounded to 40
+  // chars and stopped by a second @ so a stray character cannot open a menu
+  // halfway down a paragraph.
+  const syncMention = (value: string, caret: number) => {
+    const m = value.slice(0, caret).match(/(?:^|\s)@([^@\n]{0,40})$/);
+    if (!m) return closeMenu();
+    setMentionAt(caret - m[1].length - 1);
+    setMentionQ(m[1]);
+    setMentionI(0);
+  };
+
+  const pickMention = (m: Mention) => {
+    if (mentionAt === null) return;
+    const caret = inputRef.current?.selectionStart ?? input.length;
+    const token = refToken(m) + " ";
+    const next = input.slice(0, mentionAt) + token + input.slice(caret);
+    setInput(next);
+    setRefs((r) => (r.some((x) => x.kind === m.kind && x.id === m.id)
+      ? r
+      : [...r, { kind: m.kind, id: m.id, title: m.title }]));
+    closeMenu();
+    // restore the caret after React writes the new value
+    const pos = mentionAt + token.length;
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(pos, pos);
+    });
+  };
+
   useEffect(() => {
     if (routeId !== sessionId) navigate(`/chat/${sessionId}`, { replace: true });
     localStorage.setItem("jarvis_session", sessionId);
@@ -123,10 +169,14 @@ export function ChatPage() {
     const v = text.trim() || (pendingImgs.length ? "What do you see here?" : "");
     if (!v) return;
     if (viaVoice) voiceTurn.current = true;
+    // a mention the user typed over or deleted must not still travel
+    const sending = liveRefs(v, refs);
     setInput("");
     const imgs = pendingImgs;
     setPendingImgs([]);
-    void send(v, imgs);
+    setRefs([]);
+    closeMenu();
+    void send(v, imgs, sending);
   };
 
   const onPaste = async (e: React.ClipboardEvent) => {
@@ -269,7 +319,32 @@ export function ChatPage() {
         })}
       </div>
 
-      <div className="mt-2">
+      <div className="relative mt-2">
+        {menuOpen && <MentionMenu items={hits} index={mentionI} onPick={pickMention} />}
+        {refs.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {refs.map((r) => (
+              <span
+                key={`${r.kind}:${r.id}`}
+                title={`${r.kind} sent as a reference — Jarvis reads the file, the message stays small`}
+                className="flex items-center gap-1.5 rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-2.5 py-[3px] text-[11px] text-[var(--indigo)]"
+              >
+                <span className="font-mono text-[9px] tracking-[1px] opacity-70">{r.kind}</span>
+                <span className="max-w-[220px] truncate">{r.title}</span>
+                <button
+                  onClick={() => {
+                    setRefs((x) => x.filter((y) => !(y.kind === r.kind && y.id === r.id)));
+                    setInput((t) => t.replace(refToken(r), "").replace(/\s{2,}/g, " "));
+                  }}
+                  title="Remove reference"
+                  className="text-[var(--dim)] hover:text-[var(--red)]"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {pendingImgs.length > 0 && (
           <div className="mb-2 flex gap-2">
             {pendingImgs.map((img, i) => (
@@ -299,11 +374,24 @@ export function ChatPage() {
             🎙️
           </button>
           <input
+            ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submit()}
+            onChange={(e) => { setInput(e.target.value); syncMention(e.target.value, e.target.selectionStart ?? 0); }}
+            onClick={(e) => syncMention(input, e.currentTarget.selectionStart ?? 0)}
+            onBlur={closeMenu}
+            onKeyDown={(e) => {
+              // the menu owns these keys while it is open, or Enter would
+              // send the message instead of choosing the highlighted row
+              if (menuOpen) {
+                if (e.key === "ArrowDown") { e.preventDefault(); setMentionI((i) => (i + 1) % hits.length); return; }
+                if (e.key === "ArrowUp") { e.preventDefault(); setMentionI((i) => (i - 1 + hits.length) % hits.length); return; }
+                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(hits[mentionI]); return; }
+                if (e.key === "Escape") { e.preventDefault(); closeMenu(); return; }
+              }
+              if (e.key === "Enter") submit();
+            }}
             onPaste={onPaste}
-            placeholder={pendingImgs.length ? "Ask about the image…" : "Message Jarvis…  (paste screenshots)"}
+            placeholder={pendingImgs.length ? "Ask about the image…" : "Message Jarvis…  (@ to reference a note or call)"}
             autoFocus
             className="flex-1 bg-transparent px-2 py-[9px] font-sans text-[13.5px] text-[var(--text)] outline-none placeholder:text-[var(--dim)]"
           />

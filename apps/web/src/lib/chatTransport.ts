@@ -2,6 +2,8 @@
 // Shared chat transport — used by the chat page (visible conversation) and
 // the header voice bar (background conversation from any tab). Handles the
 // SSE stream and the ACTION:DELEGATE protocol in one place.
+import type { ChatRef } from "@jarvis/shared";
+
 export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number; id?: string };
 
 const TX_KEY = (sid: string) => "jarvis_tx_" + sid;
@@ -36,6 +38,7 @@ export async function streamChatTurn(
   message: string,
   onText?: (visible: string) => void,
   images?: string[],
+  refs?: ChatRef[],
 ): Promise<string> {
   let full = "";
   let delegated = false;
@@ -81,7 +84,7 @@ export async function streamChatTurn(
     const r = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, sessionId, images }),
+      body: JSON.stringify({ message, sessionId, images, refs }),
     });
     if (!r.ok || !r.body) throw new Error(`chat → ${r.status}`);
 
