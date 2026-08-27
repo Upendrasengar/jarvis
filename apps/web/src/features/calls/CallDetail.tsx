@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Call } from "@jarvis/shared";
 import { NotesView } from "./NotesView";
-import { pasteImagesInto } from "../../lib/pasteImage";
 import {
   callHost, callTitle, useDeleteCall, useRecordingControls, useToggleItem, useUpdateNotes,
 } from "./hooks";
@@ -464,22 +463,26 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
               </div>
             </div>
           ) : call.notes ? (
-            <div
-              className="mt-6"
-              onPaste={async (e) => {
-                const next = await pasteImagesInto(e, notesRef.current);
-                if (!next) return;                       // no image — normal paste
-                e.preventDefault();
-                notesRef.current = next;
-                save.mutate({ id: call.id, notes: next },
-                  { onSuccess: () => flash("ok"), onError: () => flash("err") });
-              }}
-            >
+            <div className="mt-6">
               <NotesView
                 noteId={call.id}
                 notes={call.notes}
                 onToggle={(index) => toggle.mutate({ id: call.id, index })}
                 onComment={setCommentFor}
+                onSplitLine={(i, before, after) => {
+                  const lines = notesRef.current.split("\n");
+                  lines.splice(i, 1, before, after);
+                  notesRef.current = lines.join("\n");
+                  save.mutate({ id: call.id, notes: notesRef.current },
+                    { onSuccess: () => flash("ok"), onError: () => flash("err") });
+                }}
+                onInsertLine={(afterIndex, line) => {
+                  const lines = notesRef.current.split("\n");
+                  lines.splice(afterIndex + 1, 0, "", line);
+                  notesRef.current = lines.join("\n");
+                  save.mutate({ id: call.id, notes: notesRef.current },
+                    { onSuccess: () => flash("ok"), onError: () => flash("err") });
+                }}
                 onEditLine={(lineIndex, newLine) => {
                   const lines = notesRef.current.split("\n");
                   lines[lineIndex] = newLine;

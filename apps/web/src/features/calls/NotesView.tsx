@@ -13,6 +13,8 @@ import { Fragment, memo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { calloutMeta } from "../../components/Markdown";
 import { CodeBlock, Embed, IMAGE_RE, Table } from "../../components/blocks";
+import { uploadPastedImage } from "../../lib/pasteImage";
+import { imagesFromClipboard } from "../../lib/image";
 import { ago, parseStamp } from "../../lib/time";
 
 function em(text: string, key: number) {
@@ -98,6 +100,12 @@ type Props = {
   noteId?: string;
   onToggle: (index: number) => void;
   onEditLine?: (lineIndex: number, newLine: string) => void;
+  // Enter splits a line and a pasted image lands next to the caret, so the
+  // view needs to ADD lines, not only rewrite them. One callback per gesture
+  // rather than an edit plus an insert — two calls would be two saves, and
+  // the second would race the first's write.
+  onSplitLine?: (lineIndex: number, before: string, after: string) => void;
+  onInsertLine?: (afterIndex: number, line: string) => void;
   onComment?: (index: number) => void;
   // card mode groups ## sections into the call-notes grid; flat mode (Notes
   // page) renders the document as one flow — freeform notes rarely have the
@@ -123,8 +131,11 @@ const LAYOUT: Record<string, { order: number; span?: boolean; glyph?: string; co
 let editingNow = false;
 
 export const NotesView = memo(
-  function NotesView({ notes, onToggle, onEditLine, onComment, cards = true }: Props) {
+  function NotesView({ notes, onToggle, onEditLine, onSplitLine, onInsertLine, onComment, cards = true }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
+    // last line the caret was in — a pasted image inserts after it instead of
+    // being dumped at the end of the note
+    const focusedLine = useRef<number>(-1);
     // A line that still has focus when this unmounts never fires onBlur, so
     // the flag stayed true and every later render was skipped — the symptom
     // was picking another call and getting the previous call's notes.
@@ -151,6 +162,44 @@ export const NotesView = memo(
     let railColor = "";                     // active callout border, carried down the rail
     const lines = notes.split("\n");
 
+    // Character offset of the caret within the element's text, counting
+    // through nested <b>/<a> nodes — needed to split a line where the cursor
+    // actually is rather than at the end.
+    const caretOffset = (el: HTMLElement): number => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return el.textContent?.length ?? 0;
+      const r = sel.getRangeAt(0).cloneRange();
+      r.selectNodeContents(el);
+      r.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
+      return r.toString().length;
+    };
+
+    // A new line inherits the list marker so Enter inside a bullet makes
+    // another bullet, the way every editor behaves. A checkbox yields an
+    // unchecked one; a heading yields a plain line.
+    const continuationPrefix = (prefix: string): string => {
+      const p = prefix ?? "";
+      if (/^\s*- \[[ x]\] $/.test(p)) return p.replace(/\[[ x]\]/, "[ ]");
+      if (/^\s*[-*] $/.test(p)) return p;
+      return "";
+    };
+
+    // An image pasted while editing belongs where the caret is, not at the
+    // end of the document — that was the first cut and it read as a bug.
+    const pasteImages = async (e: React.ClipboardEvent) => {
+      if (!onInsertLine) return;
+      const files = imagesFromClipboard(e);
+      if (!files.length) return;                     // no image — normal paste
+      e.preventDefault();
+      const after = focusedLine.current >= 0 ? focusedLine.current : lines.length - 1;
+      const embeds: string[] = [];
+      for (const f of files.slice(0, 4)) {
+        const em = await uploadPastedImage(f);
+        if (em) embeds.push(em);
+      }
+      if (embeds.length) onInsertLine(after, embeds.join("\n"));
+    };
+
     const editable = (lineIndex: number, prefix: string, className: string, content: string) =>
       onEditLine ? (
         <span
@@ -158,14 +207,25 @@ export const NotesView = memo(
           suppressContentEditableWarning
           spellCheck={false}
           className={`${className} -mx-1 rounded px-1 outline-none focus:bg-[var(--cyan-2)] focus:ring-1 focus:ring-[var(--cyan-3)]`}
-          onFocus={() => { editingNow = true; }}
+          onFocus={() => { editingNow = true; focusedLine.current = lineIndex; }}
           onBlur={(e) => {
             editingNow = false;
             const next = domToMd(e.currentTarget);
             if (next && next !== content) onEditLine(lineIndex, prefix + next);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLElement).blur(); }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const el = e.currentTarget as HTMLElement;
+              // Shift+Enter keeps the old behaviour: commit and get out
+              if (e.shiftKey || !onSplitLine) { el.blur(); return; }
+              const text = domToMd(el);
+              const at = caretOffset(el);
+              editingNow = false;
+              onSplitLine(lineIndex, prefix + text.slice(0, at), continuationPrefix(prefix) + text.slice(at));
+              el.blur();
+              return;
+            }
             if (e.key === "Escape") {
               (e.target as HTMLElement).textContent = content; // discard
               (e.target as HTMLElement).blur();
@@ -341,7 +401,7 @@ export const NotesView = memo(
 
     if (!cards)
       return (
-        <div ref={rootRef} className="max-w-[720px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
+        <div ref={rootRef} onPaste={pasteImages} className="max-w-[720px] font-sans text-[13.5px] leading-relaxed text-[var(--text)]">
           {lines.map((line, i) => {
             const h2 = line.match(/^## (.+)$/);
             if (h2)
@@ -365,7 +425,10 @@ export const NotesView = memo(
     });
 
     return (
-      <div ref={rootRef} className="grid gap-4 font-sans text-[13.5px] leading-relaxed text-[var(--text)] xl:grid-cols-2">
+      <div
+        ref={rootRef}
+        onPaste={pasteImages}
+        className="grid gap-4 font-sans text-[13.5px] leading-relaxed text-[var(--text)] xl:grid-cols-2">
         {sections.map((sec, s) => {
           const key = (sec.title?.text ?? "").trim().toLowerCase();
           const lay = sec.title ? LAYOUT[key] ?? { order: 7, span: true } : { order: 0, span: true };

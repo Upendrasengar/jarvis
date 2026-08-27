@@ -9,7 +9,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
 import { NotesView } from "../calls/NotesView";
-import { pasteImagesInto } from "../../lib/pasteImage";
 import { copyNotes } from "../calls/copyNotes";
 import { PromptDialog } from "../../components/PromptDialog";
 import { TagChips } from "../../components/TagChips";
@@ -265,18 +264,28 @@ export function NotesPage() {
                 />
               </div>
             ) : doc ? (
-              <div
-                onPaste={async (e) => {
-                  const next = await pasteImagesInto(e, mdRef.current);
-                  if (!next) return;                     // no image — normal paste
-                  e.preventDefault();
-                  mdRef.current = next;
-                  if (selected) save.mutate({ nid: selected, md: next });
-                }}
-              >
+              <div>
                 <NotesView
                   noteId={selected ?? undefined}
                   cards={false}
+                  onSplitLine={(i, before, after) => {
+                    if (!selected) return;
+                    const fm = mdRef.current.match(/^---\n[\s\S]*?\n---\n?/);
+                    const off = fm ? fm[0].split("\n").length - 1 : 0;
+                    const lines = mdRef.current.split("\n");
+                    lines.splice(i + off, 1, before, after);
+                    mdRef.current = lines.join("\n");
+                    save.mutate({ nid: selected, md: mdRef.current });
+                  }}
+                  onInsertLine={(afterIndex, line) => {
+                    if (!selected) return;
+                    const fm = mdRef.current.match(/^---\n[\s\S]*?\n---\n?/);
+                    const off = fm ? fm[0].split("\n").length - 1 : 0;
+                    const lines = mdRef.current.split("\n");
+                    lines.splice(afterIndex + off + 1, 0, "", line);
+                    mdRef.current = lines.join("\n");
+                    save.mutate({ nid: selected, md: mdRef.current });
+                  }}
                   notes={doc.md.replace(/^---\n[\s\S]*?\n---\n?/, "")}
                   onToggle={toggleItem}
                   onComment={setCommentFor}
