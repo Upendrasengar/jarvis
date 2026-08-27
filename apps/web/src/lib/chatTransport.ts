@@ -4,7 +4,10 @@
 // SSE stream and the ACTION:DELEGATE protocol in one place.
 import type { ChatRef } from "@jarvis/shared";
 
-export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number; id?: string };
+// refs ride along on the sent message so the transcript still shows WHAT was
+// referenced — once the pill replaced the inline title, the bubble otherwise
+// read as a bare question with no sign of the note it was about.
+export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number; id?: string; refs?: ChatRef[] };
 
 const TX_KEY = (sid: string) => "jarvis_tx_" + sid;
 const DELEGATE_RE = /ACTION:DELEGATE\s*(\{[\s\S]*?\})\s*/;

@@ -15,4 +15,5 @@ export const SCREEN_FORMAT = [
   "- **Bold** the load-bearing noun, not whole clauses. [[wikilinks]] for notes and calls.",
   "- Quote a note directly with '> ' when its exact words matter.",
   "- No preamble, no sign-off, no 'let me know if'. End on the content.",
+  "- End with one line 'FOLLOWUPS: a | b | c' — two or three short questions this answer opens up, phrased the way the owner would ask them (\"who owns the tag fix?\", \"what changed since Tuesday?\"). Most answers invite something, so this line is usually present; omit it only when genuinely nothing follows. The interface renders them as buttons, so they are never spoken and never part of the prose.",
 ].join("\n");

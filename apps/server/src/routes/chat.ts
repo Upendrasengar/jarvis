@@ -11,6 +11,7 @@ import { currentVoiceId, readSecrets, CLAUDE } from "../services/env.js";
 import { localOnly } from "../plugins/localOnly.js";
 import { NOTES_DIR } from "../services/notes.js";
 import { notesFileFor } from "../services/calls.js";
+import { filesFor } from "../services/topics.js";
 
 const ChatBody = z.object({
   message: z.string().min(1),
@@ -29,6 +30,19 @@ const ChatBody = z.object({
 function refBlock(refs: ChatRef[] | undefined): string {
   if (!refs?.length) return "";
   const lines = refs.map((r) => {
+    // A topic or tag is a SET: hand over the member paths and the true count,
+    // so the worker reads the cluster instead of searching for it, and knows
+    // when it is only seeing the first slice of a larger one.
+    if (r.kind === "topic" || r.kind === "tag") {
+      const { hub, files, total } = filesFor(r.kind, r.id);
+      if (!total && !hub) return `- ${r.kind} "${r.title}" → (nothing references this yet)`;
+      const shown = files.length < total ? ` (showing ${files.length} of ${total})` : "";
+      return [
+        `- ${r.kind} "${r.title}" — ${total} file(s)${shown}`,
+        ...(hub ? [`    hub: ${hub}`] : []),
+        ...files.map((f) => `    ${f}`),
+      ].join("\n");
+    }
     const p = r.kind === "call" ? notesFileFor(r.id) : path.join(NOTES_DIR, `${r.id}.md`);
     return fs.existsSync(p)
       ? `- ${r.kind} "${r.title}" → ${p}`
@@ -37,7 +51,7 @@ function refBlock(refs: ChatRef[] | undefined): string {
   return (
     "[REFERENCED BY THE OWNER — they picked these explicitly in the message box, " +
     "so the reference is already resolved. These are EXACT paths: when you delegate, " +
-    "put the path in the task and tell the worker to read that file. Never search for " +
+    "put the paths in the task and tell the worker to read those files. Never search for " +
     "them by name and never substitute a different file.\n" +
     lines.join("\n") +
     "\n]\n\n"

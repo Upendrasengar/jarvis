@@ -9,7 +9,9 @@ import { speak as speakAloud } from "../../lib/tts";
 import { Markdown } from "../../components/Markdown";
 import { MentionMenu } from "./MentionMenu";
 import { useMentions, type Mention } from "./useMentions";
-import type { ChatRef } from "@jarvis/shared";
+import { Call, NoteMeta, type ChatRef } from "@jarvis/shared";
+import { useQuery } from "@tanstack/react-query";
+import { callTitle } from "../calls/hooks";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
 
@@ -23,6 +25,19 @@ function splitSpoken(t: string): { display: string; spoken: string } {
     display: t.replace(/^SPOKEN:.*$/im, "").replace(/\n{3,}/g, "\n\n").trim(),
     spoken: m[1].trim(),
   };
+}
+
+// FOLLOWUPS: a | b | c — pulled out before display so it never renders as
+// prose, and never reaches the voice channel.
+function splitFollowups(t: string): { body: string; followups: string[] } {
+  const m = t.match(/^FOLLOWUPS:\s*(.+)$/im);
+  if (!m) return { body: t, followups: [] };
+  const followups = m[1]
+    .split("|")
+    .map((x) => x.trim().replace(/^[-*\d.\s]+/, ""))
+    .filter((x) => x.length > 2 && x.length < 120)
+    .slice(0, 3);
+  return { body: t.replace(m[0], "").trimEnd(), followups };
 }
 
 function splitSources(t: string): { body: string; sources: { to: string; kind: "call" | "note"; label: string }[] } {
@@ -41,7 +56,31 @@ function splitSources(t: string): { body: string; sources: { to: string; kind: "
   return { body: t.replace(m[0], "").trimEnd(), sources };
 }
 
+// A source chip used to read "☎ 2026-08-24-1211", which is an id, not an
+// answer to "where did this come from". The title is already in the caches
+// the page holds, so resolve it and fall back to the id only when the file is
+// genuinely unknown.
 function SourceChips({ sources }: { sources: { to: string; kind: "call" | "note"; label: string }[] }) {
+  const { data: calls = [] } = useQuery({
+    queryKey: ["calls"],
+    queryFn: async () => Call.array().parse(await (await fetch("/api/calls")).json()),
+    staleTime: 30_000,
+    enabled: sources.some((s) => s.kind === "call"),
+  });
+  const { data: notes = [] } = useQuery({
+    queryKey: ["notes"],
+    queryFn: async () => NoteMeta.array().parse(await (await fetch("/api/notes")).json()),
+    staleTime: 30_000,
+    enabled: sources.some((s) => s.kind === "note"),
+  });
+  const titleFor = (s: { to: string; kind: "call" | "note" }) => {
+    const id = decodeURIComponent(s.to.split("/").pop() ?? "");
+    if (s.kind === "call") {
+      const c = calls.find((x) => x.id === id);
+      return c ? callTitle(c) : id;
+    }
+    return notes.find((n) => n.id === id)?.title ?? id;
+  };
   if (!sources.length) return null;
   return (
     <span className="mt-2 flex flex-wrap gap-1.5">
@@ -51,7 +90,8 @@ function SourceChips({ sources }: { sources: { to: string; kind: "call" | "note"
           to={s.to}
           className={`rounded-full border border-[var(--line)] bg-[var(--surf-2)] px-2 py-[2px] text-[10px] no-underline ${s.kind === "call" ? "text-[var(--cyan)] hover:border-[var(--cyan-3)]" : "text-[var(--indigo)] hover:border-[var(--indigo-3)]"}`}
         >
-          {s.label}
+          <span className="opacity-60">{s.kind === "call" ? "☎" : "◇"}</span>{" "}
+          {titleFor(s)}
         </Link>
       ))}
     </span>
@@ -107,12 +147,13 @@ export function ChatPage() {
   const [refs, setRefs] = useState<ChatRef[]>([]);
   const [mentionAt, setMentionAt] = useState<number | null>(null); // caret index of the "@"
   const [mentionQ, setMentionQ] = useState("");
+  const [mentionKind, setMentionKind] = useState<"doc" | "set">("doc");
   const [mentionI, setMentionI] = useState(0);
   // Backspace into the pills highlights the last one first, then deletes it —
   // one keystroke should never silently drop a reference you cannot see go.
   const [armedRef, setArmedRef] = useState(false);
-  const { search } = useMentions();
-  const hits = mentionAt === null ? [] : search(mentionQ);
+  const { search, searchSets } = useMentions();
+  const hits = mentionAt === null ? [] : (mentionKind === "set" ? searchSets(mentionQ) : search(mentionQ));
   const menuOpen = mentionAt !== null && hits.length > 0;
 
   const closeMenu = () => { setMentionAt(null); setMentionQ(""); setMentionI(0); };
@@ -121,10 +162,12 @@ export function ChatPage() {
   // chars and stopped by a second @ so a stray character cannot open a menu
   // halfway down a paragraph.
   const syncMention = (value: string, caret: number) => {
-    const m = value.slice(0, caret).match(/(?:^|\s)@([^@\n]{0,40})$/);
+    // "@" picks a document (note, call); "#" picks a set (topic, tag)
+    const m = value.slice(0, caret).match(/(?:^|\s)([@#])([^@#\n]{0,40})$/);
     if (!m) return closeMenu();
-    setMentionAt(caret - m[1].length - 1);
-    setMentionQ(m[1]);
+    setMentionKind(m[1] === "#" ? "set" : "doc");
+    setMentionAt(caret - m[2].length - 1);
+    setMentionQ(m[2]);
     setMentionI(0);
   };
 
@@ -170,7 +213,7 @@ export function ChatPage() {
     onReply((text) => {
       if (!speak && !voiceTurn.current) return;
       voiceTurn.current = false;
-      void speakAloud(splitSpoken(splitSources(text).body).spoken);
+      void speakAloud(splitSpoken(splitSources(splitFollowups(text).body).body).spoken);
     });
   }, [speak, onReply]);
 
@@ -298,6 +341,20 @@ export function ChatPage() {
                   ))}
                 </span>
               ) : null}
+              {m.refs?.length ? (
+                <span className="mb-2 flex flex-wrap gap-1.5">
+                  {m.refs.map((r) => (
+                    <span
+                      key={`${r.kind}:${r.id}`}
+                      title={`${r.kind} referenced with this message`}
+                      className="flex items-center gap-1.5 rounded-lg border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-2 py-[2px] text-[10.5px] text-[var(--indigo)]"
+                    >
+                      <span className="font-mono text-[8.5px] uppercase tracking-[1px] opacity-70">{r.kind}</span>
+                      <span className="max-w-[220px] truncate">{r.title}</span>
+                    </span>
+                  ))}
+                </span>
+              ) : null}
               {m.t}
               {m.ts && (
                 <span className="mt-[3px] block text-right text-[8.5px] text-[var(--dim)]">{fmtTime(m.ts)}</span>
@@ -319,9 +376,31 @@ export function ChatPage() {
               )}
               {(() => {
                 if (!m.t) return <span className="blip text-[var(--dim)]">…</span>;
-                const { body, sources } = splitSources(m.t);
+                const { body: noFollow, followups } = splitFollowups(m.t);
+                const { body, sources } = splitSources(noFollow);
                 const { display } = splitSpoken(body);
-                return (<><Markdown md={display} /><SourceChips sources={sources} /></>);
+                const last = i === messages.length - 1;
+                return (
+                  <>
+                    <Markdown md={display} />
+                    <SourceChips sources={sources} />
+                    {/* only the newest reply offers them — older ones would be
+                        a wall of stale buttons down the transcript */}
+                    {last && !streaming && followups.length > 0 && (
+                      <span className="mt-3 flex flex-wrap gap-1.5">
+                        {followups.map((q, k) => (
+                          <button
+                            key={k}
+                            onClick={() => submit(q)}
+                            className="rounded-full border border-[var(--line)] bg-[var(--surf)] px-3 py-[5px] text-left font-sans text-[11.5px] text-[var(--dim)] transition hover:border-[var(--cyan-3)] hover:text-[var(--cyan)]"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </span>
+                    )}
+                  </>
+                );
               })()}
             </div>
           </Fragment>);

@@ -39,7 +39,7 @@ export function useChatStream(sessionId: string) {
     const replyId = crypto.randomUUID ? crypto.randomUUID() : `r${Date.now()}`;
     setMessages((m) => [
       ...m,
-      { c: "me", t: message, ts: Date.now(), ...(images.length ? { imgs: images.map((i) => i.thumb) } : {}) },
+      { c: "me", t: message, ts: Date.now(), ...(images.length ? { imgs: images.map((i) => i.thumb) } : {}), ...(refs.length ? { refs } : {}) },
       { c: "jarvis", t: "", ts: Date.now(), id: replyId },
     ]);
     const setLast = (t: string) =>

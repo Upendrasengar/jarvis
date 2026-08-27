@@ -6,12 +6,12 @@ import { z } from "zod";
 
 export { SCREEN_FORMAT } from "./replyFormat.js";
 
-// An @-mention in the chat box. The chat carries the REFERENCE, never the
-// file's content — inlining a note into the prompt is how the core-memory
+// A reference picked in the chat box: @ for a document (note, call), # for a
+// SET (topic, tag). The chat carries the REFERENCE, never the file's content — inlining a note into the prompt is how the core-memory
 // budget got blown. The server resolves these to exact paths and the worker
 // reads the file.
 export const ChatRef = z.object({
-  kind: z.enum(["note", "call"]),
+  kind: z.enum(["note", "call", "topic", "tag"]),
   id: z.string().min(1).max(200),
   title: z.string().min(1).max(300),
 });

@@ -8,6 +8,39 @@ import path from "node:path";
 import { BRAIN_DIR, CALL_NOTES_DIR, REPORTS_DIR } from "../config.js";
 
 const TOPICS_DIR = path.join(BRAIN_DIR, "Topics");
+const NOTES_DIR = path.join(BRAIN_DIR, "Notes");
+const CALLS_DIR = path.join(BRAIN_DIR, "Calls");
+
+// Files that carry a topic wikilink or a tag. A topic is a SET, not a
+// document — referencing one in chat means "everything under this", so the
+// dispatcher needs the member PATHS to hand a worker, never their contents.
+export function filesFor(kind: "topic" | "tag", name: string, cap = 12):
+  { hub: string | null; files: string[]; total: number } {
+  const needle = kind === "topic"
+    ? new RegExp(`\\[\\[${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\||\\]\\])`, "i")
+    : new RegExp(`(^|\\s|-\\s)#?${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "im");
+  const hits: string[] = [];
+  for (const dir of [NOTES_DIR, CALLS_DIR]) {
+    let names: string[] = [];
+    try { names = fs.readdirSync(dir).filter((f) => f.endsWith(".md")); } catch { continue; }
+    for (const f of names) {
+      const p = path.join(dir, f);
+      let txt = "";
+      try { txt = fs.readFileSync(p, "utf8"); } catch { continue; }
+      if (kind === "tag") {
+        // a tag counts when it is in the frontmatter tag list or written inline
+        const fm = txt.match(/^---\n([\s\S]*?)\n---/);
+        const inFm = fm ? new RegExp(`^\\s*-\\s*${name}\\s*$`, "im").test(fm[1]) : false;
+        if (!inFm && !new RegExp(`#${name}\\b`, "i").test(txt)) continue;
+      } else if (!needle.test(txt)) continue;
+      hits.push(p);
+    }
+  }
+  const hub = kind === "topic" && fs.existsSync(path.join(TOPICS_DIR, `${name}.md`))
+    ? path.join(TOPICS_DIR, `${name}.md`)
+    : null;
+  return { hub, files: hits.slice(0, cap), total: hits.length };
+}
 
 const badName = (n: string) =>
   !n || n.length > 60 || /[/\\[\]#|]/.test(n) || n.startsWith(".") || n.includes("..");

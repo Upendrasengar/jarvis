@@ -24,6 +24,37 @@ export function useMentions() {
     staleTime: 30_000,
   });
 
+  // Topics and tags are the "#" vocabulary: a SET of files rather than one
+  // document, which is why they get their own trigger instead of being mixed
+  // into "@" — picking one means "everything under this".
+  const { data: topics = [] } = useQuery({
+    queryKey: ["topics"],
+    queryFn: async (): Promise<Array<{ name: string }>> => {
+      const j = await (await fetch("/api/topics")).json();
+      return Array.isArray(j) ? j.filter((t) => typeof t?.name === "string") : [];
+    },
+    staleTime: 60_000,
+  });
+  const { data: tags = [] } = useQuery({
+    queryKey: ["tags"],
+    queryFn: async (): Promise<string[]> => {
+      const j = await (await fetch("/api/tags")).json();
+      return Array.isArray(j) ? j.filter((t): t is string => typeof t === "string") : [];
+    },
+    staleTime: 60_000,
+  });
+
+  // /api/tags derives its vocabulary from the graph and picks up debris —
+  // "[[Claims]]", "-babel-parser-+--babel-traverse--ast-". Obsidian tags are
+  // letters first, then word chars, dashes or slashes; anything else is not a
+  // tag anyone typed on purpose and does not belong in a picker.
+  const validTag = (t: string) => /^[A-Za-z][\w\-/]*$/.test(t) && t.length <= 40;
+
+  const sets = useMemo<Mention[]>(() => [
+    ...topics.map((t) => ({ kind: "topic" as const, id: t.name, title: t.name, sub: "topic", when: 0 })),
+    ...tags.filter(validTag).map((t) => ({ kind: "tag" as const, id: t, title: t, sub: "tag", when: 0 })),
+  ], [topics, tags]);
+
   const all = useMemo<Mention[]>(() => {
     const n: Mention[] = notes.map((x) => ({
       kind: "note", id: x.id, title: x.title,
@@ -58,5 +89,20 @@ export function useMentions() {
     [all],
   );
 
-  return { search, ready: all.length > 0 };
+  const searchSets = useMemo(
+    () => (q: string): Mention[] => {
+      const s = q.trim().toLowerCase();
+      const pool = s ? sets.filter((m) => m.title.toLowerCase().includes(s)) : sets;
+      return pool
+        .sort((a, b) => {
+          const ap = a.title.toLowerCase().startsWith(s) ? 0 : 1;
+          const bp = b.title.toLowerCase().startsWith(s) ? 0 : 1;
+          return ap - bp || a.title.localeCompare(b.title);
+        })
+        .slice(0, MAX);
+    },
+    [sets],
+  );
+
+  return { search, searchSets, ready: all.length > 0 };
 }
