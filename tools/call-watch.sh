@@ -70,7 +70,7 @@ misses=0
 session=""
 audiocap_pid=""
 ffmpeg_pid=""
-mode=""        # browser | teams-app | manual
+mode=""        # browser | teams-app | teams-web | firefox | manual
 rec_started=0
 
 # PID of a Teams desktop process currently capturing the mic (empty if none).
@@ -91,6 +91,19 @@ browser_mic_pid() {
     [ "$p" = "${ffmpeg_pid:-x}" ] && continue
     ps -o command= -p "$p" 2>/dev/null | \
       grep -qiE 'Google Chrome|Chromium|Microsoft Edge|Brave Browser|Arc\.app' && { echo "$p"; return; }
+  done
+}
+
+# PID of Firefox capturing the mic. Firefox exposes NO AppleScript tab API
+# ("Can't make tabs of every window" — it is not a permissions problem, the
+# interface does not exist), so a Firefox call has no URL to match on and the
+# mic is the only available signal. Deliberately NOT folded into
+# browser_mic_pid: that one only ever corroborates a Teams tab we can read.
+firefox_mic_pid() {
+  local p
+  for p in $("$BIN/miccheck" --pids 2>/dev/null); do
+    [ "$p" = "${ffmpeg_pid:-x}" ] && continue
+    ps -o command= -p "$p" 2>/dev/null | grep -qi 'Firefox\.app' && { echo "$p"; return; }
   done
 }
 
@@ -249,6 +262,7 @@ done
 echo "$(date '+%H:%M:%S') call-watch running (poll ${POLL}s)"
 mkdir -p "$JARVIS_DIR/data"
 webteams_hits=0
+firefox_hits=0
 while true; do
   # liveness heartbeat — the server's watchdog kills+restarts us if this
   # goes stale (a wedged watcher looks alive but stops beating)
@@ -272,8 +286,18 @@ while true; do
         webteams_hits=0
         start_recording "Microsoft Teams (browser)" teams-web
       fi
+    elif ! voice_listening && [ -n "$(firefox_mic_pid)" ]; then
+      # Firefox: no tab to read, so a sustained mic hold IS the signal. Two
+      # consecutive polls (30s), the same debounce the Teams-web rule uses, so
+      # a short mic blip does not phantom-trigger a recording.
+      firefox_hits=$((firefox_hits + 1))
+      if [ "$firefox_hits" -ge 2 ]; then
+        firefox_hits=0
+        start_recording "Firefox (browser)" firefox
+      fi
     else
       webteams_hits=0
+      firefox_hits=0
     fi
   else
     # End-of-call signal depends on how the recording started:
@@ -286,6 +310,10 @@ while true; do
     over=0
     if [ "$mode" = "teams-app" ]; then
       [ -z "$(teams_mic_pid)" ] && over=1
+    elif [ "$mode" = "firefox" ]; then
+      # over when Firefox lets go of the mic; 60s grace covers the pre-join →
+      # in-call mic re-grab, same as teams-web
+      [ $(( $(date +%s) - rec_started )) -gt 60 ] && [ -z "$(firefox_mic_pid)" ] && over=1
     elif [ "$mode" = "teams-web" ]; then
       # call over when the browser lets go of the mic (60s grace covers the
       # pre-join → in-call mic re-grab)
