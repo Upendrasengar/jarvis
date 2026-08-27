@@ -75,21 +75,27 @@ export function imageOnly(line: string): { name: string; alt: string } | null {
   return null;
 }
 
-// contentEditable DOM → markdown: keep **bold**, flatten everything else
-function domToMd(el: HTMLElement): string {
+// contentEditable DOM → markdown: keep **bold**, flatten everything else.
+// The raw form is what a caret offset must be measured against — trimming or
+// collapsing here would shift every index computed from it.
+function domToMdRaw(el: HTMLElement): string {
   let out = "";
   el.childNodes.forEach((n) => {
     if (n.nodeType === Node.TEXT_NODE) out += n.textContent ?? "";
     else if (n instanceof HTMLElement) {
       if (n.dataset.md) { out += n.dataset.md; return; }
-      const inner = domToMd(n);
+      const inner = domToMdRaw(n);
       out +=
         n.tagName === "B" || n.tagName === "STRONG" ? `**${inner}**`
         : n.tagName === "I" || n.tagName === "EM" ? `*${inner}*`
         : inner;
     }
   });
-  return out.replace(/\n+/g, " ").trim();
+  return out;
+}
+
+function domToMd(el: HTMLElement): string {
+  return domToMdRaw(el).replace(/\n+/g, " ").trim();
 }
 
 type Props = {
@@ -136,6 +142,7 @@ export const NotesView = memo(
     // last line the caret was in — a pasted image inserts after it instead of
     // being dumped at the end of the note
     const focusedLine = useRef<number>(-1);
+    const justSplit = useRef(false);
     // A line that still has focus when this unmounts never fires onBlur, so
     // the flag stayed true and every later render was skipped — the symptom
     // was picking another call and getting the previous call's notes.
@@ -162,16 +169,21 @@ export const NotesView = memo(
     let railColor = "";                     // active callout border, carried down the rail
     const lines = notes.split("\n");
 
-    // Character offset of the caret within the element's text, counting
-    // through nested <b>/<a> nodes — needed to split a line where the cursor
-    // actually is rather than at the end.
-    const caretOffset = (el: HTMLElement): number => {
+    // Caret offset in MARKDOWN coordinates, not visible-text coordinates.
+    // The first cut measured visible text and sliced the markdown with it, so
+    // every "**" before the caret shifted the split two characters early —
+    // one bold span turned "…Author access." into a stray "ess." on the new
+    // line. Measuring means re-serialising the span up to the caret.
+    const mdCaretOffset = (el: HTMLElement): number => {
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return el.textContent?.length ?? 0;
-      const r = sel.getRangeAt(0).cloneRange();
-      r.selectNodeContents(el);
-      r.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
-      return r.toString().length;
+      if (!sel || sel.rangeCount === 0) return domToMdRaw(el).length;
+      const pre = document.createRange();
+      pre.selectNodeContents(el);
+      try { pre.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset); }
+      catch { return domToMdRaw(el).length; }
+      const tmp = document.createElement("span");
+      tmp.appendChild(pre.cloneContents());
+      return domToMdRaw(tmp).length;
     };
 
     // A new line inherits the list marker so Enter inside a bullet makes
@@ -197,7 +209,13 @@ export const NotesView = memo(
         const em = await uploadPastedImage(f);
         if (em) embeds.push(em);
       }
-      if (embeds.length) onInsertLine(after, embeds.join("\n"));
+      if (!embeds.length) return;
+      // The paste happens with a line still focused, so editingNow is true and
+      // the memo comparator below would skip the very re-render that shows the
+      // image. Structural changes must always paint.
+      editingNow = false;
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      onInsertLine(after, embeds.join("\n"));
     };
 
     const editable = (lineIndex: number, prefix: string, className: string, content: string) =>
@@ -210,6 +228,7 @@ export const NotesView = memo(
           onFocus={() => { editingNow = true; focusedLine.current = lineIndex; }}
           onBlur={(e) => {
             editingNow = false;
+            if (justSplit.current) { justSplit.current = false; return; }
             const next = domToMd(e.currentTarget);
             if (next && next !== content) onEditLine(lineIndex, prefix + next);
           }}
@@ -219,10 +238,18 @@ export const NotesView = memo(
               const el = e.currentTarget as HTMLElement;
               // Shift+Enter keeps the old behaviour: commit and get out
               if (e.shiftKey || !onSplitLine) { el.blur(); return; }
-              const text = domToMd(el);
-              const at = caretOffset(el);
+              const raw = domToMdRaw(el);
+              const at = mdCaretOffset(el);
               editingNow = false;
-              onSplitLine(lineIndex, prefix + text.slice(0, at), continuationPrefix(prefix) + text.slice(at));
+              // the split already wrote both halves — the blur that follows
+              // must not also save this element's (pre-split) full text over
+              // the first half
+              justSplit.current = true;
+              onSplitLine(
+                lineIndex,
+                prefix + raw.slice(0, at).replace(/\n+/g, " ").trimEnd(),
+                continuationPrefix(prefix) + raw.slice(at).replace(/\n+/g, " ").trimStart(),
+              );
               el.blur();
               return;
             }
