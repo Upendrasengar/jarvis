@@ -132,9 +132,17 @@ const LAYOUT: Record<string, { order: number; span?: boolean; glyph?: string; co
   "open questions": { order: 6 },
 };
 
-// while a line has focus, ignore incoming re-renders so live-channel refetches
-// can't wipe an edit in progress
-let editingNow = false;
+// Which line currently holds the caret, or null. Module scope is right here:
+// browser focus is global, only one element can hold it.
+//
+// This replaces a plain "editingNow" boolean that gated rendering for the
+// WHOLE view. That flag caused three separate "it only appears after I
+// reload" bugs — the pane froze on the previous call, a pasted image never
+// drew, and a line split needed its own exemption — because skipping every
+// render is far broader than the thing worth protecting, which is only the
+// caret in the line being typed. The comparator below now states that rule
+// directly instead of carving out cases one at a time.
+let editingLine: number | null = null;
 
 export const NotesView = memo(
   function NotesView({ notes, onToggle, onEditLine, onSplitLine, onInsertLine, onComment, cards = true }: Props) {
@@ -143,10 +151,30 @@ export const NotesView = memo(
     // being dumped at the end of the note
     const focusedLine = useRef<number>(-1);
     const justSplit = useRef(false);
+    // line to focus once the new markdown has rendered (set by a split)
+    const focusNext = useRef<number | null>(null);
     // A line that still has focus when this unmounts never fires onBlur, so
     // the flag stayed true and every later render was skipped — the symptom
     // was picking another call and getting the previous call's notes.
-    useEffect(() => () => { editingNow = false; }, []);
+    useEffect(() => () => { editingLine = null; }, []);
+
+    // Enter used to create the line and leave you to click into it. The new
+    // line only exists after the parent has saved and re-rendered, so the
+    // focus has to happen here, once the element is actually in the DOM.
+    useEffect(() => {
+      const want = focusNext.current;
+      if (want === null) return;
+      focusNext.current = null;
+      const el = rootRef.current?.querySelector<HTMLElement>(`[data-line="${want}"]`);
+      if (!el) return;
+      el.focus();
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(true);                 // caret at the start of the new line
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }, [notes]);
     let checkboxIndex = -1;
     // frontmatter lines render as nothing but KEEP their indexes so inline
     // edits still map to the right source line
@@ -210,10 +238,9 @@ export const NotesView = memo(
         if (em) embeds.push(em);
       }
       if (!embeds.length) return;
-      // The paste happens with a line still focused, so editingNow is true and
-      // the memo comparator below would skip the very re-render that shows the
-      // image. Structural changes must always paint.
-      editingNow = false;
+      // The document is about to change shape under the caret, so let go of it.
+      // No flag poking: the comparator renders on any structural change.
+      editingLine = null;
       (document.activeElement as HTMLElement | null)?.blur?.();
       onInsertLine(after, embeds.join("\n"));
     };
@@ -224,10 +251,13 @@ export const NotesView = memo(
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
-          className={`${className} -mx-1 rounded px-1 outline-none focus:bg-[var(--cyan-2)] focus:ring-1 focus:ring-[var(--cyan-3)]`}
-          onFocus={() => { editingNow = true; focusedLine.current = lineIndex; }}
+          data-line={lineIndex}
+          // the empty: variants only affect the blank line Enter just made —
+          // making every span inline-block would change how normal text wraps
+          className={`${className} -mx-1 rounded px-1 outline-none empty:inline-block empty:min-h-[1.2em] empty:min-w-[10px] focus:bg-[var(--cyan-2)] focus:ring-1 focus:ring-[var(--cyan-3)]`}
+          onFocus={() => { editingLine = lineIndex; focusedLine.current = lineIndex; }}
           onBlur={(e) => {
-            editingNow = false;
+            editingLine = null;
             if (justSplit.current) { justSplit.current = false; return; }
             const next = domToMd(e.currentTarget);
             if (next && next !== content) onEditLine(lineIndex, prefix + next);
@@ -240,11 +270,12 @@ export const NotesView = memo(
               if (e.shiftKey || !onSplitLine) { el.blur(); return; }
               const raw = domToMdRaw(el);
               const at = mdCaretOffset(el);
-              editingNow = false;
+              editingLine = null;
               // the split already wrote both halves — the blur that follows
               // must not also save this element's (pre-split) full text over
               // the first half
               justSplit.current = true;
+              focusNext.current = lineIndex + 1;
               onSplitLine(
                 lineIndex,
                 prefix + raw.slice(0, at).replace(/\n+/g, " ").trimEnd(),
@@ -309,7 +340,16 @@ export const NotesView = memo(
       const blk = blockAt.get(i);
       if (blk?.kind === "code") return <CodeBlock key={i} lang={blk.lang} body={blk.body} />;
       if (blk?.kind === "table") return <Table key={i} rows={blk.rows} inline={inline} />;
-      if (line.trim() === "") { inCheckboxBlock = false; railColor = ""; return null; }
+      if (line.trim() === "") {
+        inCheckboxBlock = false;
+        railColor = "";
+        // A blank line is normally just a separator and draws nothing — but
+        // the empty line Enter just created has to be visible and focusable,
+        // or "add a new line" still ends in nowhere to type.
+        if (focusNext.current === i && onEditLine)
+          return <p key={i} className="mb-2 min-h-[1.4em]">{editable(i, "", "", "")}</p>;
+        return null;
+      }
       if (/^# /.test(line)) { inCheckboxBlock = false; return null; }
       if (/^\*\*Topics:\*\*/.test(line)) return null; // shown as chips in the header
       const nextIsQuote = /^>/.test(lines[i + 1] ?? "");
@@ -483,9 +523,20 @@ export const NotesView = memo(
       </div>
     );
   },
-  // Skip re-renders while the user is typing in a line — but ONLY within the
-  // same note. A different noteId always renders, so a stuck editing flag can
-  // no longer freeze the pane on a stale call.
-  (prev, next) =>
-    prev.noteId === next.noteId && (editingNow ? true : prev.notes === next.notes),
+  // Skip a render ONLY when the incoming change is confined to the very line
+  // the caret sits in — that is the whole point of the guard: not losing what
+  // is being typed when the saved line echoes back. Anything else paints:
+  // a different note, a change in line COUNT (a split, a pasted image), or an
+  // edit to some other line by a worker.
+  (prev, next) => {
+    if (prev.noteId !== next.noteId) return false;
+    if (prev.notes === next.notes) return true;
+    if (editingLine === null) return false;
+    const a = prev.notes.split("\n");
+    const b = next.notes.split("\n");
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++)
+      if (a[i] !== b[i] && i !== editingLine) return false;
+    return true;
+  },
 );
