@@ -90,9 +90,11 @@ type Props = {
 
 // visual placement per known section (matched on the H2 text, lowercased);
 // unknown sections get a full-width card after the known ones
-const LAYOUT: Record<string, { order: number; span?: boolean; glyph?: string }> = {
+const LAYOUT: Record<string, { order: number; span?: boolean; glyph?: string; cols?: boolean }> = {
   summary: { order: 1, glyph: "✳" },
-  participants: { order: 2 },
+  // Spans and splits into two columns: a dozen participants in a half-width
+  // card made a tall ladder of wrapped text with dead space beside it.
+  participants: { order: 2, span: true, cols: true },
   discussion: { order: 3, span: true },
   decisions: { order: 4, glyph: "✓" },
   "action items": { order: 5 },
@@ -254,7 +256,7 @@ export const NotesView = memo(
         if (section === "participants") {
           const initial = li[2].replace(/^\W+/, "").charAt(0).toUpperCase() || "?";
           return (
-            <div key={i} className="mb-[7px] flex items-start gap-3">
+            <div key={i} className="mb-[7px] flex items-start gap-3 break-inside-avoid">
               <span className="mt-[1px] flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surf-2)] text-[10.5px] font-semibold text-[var(--bright)]">
                 {initial}
               </span>
@@ -326,7 +328,7 @@ export const NotesView = memo(
                 {lay.glyph && <span className="text-[var(--cyan)]">{lay.glyph}</span>}
                 {editable(sec.title.i, "## ", "", sec.title.text)}
               </h2>
-              {body}
+              {lay.cols ? <div className="sm:columns-2 sm:gap-x-8">{body}</div> : body}
             </section>
           );
         })}
