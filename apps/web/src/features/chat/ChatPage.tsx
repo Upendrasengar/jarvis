@@ -8,7 +8,7 @@ import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { Markdown } from "../../components/Markdown";
 import { MentionMenu } from "./MentionMenu";
-import { liveRefs, refToken, useMentions, type Mention } from "./useMentions";
+import { useMentions, type Mention } from "./useMentions";
 import type { ChatRef } from "@jarvis/shared";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
@@ -108,6 +108,9 @@ export function ChatPage() {
   const [mentionAt, setMentionAt] = useState<number | null>(null); // caret index of the "@"
   const [mentionQ, setMentionQ] = useState("");
   const [mentionI, setMentionI] = useState(0);
+  // Backspace into the pills highlights the last one first, then deletes it —
+  // one keystroke should never silently drop a reference you cannot see go.
+  const [armedRef, setArmedRef] = useState(false);
   const { search } = useMentions();
   const hits = mentionAt === null ? [] : search(mentionQ);
   const menuOpen = mentionAt !== null && hits.length > 0;
@@ -125,22 +128,28 @@ export function ChatPage() {
     setMentionI(0);
   };
 
+  // A picked reference becomes a PILL, never text. Pasting a 60-character note
+  // title into the field buried the message and made backspace chew through it
+  // one character at a time; the pill deletes as one thing.
   const pickMention = (m: Mention) => {
     if (mentionAt === null) return;
     const caret = inputRef.current?.selectionStart ?? input.length;
-    const token = refToken(m) + " ";
-    const next = input.slice(0, mentionAt) + token + input.slice(caret);
+    const next = input.slice(0, mentionAt) + input.slice(caret);   // drop the "@query"
     setInput(next);
     setRefs((r) => (r.some((x) => x.kind === m.kind && x.id === m.id)
       ? r
       : [...r, { kind: m.kind, id: m.id, title: m.title }]));
+    setArmedRef(false);
     closeMenu();
-    // restore the caret after React writes the new value
-    const pos = mentionAt + token.length;
     requestAnimationFrame(() => {
       inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(pos, pos);
+      inputRef.current?.setSelectionRange(mentionAt, mentionAt);
     });
+  };
+
+  const removeRef = (r: ChatRef) => {
+    setRefs((x) => x.filter((y) => !(y.kind === r.kind && y.id === r.id)));
+    setArmedRef(false);
   };
 
   useEffect(() => {
@@ -169,12 +178,12 @@ export function ChatPage() {
     const v = text.trim() || (pendingImgs.length ? "What do you see here?" : "");
     if (!v) return;
     if (viaVoice) voiceTurn.current = true;
-    // a mention the user typed over or deleted must not still travel
-    const sending = liveRefs(v, refs);
+    const sending = refs;
     setInput("");
     const imgs = pendingImgs;
     setPendingImgs([]);
     setRefs([]);
+    setArmedRef(false);
     closeMenu();
     void send(v, imgs, sending);
   };
@@ -321,30 +330,6 @@ export function ChatPage() {
 
       <div className="relative mt-2">
         {menuOpen && <MentionMenu items={hits} index={mentionI} onPick={pickMention} />}
-        {refs.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {refs.map((r) => (
-              <span
-                key={`${r.kind}:${r.id}`}
-                title={`${r.kind} sent as a reference — Jarvis reads the file, the message stays small`}
-                className="flex items-center gap-1.5 rounded-full border border-[var(--indigo-3)] bg-[var(--indigo-2)] px-2.5 py-[3px] text-[11px] text-[var(--indigo)]"
-              >
-                <span className="font-mono text-[9px] tracking-[1px] opacity-70">{r.kind}</span>
-                <span className="max-w-[220px] truncate">{r.title}</span>
-                <button
-                  onClick={() => {
-                    setRefs((x) => x.filter((y) => !(y.kind === r.kind && y.id === r.id)));
-                    setInput((t) => t.replace(refToken(r), "").replace(/\s{2,}/g, " "));
-                  }}
-                  title="Remove reference"
-                  className="text-[var(--dim)] hover:text-[var(--red)]"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
         {pendingImgs.length > 0 && (
           <div className="mb-2 flex gap-2">
             {pendingImgs.map((img, i) => (
@@ -361,7 +346,33 @@ export function ChatPage() {
             ))}
           </div>
         )}
-        <div className="flex items-center gap-[6px] rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-[6px] transition [box-shadow:var(--shadow)] focus-within:border-[var(--cyan-3)]">
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-[6px] transition [box-shadow:var(--shadow)] focus-within:border-[var(--cyan-3)]">
+          {refs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-1 pb-[6px] pt-[2px]">
+              {refs.map((r, i) => (
+                <span
+                  key={`${r.kind}:${r.id}`}
+                  title={`${r.kind} · Jarvis opens this file — the message itself stays small`}
+                  className={`flex items-center gap-1.5 rounded-lg border px-2 py-[3px] text-[11.5px] ${
+                    i === refs.length - 1 && armedRef
+                      ? "border-[var(--red)] bg-[var(--red)]/15 text-[var(--text)]"
+                      : "border-[var(--indigo-3)] bg-[var(--indigo-2)] text-[var(--indigo)]"
+                  }`}
+                >
+                  <span className="font-mono text-[9px] uppercase tracking-[1px] opacity-70">{r.kind}</span>
+                  <span className="max-w-[260px] truncate">{r.title}</span>
+                  <button
+                    onClick={() => removeRef(r)}
+                    title="Remove reference"
+                    className="text-[var(--dim)] hover:text-[var(--red)]"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-[6px]">
           <button
             onClick={mic}
             title="Click to speak"
@@ -388,6 +399,13 @@ export function ChatPage() {
                 if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(hits[mentionI]); return; }
                 if (e.key === "Escape") { e.preventDefault(); closeMenu(); return; }
               }
+              if (e.key === "Backspace" && !input && refs.length) {
+                e.preventDefault();
+                if (armedRef) { setRefs((r) => r.slice(0, -1)); setArmedRef(false); }
+                else setArmedRef(true);
+                return;
+              }
+              if (armedRef && e.key !== "Backspace") setArmedRef(false);
               if (e.key === "Enter") submit();
             }}
             onPaste={onPaste}
@@ -423,6 +441,7 @@ export function ChatPage() {
           >
             ❯
           </button>
+          </div>
         </div>
         <div className="mt-[7px] text-center text-[9px] uppercase tracking-[2px] text-[var(--dim)]">
           enter to send · 🎙 to speak

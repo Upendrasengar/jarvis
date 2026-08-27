@@ -60,13 +60,3 @@ export function useMentions() {
 
   return { search, ready: all.length > 0 };
 }
-
-// The token that stands in for a mention inside the message text. Kept in one
-// place so insertion and the drop-if-deleted check below cannot disagree.
-export const refToken = (m: { title: string }) => `@${m.title}`;
-
-// Refs the user has since deleted from the text should not travel with the
-// message — otherwise editing a mention away still sends the file.
-export function liveRefs(text: string, refs: ChatRef[]): ChatRef[] {
-  return refs.filter((r) => text.includes(refToken(r)));
-}
