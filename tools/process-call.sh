@@ -95,8 +95,11 @@ transcribe() { # $1 wav, $2 output prefix
   esac
 }
 
-[ -s mic.wav ]      && transcribe mic.wav mic
-[ -s system16.wav ] && transcribe system16.wav system
+# Reprocessing is the documented recovery when notes fail, so it must be
+# cheap: a channel already transcribed is left alone rather than run through
+# whisper again.
+[ -s mic.wav ]      && { [ -s mic.json ]    || transcribe mic.wav mic; }
+[ -s system16.wav ] && { [ -s system.json ] || transcribe system16.wav system; }
 
 python3 "$JARVIS_DIR/tools/merge-transcripts.py" \
   --me mic.json --them system.json > transcript.md
@@ -139,7 +142,9 @@ TOPICS_LIST="$(ls "$TOPICS_DIR" 2>/dev/null | sed 's/\.md$//' | paste -sd ', ' -
   cat meta.txt
   echo
   cat transcript.md
-} | claude -p --model sonnet "You are Jarvis writing meeting minutes for $OWNER, in the style of a good meeting facilitator (think Copilot meeting recap).
+} | claude -p --model sonnet \
+  --disallowedTools="Bash,Read,Edit,Write,Grep,Glob,WebFetch,WebSearch,Task,NotebookEdit" \
+  "You are Jarvis writing meeting minutes for $OWNER, in the style of a good meeting facilitator (think Copilot meeting recap).
 KNOWN PEOPLE — the owner's memory file, listing their team and colleagues with canonical spellings:
 $ROSTER
 When a name in the transcript is plausibly a phonetic or misspelled rendering of someone above (transcription mangles names), use the CANONICAL spelling from the roster. Only match when clearly plausible in context — a genuinely unknown participant keeps the transcript's spelling with a (?) marker; never force-match a stranger onto the roster.
@@ -184,6 +189,24 @@ Bullets. Omit if none.
 The frontmatter topics list connects this call into the knowledge graph:
 2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, ONE theme per topic (never mush two themes into one name), no punctuation or slashes inside the brackets.
 Keep it scannable — read in 30 seconds." > "$NOTES"
+
+# The model's stdout IS the note, so a refusal or an apology lands in the file
+# looking like a successful run — that is how a call ended up with "I need
+# write permission for that file" as its entire minutes. A real note always
+# has an H1. Keep the bad output for inspection rather than leaving it in
+# place of the notes.
+if ! grep -q '^# ' "$NOTES"; then
+  cp "$NOTES" "$SESSION/notes-rejected.md" 2>/dev/null || true
+  {
+    printf -- '---\ntitle: Call at %s\ntype: call\ndate: %s\n---\n\n' \
+      "$(printf '%s' "$STAMP" | sed 's/.*-\(..\)\(..\)$/\1:\2/')" "${STAMP%%-*}"
+    printf '# Call at %s\n\n' "$(printf '%s' "$STAMP" | sed 's/.*-\(..\)\(..\)$/\1:\2/')"
+    printf '> [!warning] Notes generation failed\n'
+    printf '> The summariser returned something that is not a note. The transcript below is intact —\n'
+    printf '> rerun `bash tools/process-call.sh %s` to try again. What it returned is in notes-rejected.md.\n' "$SESSION"
+  } > "$NOTES"
+  echo "[process-call] notes rejected (no H1) — wrote a placeholder, kept the raw output" >&2
+fi
 
 # The model writes this file directly, and roughly one note in a hundred comes
 # back with the frontmatter opened but never closed — which makes every reader
