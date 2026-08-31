@@ -15,6 +15,7 @@ import { sendTurn } from "../services/chatSessions.js";
 import { dispatchDelegate } from "../services/agents.js";
 import { onEvent } from "../live/liveState.js";
 import { createFromAction, setReminderSender } from "./reminders.js";
+import { findAction } from "@jarvis/shared";
 
 const SESSION = "telegram";
 const DELIVER_PROMPT =
@@ -59,16 +60,16 @@ function runTurn(message: string): Promise<string> {
       onText: (t) => { acc += t; },
       onDone: (finalText) => {
         let out = finalText ?? acc;
-        const m = out.match(/^ACTION:DELEGATE\s+(\{.*\})\s*$/m);
+        const m = findAction(out, "ACTION:DELEGATE");
         if (m) {
-          try { dispatchDelegate(JSON.parse(m[1]), SESSION); } catch {}
-          out = out.replace(m[0], "").trim() || "On it — I'll message you when it's done.";
+          try { dispatchDelegate(JSON.parse(m.json), SESSION); } catch {}
+          out = (out.slice(0, m.start) + out.slice(m.end)).trim() || "On it — I'll message you when it's done.";
         }
-        const rm = out.match(/^ACTION:REMIND\s+(\{.*\})\s*$/m);
+        const rm = findAction(out, "ACTION:REMIND");
         if (rm) {
           let note = "Reminder set.";
-          try { createFromAction(JSON.parse(rm[1])); } catch { note = "I couldn't set that reminder — try rephrasing the time."; }
-          out = out.replace(rm[0], "").trim() || note;
+          try { createFromAction(JSON.parse(rm.json)); } catch { note = "I couldn't set that reminder — try rephrasing the time."; }
+          out = (out.slice(0, rm.start) + out.slice(rm.end)).trim() || note;
         }
         resolve(out);
       },

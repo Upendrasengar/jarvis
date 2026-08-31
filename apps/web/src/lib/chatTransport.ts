@@ -2,7 +2,7 @@
 // Shared chat transport — used by the chat page (visible conversation) and
 // the header voice bar (background conversation from any tab). Handles the
 // SSE stream and the ACTION:DELEGATE protocol in one place.
-import type { ChatRef } from "@jarvis/shared";
+import { findAction, stripActions, type ChatRef } from "@jarvis/shared";
 
 // refs ride along on the sent message so the transcript still shows WHAT was
 // referenced — once the pill replaced the inline title, the bubble otherwise
@@ -10,8 +10,8 @@ import type { ChatRef } from "@jarvis/shared";
 export type Msg = { c: "me" | "jarvis"; t: string; imgs?: string[]; ts?: number; id?: string; refs?: ChatRef[] };
 
 const TX_KEY = (sid: string) => "jarvis_tx_" + sid;
-const DELEGATE_RE = /ACTION:DELEGATE\s*(\{[\s\S]*?\})\s*/;
-const REMIND_RE = /ACTION:REMIND\s*(\{[\s\S]*?\})\s*/;
+const DELEGATE = "ACTION:DELEGATE";
+const REMIND = "ACTION:REMIND";
 
 export function loadTranscript(sid: string): Msg[] {
   try { return JSON.parse(localStorage.getItem(TX_KEY(sid)) ?? "[]"); } catch { return []; }
@@ -45,15 +45,15 @@ export async function streamChatTurn(
 ): Promise<string> {
   let full = "";
   let delegated = false;
-  const visible = () => full.replace(DELEGATE_RE, "").replace(REMIND_RE, "").trimEnd();
+  const visible = () => stripActions(full, [DELEGATE, REMIND]);
 
   const maybeDelegate = () => {
     if (delegated) return;
-    const dm = full.match(DELEGATE_RE);
-    if (!dm) return;
+    const dm = findAction(full, DELEGATE);
+    if (!dm) return;                     // not balanced yet — wait for the rest
     delegated = true;
     try {
-      const d = JSON.parse(dm[1]);
+      const d = JSON.parse(dm.json);
       d.sessionId = sessionId;
       fetch("/api/delegate", {
         method: "POST",
@@ -66,11 +66,11 @@ export async function streamChatTurn(
   let reminded = false;
   const maybeRemind = () => {
     if (reminded) return;
-    const rm = full.match(REMIND_RE);
-    if (!rm) return;
+    const rm = findAction(full, REMIND);
+    if (!rm) return;                     // not balanced yet — wait for the rest
     reminded = true;
     try {
-      const r = JSON.parse(rm[1]);
+      const r = JSON.parse(rm.json);
       fetch("/api/reminders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

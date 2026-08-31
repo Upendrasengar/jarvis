@@ -5,6 +5,7 @@
 import { z } from "zod";
 
 export { SCREEN_FORMAT } from "./replyFormat.js";
+export { findAction, stripActions, type FoundAction } from "./actionJson.js";
 
 // A reference picked in the chat box: @ for a document (note, call), # for a
 // SET (topic, tag). The chat carries the REFERENCE, never the file's content — inlining a note into the prompt is how the core-memory
