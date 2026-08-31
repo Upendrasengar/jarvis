@@ -677,6 +677,32 @@ export function SettingsPage() {
               </button>
             </label>
 
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {([
+                ["modelChat", "Conversation", "the assistant you talk to"],
+                ["modelWorker", "Workers", "recall, digests, call notes"],
+                ["modelQuick", "Background", "note distilling, heartbeat"],
+              ] as const).map(([key, title, hint]) => (
+                <label key={key} className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+                  <span className="block text-[13px] font-semibold text-[var(--bright)]">{title}</span>
+                  <span className="text-[10.5px] text-[var(--dim)]">{hint}</span>
+                  <select
+                    value={settings[key]}
+                    onChange={(e) => patch.mutate({ [key]: e.target.value } as Record<string, string>)}
+                    className="mt-3 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
+                  >
+                    <option value="haiku">Haiku — fastest, cheapest</option>
+                    <option value="sonnet">Sonnet — balanced</option>
+                    <option value="opus">Opus — strongest, priciest</option>
+                  </select>
+                </label>
+              ))}
+            </div>
+            <div className="mt-2 text-[10.5px] text-[var(--dim)]">
+              Opus on Conversation is where it shows; on Background it mostly costs.
+              Changes apply to the next turn — an open conversation keeps its model until it recycles.
+            </div>
+
             <div className="mt-3 grid grid-cols-2 gap-3">
               <label className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
                 <span className="block text-[13px] font-semibold text-[var(--bright)]">

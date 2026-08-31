@@ -13,6 +13,7 @@ import type { Settings, VoicesInfo } from "@jarvis/shared";
 import { JARVIS_DIR, MEMORY_DIR } from "../config.js";
 import { getAutorecord, setAutorecord } from "./calls.js";
 import { currentVoiceId, readVoices, setVoice } from "./env.js";
+import { modelFor, setModel } from "./models.js";
 
 const SETTINGS_FILE = path.join(MEMORY_DIR, "settings", "ui.json");
 const WHISPER_FILE = path.join(MEMORY_DIR, "settings", "whisper-model.txt");
@@ -38,6 +39,9 @@ export function readSettings(): Settings {
     whisperModel: whisper === "small" || whisper === "medium" ? whisper : "base",
     retentionDays: Math.min(90, Math.max(1, retention)),
     voice: byId?.[0] ?? vid,
+    modelChat: modelFor("chat") as Settings["modelChat"],
+    modelWorker: modelFor("worker") as Settings["modelWorker"],
+    modelQuick: modelFor("quick") as Settings["modelQuick"],
   };
 }
 
@@ -48,6 +52,9 @@ export function patchSettings(patch: Partial<Settings>): Settings {
     try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(j, null, 2) + "\n"); } catch {}
   }
   if (patch.autorecord !== undefined) setAutorecord(patch.autorecord);
+  if (patch.modelChat !== undefined) setModel("chat", patch.modelChat);
+  if (patch.modelWorker !== undefined) setModel("worker", patch.modelWorker);
+  if (patch.modelQuick !== undefined) setModel("quick", patch.modelQuick);
   if (patch.whisperModel !== undefined) {
     try { fs.writeFileSync(WHISPER_FILE, patch.whisperModel + "\n"); } catch {}
   }

@@ -9,6 +9,16 @@
 # only the judgement code can't.
 set -uo pipefail
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Model routing is configurable in settings (memory/settings/model-*.txt).
+# Falls back to the previous hardcoded tier when unset or unreadable, so an
+# install that never touches settings behaves exactly as before.
+jarvis_model() {   # $1 = role file stem, $2 = default
+  local v
+  v="$(head -1 "$JARVIS_DIR/memory/settings/$1.txt" 2>/dev/null | tr -d '[:space:]' | tr 'A-Z' 'a-z')"
+  case "$v" in haiku|sonnet|opus) printf '%s' "$v" ;; *) printf '%s' "$2" ;; esac
+}
+
 PORT="$(head -1 "$JARVIS_DIR/memory/settings/port.txt" 2>/dev/null | tr -cd '0-9')"
 PORT="${PORT:-4321}"
 TODAY="$(date +%Y-%m-%d)"
@@ -26,7 +36,7 @@ open_items = [
 print(json.dumps(open_items))" )"
 [ -z "$ITEMS" ] && { echo "[triage] no items / server down — skipped"; exit 0; }
 
-RAW="$(claude -p --model sonnet "Today is $TODAY. Below are my open action items from recorded calls and notes, as JSON (id, owner, text, source call title + date, recent comments).
+RAW="$(claude -p --model "$(jarvis_model model-worker sonnet)" "Today is $TODAY. Below are my open action items from recorded calls and notes, as JSON (id, owner, text, source call title + date, recent comments).
 
 Reply with ONLY a JSON object (no markdown fences, no prose):
 {

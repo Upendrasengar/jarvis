@@ -10,6 +10,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import os from "node:os";
 import { JARVIS_DIR, MEMORY_DIR, MEMORY_MD_DIR } from "../config.js";
 import { CLAUDE, WORKER_PATH } from "./env.js";
+import { modelFor } from "./models.js";
 import { SCREEN_FORMAT } from "@jarvis/shared";
 
 const IDLE_MS = 15 * 60 * 1000;
@@ -108,8 +109,9 @@ function spawnWarm(sessionId: string): Session {
   if (UUID_RE.test(sessionId) && !known.has(sessionId)) { known.add(sessionId); persist(); }
 
   // cost discipline: the reminders/heartbeat session is a yes/no judgement
-  // over server-gathered facts — Haiku territory. Conversations stay Sonnet.
-  const model = sessionId === "reminders" ? "haiku" : "sonnet";
+  // over server-gathered facts, so it rides the "quick" tier; the
+  // conversation rides "chat". Both configurable in settings.
+  const model = sessionId === "reminders" ? modelFor("quick") : modelFor("chat");
   const child = spawn(CLAUDE, [
     "-p", "--verbose",
     "--input-format", "stream-json", "--output-format", "stream-json",

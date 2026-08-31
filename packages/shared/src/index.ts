@@ -124,12 +124,21 @@ export type LiveMessage = z.infer<typeof LiveMessage>;
 export const VoiceMode = z.enum(["on-demand", "wake-word", "conversation"]);
 export type VoiceMode = z.infer<typeof VoiceMode>;
 
+// Model routing, by the three jobs CLAUDE.md distinguishes. Not one global
+// switch: putting Opus on the note-distiller costs a great deal and buys
+// nothing, while the conversation is where a better model is actually felt.
+export const ModelTier = z.enum(["haiku", "sonnet", "opus"]);
+export type ModelTier = z.infer<typeof ModelTier>;
+
 export const Settings = z.object({
   voiceMode: VoiceMode,
   autorecord: z.boolean(),
   whisperModel: z.enum(["base", "small", "medium"]),
   retentionDays: z.number().int().min(1).max(90),
   voice: z.string(),   // ElevenLabs preset name (or raw id)
+  modelChat: ModelTier,     // the dispatcher you talk to
+  modelWorker: ModelTier,   // recall, code, digests, call notes — the real work
+  modelQuick: ModelTier,    // note distilling, heartbeat, triage
 });
 export type Settings = z.infer<typeof Settings>;
 export const SettingsPatch = Settings.partial();

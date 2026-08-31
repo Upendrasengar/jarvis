@@ -12,6 +12,16 @@
 set -euo pipefail
 
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Model routing is configurable in settings (memory/settings/model-*.txt).
+# Falls back to the previous hardcoded tier when unset or unreadable, so an
+# install that never touches settings behaves exactly as before.
+jarvis_model() {   # $1 = role file stem, $2 = default
+  local v
+  v="$(head -1 "$JARVIS_DIR/memory/settings/$1.txt" 2>/dev/null | tr -d '[:space:]' | tr 'A-Z' 'a-z')"
+  case "$v" in haiku|sonnet|opus) printf '%s' "$v" ;; *) printf '%s' "$2" ;; esac
+}
+
 SESSION="$1"
 # Multilingual whisper model — handles calls that mix languages. Which size
 # to use lives in memory/settings/whisper-model.txt ("medium" = better
@@ -142,7 +152,7 @@ TOPICS_LIST="$(ls "$TOPICS_DIR" 2>/dev/null | sed 's/\.md$//' | paste -sd ', ' -
   cat meta.txt
   echo
   cat transcript.md
-} | claude -p --model sonnet \
+} | claude -p --model "$(jarvis_model model-worker sonnet)" \
   --disallowedTools="Bash,Read,Edit,Write,Grep,Glob,WebFetch,WebSearch,Task,NotebookEdit" \
   "You are Jarvis writing meeting minutes for $OWNER, in the style of a good meeting facilitator (think Copilot meeting recap).
 KNOWN PEOPLE — the owner's memory file, listing their team and colleagues with canonical spellings:

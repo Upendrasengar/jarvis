@@ -15,6 +15,7 @@ import { CLAUDE, WORKER_PATH, readVaults, setVoice } from "./env.js";
 import { recordResult } from "./chatSessions.js";
 import { SCREEN_FORMAT } from "@jarvis/shared";
 import { pushEvent } from "../live/liveState.js";
+import { modelFor } from "./models.js";
 
 // How much of a worker report survives into the chat context.
 const ANSWER_CAP = 4000;
@@ -127,7 +128,7 @@ export function spawnAgent(project: string, task: string, sessionId = "") {
   ].join("\n");
 
   const vaultDirs = readVaults(BRAIN_DIR).flatMap((d) => ["--add-dir", d]);
-  const child = spawn(CLAUDE, ["-p", prompt, "--model", "sonnet",
+  const child = spawn(CLAUDE, ["-p", prompt, "--model", modelFor("worker"),
     "--add-dir", proj.path, ...vaultDirs, "--dangerously-skip-permissions"],
     { cwd: proj.path, env: { ...process.env, PATH: WORKER_PATH }, stdio: ["ignore", "pipe", "pipe"] });
   attach(rec, child);
@@ -194,7 +195,7 @@ export function spawnAsk(task: string, sessionId = "") {
   const codeRoot = setting("code-root");
   const addDirs = [...readVaults(BRAIN_DIR), ...(codeRoot ? [codeRoot] : [])]
     .flatMap((d) => ["--add-dir", d]);
-  const child = spawn(CLAUDE, ["-p", prompt, "--model", "sonnet", ...addDirs, "--dangerously-skip-permissions"],
+  const child = spawn(CLAUDE, ["-p", prompt, "--model", modelFor("worker"), ...addDirs, "--dangerously-skip-permissions"],
     { cwd: JARVIS_DIR, env: { ...process.env, PATH: WORKER_PATH }, stdio: ["ignore", "pipe", "pipe"] });
   attach(rec, child);
   child.on("close", (code) => {
@@ -236,7 +237,7 @@ export function spawnNote(content: string, opts: { sessionId?: string; auto?: bo
     `- If it's trivial, transient, or not worth remembering, write NOTHING and reply exactly: SKIP`,
     `- End with 'ANSWER:' then ONE short sentence saying what you saved (or that nothing was saved).`,
   ].join("\n");
-  const child = spawn(CLAUDE, ["-p", prompt, "--model", "haiku", "--add-dir", BRAIN_DIR, "--dangerously-skip-permissions"],
+  const child = spawn(CLAUDE, ["-p", prompt, "--model", modelFor("quick"), "--add-dir", BRAIN_DIR, "--dangerously-skip-permissions"],
     { cwd: BRAIN_DIR, env: { ...process.env, PATH: WORKER_PATH }, stdio: ["ignore", "pipe", "pipe"] });
   attach(rec, child, 200);
   child.on("close", (code) => {

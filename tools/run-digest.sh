@@ -6,6 +6,16 @@
 set -uo pipefail
 
 JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Model routing is configurable in settings (memory/settings/model-*.txt).
+# Falls back to the previous hardcoded tier when unset or unreadable, so an
+# install that never touches settings behaves exactly as before.
+jarvis_model() {   # $1 = role file stem, $2 = default
+  local v
+  v="$(head -1 "$JARVIS_DIR/memory/settings/$1.txt" 2>/dev/null | tr -d '[:space:]' | tr 'A-Z' 'a-z')"
+  case "$v" in haiku|sonnet|opus) printf '%s' "$v" ;; *) printf '%s' "$2" ;; esac
+}
+
 DATE="$(date +%Y-%m-%d)"
 source "$JARVIS_DIR/tools/paths.sh"
 mkdir -p "$DIGESTS_DIR"
@@ -130,6 +140,6 @@ live ONLY in the trailing (due: YYYY-MM-DD) tag, included when a real \
 deadline exists (from triage or the item text) and omitted otherwise. Example: '1. **EC Oct 1 promotion** — All approval \
 steps must clear by Thursday, not just be submitted. Irreversible if \
 missed. (due: 2026-08-27)'. Keep it scannable. Then print the digest file path." \
-  --model sonnet --allowedTools "Read,Write" 2>&1 | tail -3
+  --model "$(jarvis_model model-worker sonnet)" --allowedTools "Read,Write" 2>&1 | tail -3
 
 echo "[run-digest] done: $DIGESTS_DIR/digest-$DATE.md"
