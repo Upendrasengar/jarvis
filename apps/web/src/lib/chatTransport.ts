@@ -44,6 +44,7 @@ export async function streamChatTurn(
   refs?: ChatRef[],
 ): Promise<string> {
   let full = "";
+  let errText = "";
   let delegated = false;
   const visible = () => stripActions(full, [DELEGATE, REMIND]);
 
@@ -105,7 +106,11 @@ export async function streamChatTurn(
         const ev = chunk.match(/^event: (\w+)$/m)?.[1] ?? "message";
         const data = chunk.match(/^data: (.*)$/m)?.[1];
         if (data === undefined) continue;
-        if (ev === "err") { onText?.(JSON.parse(data)); continue; }
+        // An err event carries the reason (busy, upstream failure). It is not
+        // part of `full`, so it has to survive to the return value — otherwise
+        // finish() overwrites it with "(no reply)" and the actual reason is
+        // lost, which is how a busy turn came to report nothing at all.
+        if (ev === "err") { errText = String(JSON.parse(data)); onText?.(errText); continue; }
         if (ev === "done") continue;
         full += JSON.parse(data);
         maybeDelegate();
@@ -116,5 +121,5 @@ export async function streamChatTurn(
   } finally {
     (window as any)._jarvisTurnActive = false;
   }
-  return visible() || (delegated ? "On it." : "");
+  return visible() || errText || (delegated ? "On it." : "");
 }
