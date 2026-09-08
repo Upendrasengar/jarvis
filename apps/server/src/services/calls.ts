@@ -53,7 +53,12 @@ export function listCalls(): Call[] {
       failedMark         ? "failed" :
       hasAudio           ? (stale ? "failed" : "processing") :
       transcript         ? "failed" : "empty";
-    out.push({ id: d, url, started, ended, status, notes, transcript });
+    let lastLog = "";
+    try {
+      const log = fs.readFileSync(path.join(sess, "process.log"), "utf8").trimEnd();
+      lastLog = log.slice(log.lastIndexOf("\n") + 1).slice(0, 300);
+    } catch { /* no log yet */ }
+    out.push({ id: d, url, started, ended, status, notes, transcript, lastLog });
   }
   return out.sort((a, b) => b.id.localeCompare(a.id));
 }

@@ -416,9 +416,18 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
               title="Transcribing locally, then writing notes"
               sub="Whisper runs on this machine — a long call can take a few minutes."
               extra={
-                <a href={`/logs?src=call:${call.id}`} className="text-[var(--cyan)] hover:underline">
-                  watch live progress →
-                </a>
+                <>
+                  {/* the last processor line, so a run that has died but is
+                      not yet stale does not look like healthy progress */}
+                  {call.lastLog && (
+                    <div className="mx-auto mb-2 max-w-[560px] truncate font-mono text-[10.5px] text-[var(--dim)]" title={call.lastLog}>
+                      {call.lastLog}
+                    </div>
+                  )}
+                  <a href={`/logs?src=call:${call.id}`} className="text-[var(--cyan)] hover:underline">
+                    watch live progress →
+                  </a>
+                </>
               }
             />
           )}

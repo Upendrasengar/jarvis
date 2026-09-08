@@ -67,6 +67,28 @@ trap 'rmdir .processing 2>/dev/null' EXIT
 
 [ -s mic.wav ] || [ -s system.wav ] || [ -s system16.wav ] || { echo "no audio captured"; exit 1; }
 
+# Preflight. The ERR trap below cannot be relied on to mark these: bash
+# suppresses ERR (and errexit) for a function called inside a && / || list,
+# which is exactly how transcribe() is invoked, so a missing whisper binary
+# killed the run without writing FAILED.txt. The UI then read the session as
+# "processing" for the full 30-minute staleness window — no failure, and no
+# Rerun button, for half an hour after a run that died in its first second.
+# Check the things that make the run impossible, and say so immediately.
+fail_now() {   # $1 = reason shown in the UI
+  echo "$1" >&2
+  echo "$1 — rerun: bash tools/process-call.sh reports/calls/$STAMP" > FAILED.txt
+  osascript -e "display notification \"Call processing failed — open the Calls tab to rerun\" with title \"Jarvis\"" >/dev/null 2>&1 || true
+  exit 1
+}
+
+[ -x "$WHISPER" ] || command -v "$WHISPER" >/dev/null 2>&1 \
+  || fail_now "whisper-cli not found at '$WHISPER' — install it with: brew install whisper-cpp"
+[ -s "$MODEL" ] \
+  || fail_now "whisper model missing at '$MODEL' — run: jarvis setup"
+command -v ffmpeg >/dev/null 2>&1 \
+  || fail_now "ffmpeg not found — install it with: brew install ffmpeg"
+
+
 # whisper wants 16 kHz mono; mic.wav is already recorded that way. The raw
 # system.wav (48 kHz float stereo, ~1.4 GB/hr) is deleted once the 16 kHz
 # copy exists — the conversion is lossless for speech purposes and the small

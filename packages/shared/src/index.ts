@@ -29,6 +29,10 @@ export const Call = z.object({
   status: CallStatus,
   notes: z.string(),
   transcript: z.string(),
+  // Last line the processor printed. A run that has died but is not yet
+  // 30 minutes stale still reads as "processing", so the screen needs
+  // something truer than a spinner to show.
+  lastLog: z.string().default(""),
 });
 export type Call = z.infer<typeof Call>;
 
