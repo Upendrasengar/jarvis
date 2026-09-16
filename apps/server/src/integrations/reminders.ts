@@ -157,6 +157,33 @@ function runAgent(prompt: string): Promise<string> {
   });
 }
 
+// An infrastructure failure is not a nudge. When the CLI cannot reach the API
+// — a revoked token, a 529, a process killed mid-turn — that text comes back
+// as the turn's "reply" and used to be delivered like any other heartbeat, so
+// a revoked OAuth token pushed the identical sentence to the owner's phone
+// every 45 minutes for eight hours.
+//
+// Matching is deliberately narrow. These patterns are shapes no real nudge
+// takes: our own ⚠️ prefix, an HTTP status from the API, a named auth
+// failure. A bare word like "overloaded" is NOT here — the owner's team being
+// overloaded is exactly the sort of thing a heartbeat should be free to say.
+const FAILURE_RE = new RegExp(
+  [
+    "^⚠️",                                // errors this server itself emits
+    "\\bAPI Error: \\d{3}\\b",             // 401, 429, 529 …
+    "\\bFailed to authenticate\\b",
+    "\\bOAuth\\b[^.]*\\brevoked\\b",
+    "\\bexited unexpectedly\\b",
+    "\\bCould not start the claude CLI\\b",
+  ].join("|"),
+  "i",
+);
+
+// Told the owner already? Then stay quiet until it works again. In memory on
+// purpose: a server restart costs at most one extra alert, and a server that
+// keeps restarting is itself worth hearing about.
+let outage = false;
+
 async function fire(j: Job): Promise<string> {
   if (j.payload.kind === "message") {
     await deliver(`⏰ ${j.name}\n${j.payload.text}`);
@@ -167,7 +194,27 @@ async function fire(j: Job): Promise<string> {
     j.payload.prompt + context +
     "\n\nHARD RULES: an item that appears in ALREADY SENT TODAY must NOT be mentioned again unless its status materially changed since (e.g. it just became overdue, or a meeting moved). Maximum twice per day for any single item — once to flag it, once near end of day if still open. If everything you would flag is already covered, reply with exactly HEARTBEAT_OK and nothing else. If nothing genuinely needs the owner's attention right now, reply HEARTBEAT_OK.",
   );
-  if (!out || /^HEARTBEAT_OK\b/.test(out)) return "quiet";
+  const recovered = async () => {
+    if (!outage) return;
+    outage = false;
+    console.log("[reminders] agent reachable again");
+    await deliver("✅ Jarvis can reach the model again — heartbeats resumed.");
+  };
+
+  if (!out || /^HEARTBEAT_OK\b/.test(out)) { await recovered(); return "quiet"; }
+
+  if (FAILURE_RE.test(out)) {
+    console.warn(`[reminders] agent unavailable: ${out.slice(0, 160).replace(/\s+/g, " ")}`);
+    if (outage) return "failed";          // already said so — do not repeat
+    outage = true;
+    await deliver(
+      "⚠️ Jarvis can't reach the model right now, so heartbeats are paused until it recovers.\n" +
+      out.slice(0, 200),
+    );
+    return "failed";
+  }
+
+  await recovered();
   await deliver(out);
   if (j.id === HEARTBEAT_ID) logSent(out);
   return "ok";
