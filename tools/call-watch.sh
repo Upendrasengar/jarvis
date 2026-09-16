@@ -51,7 +51,7 @@ autorec_on() {
 }
 
 notify() {
-  osascript -e "display notification \"$1\" with title \"Jarvis\" sound name \"Glass\"" >/dev/null 2>&1 || true
+  bash "$JARVIS_DIR/tools/notify.sh" "$1" "Jarvis"
 }
 
 # Only query browsers that are actually running — AppleScript would LAUNCH

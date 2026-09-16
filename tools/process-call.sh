@@ -51,7 +51,7 @@ cd "$SESSION"
 rm -f FAILED.txt
 trap 'code=$?; if [ $code -ne 0 ]; then
   echo "failed at line $LINENO (exit $code) — rerun: bash tools/process-call.sh reports/calls/$STAMP" > FAILED.txt
-  osascript -e "display notification \"Call processing failed — open the Calls tab to rerun\" with title \"Jarvis\"" >/dev/null 2>&1 || true
+  bash "$JARVIS_DIR/tools/notify.sh" "Call processing failed — open the Calls tab to rerun"
 fi' ERR
 
 # One processor per session. A stale lock (crash, kill -9) is reclaimed if no
@@ -77,7 +77,7 @@ trap 'rmdir .processing 2>/dev/null' EXIT
 fail_now() {   # $1 = reason shown in the UI
   echo "$1" >&2
   echo "$1 — rerun: bash tools/process-call.sh reports/calls/$STAMP" > FAILED.txt
-  osascript -e "display notification \"Call processing failed — open the Calls tab to rerun\" with title \"Jarvis\"" >/dev/null 2>&1 || true
+  bash "$JARVIS_DIR/tools/notify.sh" "Call processing failed — open the Calls tab to rerun"
   exit 1
 }
 
@@ -289,4 +289,4 @@ fi
 
 echo "notes: $NOTES"
 echo "vault: $VAULT_CALLS/call-$STAMP.md"
-osascript -e "display notification \"Call notes ready: call-notes-$STAMP.md\" with title \"Jarvis\"" >/dev/null 2>&1 || true
+bash "$JARVIS_DIR/tools/notify.sh" "Call notes ready: call-notes-$STAMP.md"

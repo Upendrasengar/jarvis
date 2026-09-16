@@ -6,6 +6,7 @@
 // stays in the server/JarvisAudio — this app only talks localhost HTTP, so
 // it needs no permissions of its own.
 import AppKit
+import UserNotifications
 
 // ── config: repo dir comes from Info.plist (templated at build time);
 // the port follows memory/settings/port.txt like everything else
@@ -69,14 +70,65 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var autorecord = true
     var startedServer = false
 
+    // Notifications used to be shelled out with `osascript display notification`
+    // from five places. Two problems with that: macOS attributes them to
+    // "osascript" rather than Jarvis, so there is nothing recognisable to grant
+    // permission to; and call-watch runs under launchd (parent PID 1), a
+    // context those notifications routinely never leave. Every call site also
+    // swallowed its own errors, so a notification that went nowhere was
+    // indistinguishable from one that arrived.
+    //
+    // This bundle is a real, signed app. It can hold the permission, it shows
+    // as "Jarvis" in System Settings, and it is already awake on a 3-second
+    // timer — so it drains a queue file that any script can append to.
+    let queueURL: URL = {
+        let dir = Bundle.main.object(forInfoDictionaryKey: "JarvisDir") as? String ?? "."
+        return URL(fileURLWithPath: dir).appendingPathComponent("data/notify-queue.jsonl")
+    }()
+    var notifyReady = false
+
+    func askForNotifications() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, err in
+            DispatchQueue.main.async {
+                self.notifyReady = granted
+                if let err = err { NSLog("[jarvisbar] notification auth error: \(err)") }
+                if !granted { NSLog("[jarvisbar] notifications not granted — enable Jarvis in System Settings › Notifications") }
+            }
+        }
+    }
+
+    // Read and TRUNCATE in one step: a notification must fire once, and a
+    // crash between the two would otherwise repeat the whole backlog.
+    func drainNotifications() {
+        guard let h = try? FileHandle(forUpdating: queueURL) else { return }
+        defer { try? h.close() }
+        guard let data = try? h.readToEnd(), !data.isEmpty else { return }
+        try? h.truncate(atOffset: 0)
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            guard let d = line.data(using: .utf8),
+                  let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                  let body = j["body"] as? String, !body.isEmpty else { continue }
+            let c = UNMutableNotificationContent()
+            c.title = (j["title"] as? String) ?? "Jarvis"
+            c.body = body
+            c.sound = (j["silent"] as? Bool == true) ? nil : .default
+            UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
+        }
+    }
+
     func applicationDidFinishLaunching(_ n: Notification) {
+        askForNotifications()
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
         item.menu = menu
         render()
         poll()
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.poll() }
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            self?.poll()
+            self?.drainNotifications()
+        }
     }
 
     func poll() {

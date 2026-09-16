@@ -88,11 +88,12 @@ export function cronMatches(expr: string, d: Date): boolean {
     ));
 }
 
+// Goes through tools/notify.sh so every surface reaches the screen the same
+// way — via JarvisBar when it is running, which is what macOS can actually
+// attribute to "Jarvis" and grant permission to.
 function notify(text: string) {
   const body = text.length > 180 ? text.slice(0, 180) + "…" : text;
-  execFile("osascript", ["-e",
-    `display notification ${JSON.stringify(body)} with title "Jarvis" sound name "Glass"`,
-  ], () => {});
+  execFile("/bin/bash", [path.join(JARVIS_DIR, "tools", "notify.sh"), body, "Jarvis"], () => {});
 }
 
 async function deliver(text: string) {
