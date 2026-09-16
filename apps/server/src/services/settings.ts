@@ -15,6 +15,10 @@ import { getAutorecord, setAutorecord } from "./calls.js";
 import { currentVoiceId, readVoices, setVoice } from "./env.js";
 import { modelFor, setModel } from "./models.js";
 
+// Kept in step with tools/whisper-model.sh; anything outside this list is not
+// a size Jarvis knows how to fetch.
+export const WHISPER_SIZES = ["tiny", "base", "small", "medium", "large-v3"];
+
 const SETTINGS_FILE = path.join(MEMORY_DIR, "settings", "ui.json");
 const WHISPER_FILE = path.join(MEMORY_DIR, "settings", "whisper-model.txt");
 const RETENTION_FILE = path.join(MEMORY_DIR, "settings", "retention-days.txt");
@@ -22,6 +26,16 @@ const VOICE_ACTIVE_FILE = path.join(JARVIS_DIR, "data", "voice-listening");
 
 function readJson(): Record<string, unknown> {
   try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")); } catch { return {}; }
+}
+
+/** Which sizes exist on disk — the picker renders from this. */
+export function listWhisperModels() {
+  return WHISPER_SIZES.map((name) => {
+    const p = path.join(JARVIS_DIR, "models", `ggml-${name}.bin`);
+    let bytes = 0;
+    try { bytes = fs.statSync(p).size; } catch { /* not installed */ }
+    return { name, installed: bytes > 0, bytes };
+  });
 }
 
 export function readSettings(): Settings {
@@ -36,7 +50,7 @@ export function readSettings(): Settings {
   return {
     voiceMode: (j.voiceMode as Settings["voiceMode"]) ?? "on-demand",
     autorecord: getAutorecord().on,
-    whisperModel: whisper === "small" || whisper === "medium" ? whisper : "base",
+    whisperModel: (WHISPER_SIZES.includes(whisper) ? whisper : "base") as Settings["whisperModel"],
     retentionDays: Math.min(90, Math.max(1, retention)),
     voice: byId?.[0] ?? vid,
     modelChat: modelFor("chat") as Settings["modelChat"],

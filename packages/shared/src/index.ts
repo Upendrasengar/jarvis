@@ -141,7 +141,10 @@ export type ModelTier = z.infer<typeof ModelTier>;
 export const Settings = z.object({
   voiceMode: VoiceMode,
   autorecord: z.boolean(),
-  whisperModel: z.enum(["base", "small", "medium"]),
+  // Must match tools/whisper-model.sh. When these drifted, a model installed
+  // from the CLI could not be represented here and the settings round-trip
+  // silently rewrote it to "base".
+  whisperModel: z.enum(["tiny", "base", "small", "medium", "large-v3"]),
   retentionDays: z.number().int().min(1).max(90),
   voice: z.string(),   // ElevenLabs preset name (or raw id)
   modelChat: ModelTier,     // the dispatcher you talk to
@@ -150,6 +153,15 @@ export const Settings = z.object({
 });
 export type Settings = z.infer<typeof Settings>;
 export const SettingsPatch = Settings.partial();
+
+// What is actually on disk, so the picker cannot offer a model that is
+// missing nor hide one that is present.
+export const WhisperModel = z.object({
+  name: z.string(),
+  installed: z.boolean(),
+  bytes: z.number(),
+});
+export type WhisperModel = z.infer<typeof WhisperModel>;
 
 export const NoteMeta = z.object({
   id: z.string(),

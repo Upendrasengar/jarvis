@@ -542,6 +542,11 @@ function VaultSection() {
 }
 
 export function SettingsPage() {
+  const { data: whisperModels = [] } = useQuery<{ name: string; installed: boolean; bytes: number }[]>({
+    queryKey: ["whisper-models"],
+    queryFn: async () => (await fetch("/api/whisper-models")).json(),
+    staleTime: 30_000,
+  });
   const { data: settings } = useSettings();
   const { data: voices } = useVoices();
   const qc = useQueryClient();
@@ -709,15 +714,27 @@ export function SettingsPage() {
                   Transcription model
                 </span>
                 <span className="text-[10.5px] text-[var(--dim)]">medium = better names, ~3× slower</span>
+                {/* Rendered from what is actually in models/ — a hardcoded list
+                    offered sizes that were not downloaded and could not show one
+                    installed from the CLI. Selecting a missing model is blocked
+                    here rather than failing later in the call pipeline. */}
                 <select
                   value={settings.whisperModel}
-                  onChange={(e) => patch.mutate({ whisperModel: e.target.value as "base" | "small" | "medium" })}
+                  onChange={(e) => patch.mutate({ whisperModel: e.target.value as typeof settings.whisperModel })}
                   className="mt-3 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none focus:border-[var(--cyan)]"
                 >
-                  <option value="medium">medium (recommended)</option>
-                  <option value="base">base (fastest)</option>
-                  <option value="small">small (faster)</option>
+                  {whisperModels.map((m) => (
+                    <option key={m.name} value={m.name} disabled={!m.installed}>
+                      {m.name}
+                      {m.installed ? ` (${(m.bytes / 1073741824).toFixed(1)} GB)` : " — not installed"}
+                    </option>
+                  ))}
                 </select>
+                {whisperModels.some((m) => !m.installed) && (
+                  <span className="mt-2 block text-[10px] text-[var(--dim)]">
+                    install another with <code>jarvis model &lt;size&gt;</code>
+                  </span>
+                )}
               </label>
               <label className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
                 <span className="block text-[13px] font-semibold text-[var(--bright)]">

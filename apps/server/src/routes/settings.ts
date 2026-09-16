@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { SettingsPatch } from "@jarvis/shared";
-import { patchSettings, readSettings, setVoiceListening, voicesInfo } from "../services/settings.js";
+import { patchSettings, readSettings, setVoiceListening, voicesInfo, listWhisperModels } from "../services/settings.js";
 import { localOnly } from "../plugins/localOnly.js";
 import { voiceActive } from "../live/liveState.js";
 import { calendarState, fetchDay, refreshCalendar } from "../integrations/calendar.js";
@@ -15,6 +15,7 @@ import { tokenStats } from "../services/tokens.js";
 
 export function settingsRoutes(app: FastifyInstance) {
   app.get("/api/settings", async () => readSettings());
+  app.get("/api/whisper-models", async () => listWhisperModels());
 
   app.post("/api/settings", { preHandler: localOnly }, async (req, reply) => {
     const body = SettingsPatch.safeParse(req.body);
