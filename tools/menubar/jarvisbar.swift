@@ -177,18 +177,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    // The icon never had a point size, so it rendered at whatever the symbol's
+    // intrinsic size happened to be — noticeably chunkier than the 16pt glyphs
+    // every other menu-bar app uses. One helper now sizes all three states
+    // identically, and clamps the drawn image to the 18pt the menu bar expects.
+    // The mascot. A brain rather than a waveform: recording calls is one
+    // capability, but most of what Jarvis does is digests, recall and notes —
+    // the icon should say assistant, not tape machine. One constant, because
+    // the idle and recording states derive from it.
+    static let glyph = "brain"
+    func icon(_ name: String, tint: NSColor?) -> NSImage? {
+        var cfg = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular, scale: .medium)
+        if let tint { cfg = cfg.applying(NSImage.SymbolConfiguration(paletteColors: [tint])) }
+        // Not every glyph has a .fill variant, and an unknown symbol name
+        // returns nil — which shows as NO icon at all. Fall back to the base
+        // name so changing the mascot can never blank the menu bar.
+        let base = NSImage(systemSymbolName: name, accessibilityDescription: "Jarvis")
+            ?? NSImage(systemSymbolName: name.replacingOccurrences(of: ".fill", with: ""),
+                       accessibilityDescription: "Jarvis")
+        let img = base?.withSymbolConfiguration(cfg)
+        img?.size = NSSize(width: 18, height: 18)
+        img?.isTemplate = (tint == nil)       // template = adapts to light/dark
+        return img
+    }
+
     func render() {
         guard let btn = item.button else { return }
         // Muted wins the icon. While the mic is off, "am I being recorded?" is
         // the question the menu bar has to answer at a glance — a red dot says
         // the opposite of the truth.
         if micMuted {
-            let cfg = NSImage.SymbolConfiguration(paletteColors: [.systemOrange])
-            let img = NSImage(systemSymbolName: "mic.slash.circle.fill",
-                              accessibilityDescription: "Jarvis — microphone muted")?
-                .withSymbolConfiguration(cfg)
-            img?.isTemplate = false
-            btn.image = img
+            btn.image = icon("mic.slash.circle.fill", tint: .systemOrange)
             // still show the counter when a call is being recorded around you:
             // the far side is captured, only your room is not
             var t = muteMinutesLeft > 0 ? " \(muteMinutesLeft)m" : ""
@@ -202,16 +221,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ])
             return
         }
-        let sym = recording ? "waveform.circle.fill" : "waveform.circle"
+        let sym = recording ? Self.glyph + ".fill" : Self.glyph
         if recording {
             // contentTintColor on status-item buttons is unreliable — paint
             // the symbol itself via a palette configuration, and the counter
             // via an attributed title. Red on ANY menu bar appearance.
-            let cfg = NSImage.SymbolConfiguration(paletteColors: [.systemRed])
-            let img = NSImage(systemSymbolName: sym, accessibilityDescription: "Jarvis recording")?
-                .withSymbolConfiguration(cfg)
-            img?.isTemplate = false
-            btn.image = img
+            btn.image = icon(sym, tint: .systemRed)
             var t = " REC"
             if let s = recStarted {
                 let secs = max(0, Int(Date().timeIntervalSince(s)))
@@ -224,9 +239,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
             ])
         } else {
-            let img = NSImage(systemSymbolName: sym, accessibilityDescription: "Jarvis")
-            img?.isTemplate = true       // adapts to light/dark menu bars
-            btn.image = img
+            btn.image = icon(sym, tint: nil)
             btn.contentTintColor = serverUp ? nil : .disabledControlTextColor
             btn.attributedTitle = NSAttributedString(string: "")
         }
