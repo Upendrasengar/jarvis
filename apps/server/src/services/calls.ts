@@ -54,11 +54,14 @@ export function listCalls(): Call[] {
       hasAudio           ? (stale ? "failed" : "processing") :
       transcript         ? "failed" : "empty";
     let lastLog = "";
+    let lastLogAge = 0;
     try {
-      const log = fs.readFileSync(path.join(sess, "process.log"), "utf8").trimEnd();
+      const lp = path.join(sess, "process.log");
+      const log = fs.readFileSync(lp, "utf8").trimEnd();
       lastLog = log.slice(log.lastIndexOf("\n") + 1).slice(0, 300);
+      lastLogAge = Date.now() - fs.statSync(lp).mtimeMs;
     } catch { /* no log yet */ }
-    out.push({ id: d, url, started, ended, status, notes, transcript, lastLog });
+    out.push({ id: d, url, started, ended, status, notes, transcript, lastLog, lastLogAge });
   }
   return out.sort((a, b) => b.id.localeCompare(a.id));
 }

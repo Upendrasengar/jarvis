@@ -6,6 +6,7 @@
 #   jarvis stop|restart|status  -> manage those services
 #   jarvis digest     -> run today's digest and print it
 #   jarvis setup      -> full dependency setup (whisper model download etc.)
+#   jarvis model [size] -> list transcription models, or pick+download one
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
 #   jarvis bar        -> open the menu-bar icon (status + record controls)
@@ -45,6 +46,12 @@ elif [[ "$1" == "telegram" ]]; then
   exec bash tools/setup-telegram.sh
 elif [[ "$1" == "init" ]]; then
   exec bash tools/init.sh
+elif [[ "$1" == "model" ]]; then
+  # Picking a transcription model and HAVING it were separate things: the
+  # setting chose which file to load, `jarvis setup` only downloaded when
+  # models/ was empty, and nothing connected the two. Selecting a size you
+  # did not have on disk left the next call failing its preflight.
+  exec bash tools/whisper-model.sh "${2:-}"
 elif [[ "$1" == "setup" ]]; then
   bash install.sh || exit $?
   # offer auto-start at login (skipped when non-interactive)

@@ -419,9 +419,11 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
                 <>
                   {/* the last processor line, so a run that has died but is
                       not yet stale does not look like healthy progress */}
-                  {call.lastLog && (
-                    <div className="mx-auto mb-2 max-w-[560px] truncate font-mono text-[10.5px] text-[var(--dim)]" title={call.lastLog}>
-                      {call.lastLog}
+                  {/* A stalled run needs a plain statement and a way out, not
+                      its shell output — the raw log lives behind the link. */}
+                  {call.lastLogAge > 3 * 60_000 && (
+                    <div className="mb-2 text-[var(--amber)]">
+                      No progress for {Math.round(call.lastLogAge / 60_000)} minutes — this run has probably stopped.
                     </div>
                   )}
                   <a href={`/logs?src=call:${call.id}`} className="text-[var(--cyan)] hover:underline">
@@ -431,7 +433,10 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
               }
             />
           )}
-          {call.status === "failed" && (
+          {/* Rerun is offered for an outright failure OR a run that has gone
+              quiet — waiting out the 30-minute staleness window before the
+              button appears is the thing that made this feel broken. */}
+          {(call.status === "failed" || (call.status === "processing" && call.lastLogAge > 3 * 60_000)) && (
             <div className="mb-4 mt-3 flex items-center gap-3">
               <button
                 onClick={async () => {

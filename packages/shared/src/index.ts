@@ -33,6 +33,10 @@ export const Call = z.object({
   // 30 minutes stale still reads as "processing", so the screen needs
   // something truer than a spinner to show.
   lastLog: z.string().default(""),
+  // ms since the processor last wrote anything. Without this, a line left
+  // over from an earlier failed run looks like live output from the current
+  // one — which is exactly the confusion lastLog was added to remove.
+  lastLogAge: z.number().default(0),
 });
 export type Call = z.infer<typeof Call>;
 
