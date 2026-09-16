@@ -10,6 +10,7 @@ import {
 } from "../services/calls.js";
 import { signalWatcher } from "../integrations/watcher.js";
 import { localOnly } from "../plugins/localOnly.js";
+import { getMicMute, setMicMute } from "../services/micMute.js";
 import { CALLS_DIR, JARVIS_DIR } from "../config.js";
 import { WORKER_PATH } from "../services/env.js";
 
@@ -68,4 +69,12 @@ export function callRoutes(app: FastifyInstance) {
 
   app.post("/api/calls/stoprec", { preHandler: localOnly }, async () => signalWatcher("stop"));
   app.post("/api/calls/startrec", { preHandler: localOnly }, async () => signalWatcher("start"));
+
+  app.get("/api/mic-mute", async () => getMicMute());
+  app.post("/api/mic-mute", { preHandler: localOnly }, async (req, reply) => {
+    const b = z.object({ on: z.boolean(), minutes: z.number().int().min(1).max(480).optional() })
+      .safeParse(req.body);
+    if (!b.success) return reply.code(400).send({ error: "bad body" });
+    return setMicMute(b.data.on, b.data.minutes ? b.data.minutes * 60e3 : undefined);
+  });
 }

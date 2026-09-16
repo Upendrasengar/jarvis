@@ -68,6 +68,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var recording = false
     var recStarted: Date?
     var autorecord = true
+    var micMuted = false
+    var muteMinutesLeft = 0
     var startedServer = false
 
     // Notifications used to be shelled out with `osascript display notification`
@@ -131,7 +133,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    func pollMute() {
+        getJSON("/api/mic-mute") { [weak self] j in
+            guard let self else { return }
+            let m = (j?["muted"] as? Bool) ?? false
+            let left = (j?["minutesLeft"] as? Int) ?? 0
+            if m != self.micMuted || left != self.muteMinutesLeft {
+                self.micMuted = m; self.muteMinutesLeft = left; self.render()
+            }
+        }
+    }
+
     func poll() {
+        pollMute()
         getJSON("/api/health") { [weak self] h in
             guard let self else { return }
             let wasUp = self.serverUp
@@ -165,6 +179,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func render() {
         guard let btn = item.button else { return }
+        // Muted wins the icon. While the mic is off, "am I being recorded?" is
+        // the question the menu bar has to answer at a glance — a red dot says
+        // the opposite of the truth.
+        if micMuted {
+            let cfg = NSImage.SymbolConfiguration(paletteColors: [.systemOrange])
+            let img = NSImage(systemSymbolName: "mic.slash.circle.fill",
+                              accessibilityDescription: "Jarvis — microphone muted")?
+                .withSymbolConfiguration(cfg)
+            img?.isTemplate = false
+            btn.image = img
+            // still show the counter when a call is being recorded around you:
+            // the far side is captured, only your room is not
+            var t = muteMinutesLeft > 0 ? " \(muteMinutesLeft)m" : ""
+            if recording, let s = recStarted {
+                let secs = max(0, Int(Date().timeIntervalSince(s)))
+                t = String(format: " %d:%02d", secs / 60, secs % 60)
+            }
+            btn.attributedTitle = NSAttributedString(string: t, attributes: [
+                .foregroundColor: NSColor.systemOrange,
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
+            ])
+            return
+        }
         let sym = recording ? "waveform.circle.fill" : "waveform.circle"
         if recording {
             // contentTintColor on status-item buttons is unreliable — paint
@@ -216,6 +253,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else if serverUp {
             menu.addItem(mk("● Record a Call Now", #selector(startRec), "r"))
         }
+        menu.addItem(mk(micMuted ? "🔇 Mic muted — \(muteMinutesLeft)m left · Unmute"
+                                 : "🎙 Mute My Mic (1 hour)", #selector(toggleMute), "m"))
         let auto = mk(autorecord ? "Auto-record Calls ✓" : "Auto-record Calls", #selector(toggleAuto), "")
         menu.addItem(auto)
         menu.addItem(.separator())
@@ -235,6 +274,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func dash() { openPage("/") }
     @objc func digest() { openPage("/digest") }
     @objc func logs() { openPage("/logs") }
+    @objc func toggleMute() {
+        postJSON("/api/mic-mute", ["on": !micMuted])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.pollMute() }
+    }
     @objc func startRec() { postJSON("/api/calls/startrec"); DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.poll() } }
     @objc func stopRec() { postJSON("/api/calls/stoprec"); DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.poll() } }
     @objc func toggleAuto() { postJSON("/api/autorecord", ["on": !autorecord]); autorecord.toggle() }

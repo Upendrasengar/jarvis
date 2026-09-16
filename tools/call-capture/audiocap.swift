@@ -124,7 +124,41 @@ final class MicRecorder {
     private var file: AVAudioFile?
     private let url: URL
 
-    init(url: URL) { self.url = url }
+    // Mute writes SILENCE rather than skipping the write. mic.wav and
+    // system16.wav are merged by timestamp afterwards, so dropping frames
+    // would shorten one channel against the other and slide every later line
+    // onto the wrong speaker. Zeroed frames keep the two timelines identical
+    // and simply contain nothing.
+    //
+    // The flag is refreshed on its own timer, never from inside the audio
+    // tap: that closure runs on the render thread, where a stat() per buffer
+    // has no business being.
+    private var muted = false
+    private var muteTimer: DispatchSourceTimer?
+    private let muteFile: URL
+
+    init(url: URL) {
+        self.url = url
+        let dir = ProcessInfo.processInfo.environment["JARVIS_DIR"] ?? FileManager.default.currentDirectoryPath
+        self.muteFile = URL(fileURLWithPath: dir).appendingPathComponent("data/mic-mute")
+    }
+
+    // File holds the epoch second the mute expires. An expired file is not
+    // muted — a mute nobody remembers setting must not silence calls forever.
+    private func readMute() -> Bool {
+        guard let t = try? String(contentsOf: muteFile, encoding: .utf8),
+              let until = Double(t.trimmingCharacters(in: .whitespacesAndNewlines)) else { return false }
+        return Date().timeIntervalSince1970 < until
+    }
+
+    private func watchMute() {
+        muted = readMute()
+        let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        t.schedule(deadline: .now() + 1, repeating: 1)
+        t.setEventHandler { [weak self] in self?.muted = self?.readMute() ?? false }
+        t.resume()
+        muteTimer = t
+    }
 
     func start() throws {
         let input = engine.inputNode
@@ -148,8 +182,14 @@ final class MicRecorder {
                 if consumed { status.pointee = .noDataNow; return nil }
                 consumed = true; status.pointee = .haveData; return buf
             }
-            if out.frameLength > 0 { try? file.write(from: out) }
+            if out.frameLength > 0 {
+                if self.muted, let ch = out.int16ChannelData {
+                    memset(ch[0], 0, Int(out.frameLength) * MemoryLayout<Int16>.size)
+                }
+                try? file.write(from: out)
+            }
         }
+        watchMute()
         try engine.start()
     }
 
