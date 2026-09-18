@@ -53,9 +53,19 @@ done
 for b in miccheck; do
   [ -f "tools/call-capture/$b.swift" ] && swiftc -O "tools/call-capture/$b.swift" -o "tools/call-capture/bin/$b" 2>/dev/null || true
 done
-codesign --force -s - tools/call-capture/JarvisAudio.app >/dev/null 2>&1 || true
-codesign --force -s - tools/menubar/JarvisBar.app >/dev/null 2>&1 || true
-ok "swift binaries built and signed"
+# Sign with the CONFIGURED identity, not ad-hoc. This step compiles into the
+# working tree, so `-s -` re-signed the developer's own installed apps ad-hoc
+# as a side effect of cutting a release — silently revoking the macOS
+# recording grants that a stable identity exists to preserve. Building a
+# release must not break the machine doing the building.
+SIGN_ID="$(head -1 memory/settings/signing-identity.txt 2>/dev/null | tr -d '\n')"
+if [ -n "$SIGN_ID" ] && ! security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  SIGN_ID=""
+fi
+SIGN_ID="${SIGN_ID:--}"
+codesign --force -s "$SIGN_ID" tools/call-capture/JarvisAudio.app >/dev/null 2>&1 || true
+codesign --force -s "$SIGN_ID" tools/menubar/JarvisBar.app >/dev/null 2>&1 || true
+ok "swift binaries built and signed${SIGN_ID:+ as '$SIGN_ID'}"
 
 echo "── production dependencies ──"
 # Built with npm rather than `pnpm deploy`: deploy requires the workspace to
