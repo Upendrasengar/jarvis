@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 10 — Publish architecture-specific Homebrew bottles
-- **Completed:** 9 of 16 tasks
+- **Current task:** blocked — Tasks 13, 15, 16 need an Apple Developer account
+- **Completed:** 12 of 16 tasks (13, 15, 16 blocked; 10 pending publication)
 
 ## Phase 1: Installation contract
 

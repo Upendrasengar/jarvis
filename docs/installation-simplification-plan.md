@@ -427,6 +427,27 @@ Dependencies: Task 9.
 
 ### Task 11: Automate release validation
 
+**Status: Complete for the single architecture this project can build.**
+`release.sh` now gates, publishes, verifies and reports.
+
+- Four gates run BEFORE anything is tagged: the doctor JSON contract, the
+  onboarding state contract, the onboarding wizard suite, and the public audit.
+  Any failure exits with nothing tagged or pushed — a release that tags first
+  and tests afterwards has already published the mistake.
+- After tagging, the published source tarball and the published engine are
+  downloaded and checked against the formula, and the engine is opened to
+  confirm it contains a server. GitHub caches tag tarballs, and this repo has
+  already shipped a release whose formula pointed at content that was not what
+  had been built.
+- Each release writes `reports/releases/v<version>.md` recording the commit,
+  checksums, and the result of every gate.
+- The dirty-tree, non-main, unpushed-main and tap-fast-forward guards are
+  unchanged and still mandatory.
+- "Either architecture failing blocks release" cannot be satisfied while only
+  one architecture can be built. The release publishes the architecture it runs
+  on; the other falls back to a source build rather than shipping something
+  unverified.
+
 The release process should build both architectures, run tests and the public
 audit, publish artifacts, update the tap, verify the downloaded archive, and
 test installation through Homebrew.
@@ -529,12 +550,31 @@ Only pursue this after Homebrew onboarding and bottles are reliable.
 
 ### Task 15: Prototype `Jarvis.app`
 
+**Status: Substantially built as JarvisBar.app; blocked on Task 13 for its
+stated success criterion.**
+
+JarvisBar already owns server lifecycle (it starts the server when down and
+stops services on quit), menu-bar state, the permission identity through
+JarvisAudio, and the web interface in a native WKWebView window with its own
+Dock icon and title. Setup is reachable at `/onboarding`.
+
+What is missing is distribution, not function: the success criterion is
+installing from a DMG without a Terminal, and an application that is not
+notarized is refused by Gatekeeper on a machine that has never seen it. That
+makes this dependent on Task 13, which needs an Apple Developer account.
+Packaging a DMG before then would produce something that cannot be opened by
+the people it is for.
+
 The native app would own server lifecycle, menu-bar behavior, setup, login
 startup, permission identity, updates, and opening the web interface.
 
 Success criterion: a user installs Jarvis from a DMG without using Terminal.
 
 ### Task 16: Add a Homebrew cask
+
+**Status: Blocked.** The first acceptance criterion is that the cask installs a
+signed, notarized application, so this cannot begin before Task 13. Nothing
+here is partially doable.
 
 Target:
 
