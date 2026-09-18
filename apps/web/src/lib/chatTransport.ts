@@ -62,6 +62,12 @@ export async function streamChatTurn(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(d),
       }).catch(() => {});
+      // The client starts the work, so it is the only thing that knows the
+      // instant a worker exists. The server announces completion
+      // (worker-result) but never a start, and the activity rows polled only
+      // while something was already running — so a new worker had nothing to
+      // reveal it and showed up only if the page happened to be reloaded.
+      window.dispatchEvent(new CustomEvent("jarvis:worker-started"));
     } catch {}
   };
 

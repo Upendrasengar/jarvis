@@ -10,7 +10,7 @@
 // It matters more now that a turn can delegate twice. A loop you can watch is
 // one you can interrupt; a silent one is indistinguishable from a hang.
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 type Run = {
   id: string; kind: string; task: string; status: string;
@@ -36,22 +36,38 @@ function elapsed(from: number, to: number | null): string {
 }
 
 export function ActivityRows({ sessionId }: { sessionId: string }) {
+  // Polling only while a run is already visible cannot start itself: a brand
+  // new worker is not in the data yet, so nothing asks for it, and the row
+  // appeared only if the page happened to be reloaded. `expecting` covers the
+  // gap between dispatching a worker and first seeing it.
+  const [expecting, setExpecting] = useState(false);
+
   const { data: runs = [], refetch } = useQuery<Run[]>({
     queryKey: ["agents"],
     queryFn: async () => (await fetch("/api/agents")).json(),
-    // poll only while something is actually running — a finished list does not
-    // need a request every two seconds
     refetchInterval: (q) =>
-      (q.state.data ?? []).some((r) => r.status === "working") ? 2000 : false,
+      expecting || (q.state.data ?? []).some((r) => r.status === "working") ? 2000 : false,
   });
 
-  // the server already announces completion over the live channel; take it
-  // rather than waiting out the poll interval
   useEffect(() => {
+    // start: dispatched by the client the moment it posts a delegation
+    const onStart = () => { setExpecting(true); void refetch(); };
+    // finish: pushed by the server over the live channel — take it rather than
+    // waiting out the interval
     const onDone = () => void refetch();
+    window.addEventListener("jarvis:worker-started", onStart);
     window.addEventListener("jarvis:worker-result", onDone);
-    return () => window.removeEventListener("jarvis:worker-result", onDone);
+    return () => {
+      window.removeEventListener("jarvis:worker-started", onStart);
+      window.removeEventListener("jarvis:worker-result", onDone);
+    };
   }, [refetch]);
+
+  // stop expecting once the run is visible, so polling can wind down again
+  useEffect(() => {
+    if (expecting && runs.some((r) => r.sessionId === sessionId && r.status === "working"))
+      setExpecting(false);
+  }, [expecting, runs, sessionId]);
 
   const mine = runs.filter(
     (r) =>
