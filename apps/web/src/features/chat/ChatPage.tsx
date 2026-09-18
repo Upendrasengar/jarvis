@@ -3,6 +3,7 @@
 // the system (node + mono eyebrow, no bubble), you transmit in capsules.
 // Voice: 🎙 fills the composer via speech recognition; 🔈 reads replies aloud.
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { cachedUiState, fetchUiState, saveUiState } from "../../lib/uiState";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
@@ -121,9 +122,15 @@ function newId() {
   return crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
 }
 
+// `hadLocal` records whether THIS origin already knew a conversation, which
+// decides whether the server's is allowed to replace it below. Read once, at
+// module load, before anything writes a new id.
+const hadLocalSession =
+  !!localStorage.getItem("jarvis_session") || !!cachedUiState().session;
+
 function sessionFromRoute(param: string | undefined): string {
   if (param && /^[0-9a-f-]{8,}$/i.test(param)) return param;
-  const saved = localStorage.getItem("jarvis_session");
+  const saved = localStorage.getItem("jarvis_session") ?? cachedUiState().session;
   if (saved) return saved;
   const id = newId();
   localStorage.setItem("jarvis_session", id);
@@ -136,7 +143,9 @@ export function ChatPage() {
   const sessionId = useMemo(() => sessionFromRoute(routeId), [routeId]);
   const { messages, send, streaming, clear, onReply } = useChatStream(sessionId);
   const [input, setInput] = useState("");
-  const [speak, setSpeak] = useState(() => localStorage.getItem("jarvis_voice") === "on");
+  const [speak, setSpeak] = useState(
+    () => (cachedUiState().voice ?? localStorage.getItem("jarvis_voice")) === "on",
+  );
   const [listening, setListening] = useState(false);
   const [pendingImgs, setPendingImgs] = useState<ChatImage[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
@@ -199,8 +208,30 @@ export function ChatPage() {
   useEffect(() => {
     if (routeId !== sessionId) navigate(`/chat/${sessionId}`, { replace: true });
     localStorage.setItem("jarvis_session", sessionId);
+    saveUiState({ session: sessionId });
     fetch(`/api/warmup?sessionId=${sessionId}`).catch(() => {});
   }, [sessionId]);
+
+  // Adopt the conversation the owner was actually in, when this origin has
+  // never seen one. That is the native window (127.0.0.1) opening for the
+  // first time while the browser (localhost) holds the real session — two
+  // origins, two localStorages, one person who does not care about the
+  // difference.
+  //
+  // Narrow on purpose: only when there was no local session AND no explicit
+  // /chat/:id in the URL. Pressing "new chat" must not be undone by the
+  // server still remembering the previous one.
+  useEffect(() => {
+    if (hadLocalSession || routeId) return;
+    let cancelled = false;
+    void fetchUiState()
+      .then((st) => {
+        if (cancelled || !st.session || st.session === sessionId) return;
+        navigate(`/chat/${st.session}`, { replace: true });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -501,7 +532,7 @@ export function ChatPage() {
             onClick={() => {
               const next = !speak;
               setSpeak(next);
-              localStorage.setItem("jarvis_voice", next ? "on" : "off");
+              saveUiState({ voice: next ? "on" : "off" });
             }}
             title="Spoken replies"
             className={`h-[38px] w-[38px] shrink-0 rounded-full border text-[14px] ${
