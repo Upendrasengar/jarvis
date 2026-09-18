@@ -275,6 +275,25 @@ Dependencies: Tasks 2–3.
 
 ### Task 7: Build `/onboarding`
 
+**Status: Complete.** Implemented by
+`apps/web/src/features/onboarding/OnboardingPage.tsx`, backed by the Task 6
+API and by `GET /api/doctor`, which spawns `tools/doctor.sh --json` rather
+than reimplementing its checks.
+
+Screen contract:
+
+- Steps come from the onboarding API, so the browser and the CLI wizard agree
+  about what is done and what is next; the page only supplies presentation.
+- Required and optional steps are labelled and styled differently, and skipping
+  an optional step says plainly that Doctor will record it as optional rather
+  than failed.
+- No credential is collected or redisplayed. Calendar readiness is proved with
+  a fetch timestamp and an event COUNT; the feed address is never shown.
+- The system check runs only when asked, because Doctor takes about eight
+  seconds, and its result is briefly cached so a repeat click is instant.
+- Only failing checks are listed with their remediation. A wall of green
+  reports nothing the user can act on.
+
 Create a guided flow:
 
 ```text

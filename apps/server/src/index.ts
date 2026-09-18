@@ -21,6 +21,7 @@ import { memoryFileRoutes } from "./routes/memoryFiles.js";
 import { backupRoutes } from "./routes/backup.js";
 import { attachmentRoutes } from "./routes/attachments.js";
 import { onboardingRoutes } from "./routes/onboarding.js";
+import { doctorRoutes } from "./routes/doctor.js";
 import { addClient, startWatching } from "./live/liveState.js";
 import { startWatchdog } from "./integrations/watchdog.js";
 import { startTelegram } from "./integrations/telegram.js";
@@ -57,6 +58,7 @@ memoryFileRoutes(app);
 backupRoutes(app);
 attachmentRoutes(app);
 onboardingRoutes(app);
+doctorRoutes(app);
 
 // Serve the built React app when it exists (production). SPA fallback: any
 // non-API GET renders index.html and the client router takes over.

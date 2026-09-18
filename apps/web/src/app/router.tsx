@@ -12,6 +12,7 @@ import { BrainPage } from "../features/brain/BrainPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { LogsPage } from "../features/logs/LogsPage";
 import { NotesPage } from "../features/notes/NotesPage";
+import { OnboardingPage } from "../features/onboarding/OnboardingPage";
 
 // The window title is how this app is identified in Mission Control, cmd-tab
 // and the Window menu. Nothing set a per-view title, so every route read
@@ -19,7 +20,7 @@ import { NotesPage } from "../features/notes/NotesPage";
 const TITLES: Record<string, string> = {
   overview: "Overview", chat: "Chat", brain: "Brain", projects: "Projects",
   calls: "Calls", actions: "Actions", digest: "Digest", settings: "Settings",
-  logs: "Activity", notes: "Notes",
+  logs: "Activity", notes: "Notes", onboarding: "Setup",
 };
 
 function PageTitle() {
@@ -50,6 +51,7 @@ export function AppRoutes() {
         <Route path="/digest/:date" element={<DigestPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/logs" element={<LogsPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/notes" element={<NotesPage />} />
         <Route path="/notes/:id" element={<NotesPage />} />
         <Route path="*" element={<Navigate to="/overview" replace />} />

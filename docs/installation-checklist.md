@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 7 — Build `/onboarding`
-- **Completed:** 6 of 16 tasks
+- **Current task:** Task 8 — Route incomplete installs into onboarding
+- **Completed:** 7 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -73,11 +73,16 @@ blocked.
     against the shared contract, asserts no secret value or extra field
     appears, rejects unknown steps and profiles without writing them, and
     proves a repeated mutation changes nothing.
-- [ ] **Task 7 — Build `/onboarding`**
-  - [ ] Implement the complete guided flow.
-  - [ ] Verify keyboard accessibility.
-  - [ ] Verify dark and light themes.
-  - [ ] Never redisplay stored secrets.
+- [x] **Task 7 — Build `/onboarding`**
+  - [x] Guided flow over the Task 6 API.
+  - [x] Works in light and dark themes (palette tokens only).
+  - [x] Keyboard navigation between steps.
+  - [x] Required and optional steps are clearly distinguished.
+  - [x] Sensitive inputs are never collected or redisplayed.
+  - [x] Calendar proves the connection with safe status only.
+  - [x] Completion opens the normal overview.
+  - Evidence: `GET /api/doctor` returns the same 23 checks as the CLI;
+    `/onboarding` serves; calendar shows fetch time and event count only.
 - [ ] **Task 8 — Route incomplete installs into onboarding**
   - [ ] Redirect only fresh/incomplete installations.
   - [ ] Preserve the existing-install experience.
