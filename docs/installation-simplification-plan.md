@@ -91,8 +91,26 @@ Dependencies: none.
 
 ### Task 3: Introduce onboarding state
 
+**Status: Complete.** Implemented by `tools/onboarding-state.mjs`, with the
+state contract verified by `tools/test-onboarding-state.mjs`.
+
 Store only non-secret progress under `memory/settings/`. Credentials remain in
 `secrets/.env`.
+
+State contract:
+
+- `memory/settings/onboarding.json` stores schema version `1`, creation and
+  update timestamps, whether a pre-existing installation was adopted, and an
+  allowlisted status for each onboarding step.
+- Step status is either `incomplete` or `complete`. Revisiting a completed
+  step marks that step incomplete without discarding later progress.
+- Reading status does not create or modify the state file. The first explicit
+  progress update writes it atomically.
+- An installation with an existing profile plus built engine dependencies and
+  web assets is adopted as complete when no state file exists. This prevents
+  upgrades from resetting established installations.
+- The state writer rejects unknown steps, unknown fields, and values that
+  resemble credentials or secret configuration.
 
 Suggested steps:
 

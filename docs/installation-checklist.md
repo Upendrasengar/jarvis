@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 3 — Introduce onboarding state
-- **Completed:** 2 of 16 tasks
+- **Current task:** Task 4 — Add the `jarvis onboard` CLI wizard
+- **Completed:** 3 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -30,10 +30,13 @@ blocked.
 
 ## Phase 2: Resumable onboarding
 
-- [ ] **Task 3 — Introduce onboarding state**
-  - [ ] Store only non-secret progress.
-  - [ ] Resume at the first incomplete step.
-  - [ ] Recognize existing installations.
+- [x] **Task 3 — Introduce onboarding state**
+  - [x] Store only non-secret progress.
+  - [x] Resume at the first incomplete step.
+  - [x] Recognize existing installations.
+  - Evidence: `tools/test-onboarding-state.mjs` verifies clean and
+    existing installations, step completion and revisiting, upgrade-safe
+    reads, schema allowlisting, and rejection of credential-like fields.
 - [ ] **Task 4 — Add the `jarvis onboard` CLI wizard**
   - [ ] Check the system and Claude Code.
   - [ ] Configure the user profile and optional modules.
@@ -135,6 +138,7 @@ blocked.
 |---|---|---|---|
 | 2026-09-18 | Task 1 — Installation contract | `d0a3ee5` | `docs/install.md`, `docs/support-matrix.md` |
 | 2026-09-18 | Task 2 — Machine-readable Doctor | This commit | `tools/doctor.sh`, `tools/tests/doctor-json.test.sh` |
+| 2026-09-18 | Task 3 — Resumable onboarding state | This commit | `tools/onboarding-state.mjs`, `tools/test-onboarding-state.mjs` |
 
 ## Update rule
 
