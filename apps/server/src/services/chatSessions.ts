@@ -200,6 +200,69 @@ export function getSession(sessionId: string): Session {
 // paraphrases the spoken prose and the screen loses every bullet.
 const sessionResults = new Map<string, Array<{ task: string; answer: string; spoken: string }>>();
 
+// ── delegation rounds ──────────────────────────────────────────────────────
+// A turn used to be one-shot: ask → delegate once → relay whatever came back.
+// If the worker searched the wrong place or found nothing, that miss WAS the
+// answer. Letting the dispatcher look again is the single biggest difference
+// between relaying and actually answering.
+//
+// The cap is enforced HERE rather than in the prompt. A limit the model is
+// merely asked to respect is not a limit — it is a suggestion that holds until
+// the one time it matters.
+export const MAX_ROUNDS = 2;
+
+type TurnState = { rounds: number; lastTask: string; startedAt: number };
+const turnState = new Map<string, TurnState>();
+const TURN_BUDGET_MS = 5 * 60e3;
+
+/** A real user message starts a new turn; a delivery prompt continues one. */
+export function beginTurn(sessionId: string, internal: boolean) {
+  if (!sessionId || internal) return;
+  turnState.set(sessionId, { rounds: 0, lastTask: "", startedAt: Date.now() });
+}
+
+export function roundsLeft(sessionId: string): number {
+  const t = turnState.get(sessionId);
+  if (!t) return MAX_ROUNDS;
+  if (Date.now() - t.startedAt > TURN_BUDGET_MS) return 0;   // slow chain — stop
+  return Math.max(0, MAX_ROUNDS - t.rounds);
+}
+
+/**
+ * Claim a round for this task. Refuses when the budget is gone, and when the
+ * task repeats the previous one — a worker that found nothing being asked the
+ * same question again is the classic way a loop spins without progressing.
+ */
+export function claimRound(sessionId: string, task: string): { ok: true } | { ok: false; why: string } {
+  if (!sessionId) return { ok: true };                        // not a chat turn
+  const t = turnState.get(sessionId) ?? { rounds: 0, lastTask: "", startedAt: Date.now() };
+  if (Date.now() - t.startedAt > TURN_BUDGET_MS)
+    return { ok: false, why: "this turn has been running too long — answer with what you have" };
+  if (t.rounds >= MAX_ROUNDS)
+    return { ok: false, why: `no delegation attempts left (limit ${MAX_ROUNDS} per question)` };
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  if (t.lastTask && norm(task) === norm(t.lastTask))
+    return { ok: false, why: "that is the same task the last worker already ran — try a different angle or answer directly" };
+  t.rounds += 1;
+  t.lastTask = task;
+  turnState.set(sessionId, t);
+  return { ok: true };
+}
+
+/**
+ * The line appended to a delivery turn telling the dispatcher what it has
+ * left. Lives here because there are two entry points — the HTTP route and
+ * Telegram's direct sendTurn — and their delivery prompts have already drifted
+ * into different strings once.
+ */
+export function budgetNote(sessionId: string, internal: boolean): string {
+  if (!internal) return "";
+  const left = roundsLeft(sessionId);
+  return left > 0
+    ? `\n\n[You may delegate ONCE more only if the worker clearly fell short — wrong file, nothing found, or an obvious follow-up the owner would ask next. ${left} of ${MAX_ROUNDS} attempt(s) left. Otherwise answer now.]`
+    : "\n\n[No delegation attempts left. Answer with what you have and say plainly what is still unknown.]";
+}
+
 export function recordResult(sessionId: string, task: string, answer: string, spoken = "") {
   if (!sessionId || !answer?.trim()) return;
   const arr = sessionResults.get(sessionId) ?? [];

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { ChatRef } from "@jarvis/shared";
-import { getSession, sendTurn } from "../services/chatSessions.js";
+import { beginTurn, budgetNote, getSession, sendTurn } from "../services/chatSessions.js";
 import { agentList, agentLog, agentStop, dispatchDelegate, spawnAgent } from "../services/agents.js";
 import { currentVoiceId, readSecrets, CLAUDE } from "../services/env.js";
 import { localOnly } from "../plugins/localOnly.js";
@@ -20,6 +20,11 @@ const ChatBody = z.object({
   images: z.array(z.string().max(7_000_000)).max(4).optional(),
   // @-mentioned notes/calls, resolved to paths below
   refs: z.array(ChatRef).max(8).optional(),
+  // true when Jarvis is prompting itself to deliver a worker result. An
+  // explicit flag rather than matching the prompt text: the two delivery
+  // prompts in this codebase have already drifted into completely different
+  // strings, so anything keyed on their wording would break silently.
+  internal: z.boolean().optional(),
 });
 
 // Turn @-mentions into exact paths for the dispatcher to hand its worker.
@@ -78,7 +83,15 @@ export function chatRoutes(app: FastifyInstance) {
     });
 
     let emitted = false;
-    const withRefs = refBlock(body.data.refs) + body.data.message;
+    const internal = body.data.internal === true;
+    beginTurn(body.data.sessionId, internal);
+
+    // Between rounds, tell the dispatcher what it has left. The bar is
+    // deliberately high — "clearly fell short" — because delegating again
+    // always feels safer to a model than committing to an answer, and a
+    // second identical attempt costs a minute and teaches nothing.
+    const withRefs = refBlock(body.data.refs) + body.data.message
+      + budgetNote(body.data.sessionId, internal);
     const r = sendTurn(body.data.sessionId, withRefs, {
       onText: (t) => { emitted = true; try { res.write(`data: ${JSON.stringify(t)}\n\n`); } catch {} },
       onDone: (finalText) => {

@@ -11,7 +11,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { JARVIS_DIR } from "../config.js";
 import { readSecrets } from "../services/env.js";
-import { sendTurn } from "../services/chatSessions.js";
+import { beginTurn, budgetNote, sendTurn } from "../services/chatSessions.js";
 import { dispatchDelegate } from "../services/agents.js";
 import { onEvent } from "../live/liveState.js";
 import { createFromAction, setReminderSender } from "./reminders.js";
@@ -20,7 +20,8 @@ import { findAction } from "@jarvis/shared";
 const SESSION = "telegram";
 const DELIVER_PROMPT =
   "A background worker just finished and its result was recorded in your pending context. " +
-  "Relay the outcome to me now, concisely. Do not delegate again.";
+  "Relay the outcome to me now, concisely. Whether you may look again is stated " +
+  "at the end of this message — do not assume either way.";
 
 let token = "";
 let ownerChat = "";
@@ -53,10 +54,11 @@ async function say(text: string) {
 
 // One full assistant turn: stream to completion, handle ACTION:DELEGATE the
 // same way the dashboard does (strip the line, dispatch the worker).
-function runTurn(message: string): Promise<string> {
+function runTurn(message: string, internal = false): Promise<string> {
+    beginTurn(SESSION, internal);
   return new Promise((resolve) => {
     let acc = "";
-    const r = sendTurn(SESSION, message, {
+    const r = sendTurn(SESSION, message + budgetNote(SESSION, internal), {
       onText: (t) => { acc += t; },
       onDone: (finalText) => {
         let out = finalText ?? acc;
@@ -158,7 +160,7 @@ export function startTelegram() {
   // result to the phone instead of leaving dead air after "On it"
   onEvent((e: any) => {
     if (e?.type === "worker-result" && e?.sessionId === SESSION)
-      runTurn(DELIVER_PROMPT).then((t) => say(spokenForm(t))).catch(() => {});
+      runTurn(DELIVER_PROMPT, true).then((t) => say(spokenForm(t))).catch(() => {});
   });
   setReminderSender(say);   // reminders fire through the same owner chat
   void pollLoop();

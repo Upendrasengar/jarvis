@@ -42,6 +42,7 @@ export async function streamChatTurn(
   onText?: (visible: string) => void,
   images?: string[],
   refs?: ChatRef[],
+  internal = false,
 ): Promise<string> {
   let full = "";
   let errText = "";
@@ -88,7 +89,7 @@ export async function streamChatTurn(
     const r = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, sessionId, images, refs }),
+      body: JSON.stringify({ message, sessionId, images, refs, internal }),
     });
     if (!r.ok || !r.body) throw new Error(`chat → ${r.status}`);
 

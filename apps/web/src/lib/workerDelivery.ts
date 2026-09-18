@@ -40,7 +40,7 @@ export function useWorkerDelivery() {
       retries = 0;
       const sid = currentSessionId();
       try {
-        const reply = await streamChatTurn(sid, DELIVER_PROMPT);
+        const reply = await streamChatTurn(sid, DELIVER_PROMPT, undefined, undefined, undefined, true);
         if (!reply) return;
         appendTranscript(sid, [{ c: "jarvis", t: reply }]);
         window.dispatchEvent(new Event("jarvis:transcript"));

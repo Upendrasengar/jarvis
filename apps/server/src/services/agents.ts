@@ -16,6 +16,7 @@ import { recordResult } from "./chatSessions.js";
 import { SCREEN_FORMAT } from "@jarvis/shared";
 import { pushEvent } from "../live/liveState.js";
 import { modelFor } from "./models.js";
+import { claimRound, recordResult as recordTurnResult } from "./chatSessions.js";
 
 // How much of a worker report survives into the chat context.
 const ANSWER_CAP = 4000;
@@ -261,6 +262,15 @@ function autoDistill(content: string) {
 export function dispatchDelegate(d: { type?: string; project?: string; task?: string }, sessionId = "") {
   const task = (d?.task ?? "").trim();
   if (!task) return { error: "empty task" };
+  // The budget is spent here, at the only door every delegation goes through.
+  // A refusal is recorded as a RESULT rather than thrown away, so the
+  // dispatcher sees it in context on the next turn and has to answer with what
+  // it already has instead of silently trying again.
+  const claim = claimRound(sessionId, task);
+  if (!claim.ok) {
+    recordTurnResult(sessionId, task, `Delegation refused: ${claim.why}.`);
+    return { error: claim.why };
+  }
   if (d.type === "voice") {
     const r = setVoice(task);
     const answer = "error" in r ? r.error : `Voice changed to ${r.name}.`;
