@@ -543,6 +543,36 @@ function BackupSection() {
 
 // where the knowledge tree lives — the one folder holding Calls/Notes/
 // Digests/Topics/Memory as Obsidian markdown
+// Setup is reachable after the fact: an install that skipped meeting recording
+// or the calendar should be able to come back and add it without reinstalling
+// or remembering a CLI command.
+function SetupSection() {
+  const { data } = useQuery<{ setupComplete: boolean; steps: { id: string; status: string; required: boolean }[] }>({
+    queryKey: ["onboarding"],
+    queryFn: async () => (await fetch("/api/onboarding")).json(),
+    staleTime: 30_000,
+  });
+  const optionalLeft = (data?.steps ?? []).filter((x) => !x.required && x.status !== "complete").length;
+  return (
+    <section className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+      <div className="text-[13px] font-semibold text-[var(--bright)]">Setup</div>
+      <div className="mt-1 text-[10.5px] text-[var(--dim)]">
+        {data?.setupComplete
+          ? optionalLeft
+            ? `Core setup is done. ${optionalLeft} optional step${optionalLeft === 1 ? "" : "s"} not configured.`
+            : "Everything is configured."
+          : "Core setup is incomplete."}
+      </div>
+      <a
+        href="/onboarding"
+        className="mt-3 inline-block rounded-full border border-[var(--cyan)] px-4 py-1.5 text-[12px] text-[var(--cyan)] no-underline hover:bg-[var(--cyan-2)]"
+      >
+        Open setup
+      </a>
+    </section>
+  );
+}
+
 function VaultSection() {
   const { data } = useQuery<{ dir: string | null; default: string }>({
     queryKey: ["vault"],
@@ -887,6 +917,8 @@ export function SettingsPage() {
           </section>
 
           <RemindersSection />
+
+          <SetupSection />
 
           <VaultSection />
 

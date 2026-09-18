@@ -314,6 +314,23 @@ Dependencies: Task 6.
 
 ### Task 8: Route incomplete installs into onboarding
 
+**Status: Complete.** The gate lives in `apps/web/src/app/router.tsx`, backed
+by `setupComplete` from the onboarding API, with a reopen entry point in
+Settings.
+
+Gate contract:
+
+- `setupComplete` counts only REQUIRED steps — `system`, `claude`, `profile`,
+  `vault`. Optional steps and unconfigured integrations never hold it open.
+  Required-ness is decided on the server so the redirect and the setup screen
+  cannot hold different opinions about whether setup is finished.
+- The redirect fires only from `/` and `/overview`. Navigating anywhere
+  deliberately is never overridden, so setup can be left at any moment.
+- A server that cannot answer does not redirect, so an API failure cannot
+  strand someone in setup.
+- Settings carries a Setup section that reports outstanding optional steps and
+  reopens the flow, so a skipped module can be added later without a CLI.
+
 Acceptance criteria:
 
 - Fresh installs enter onboarding.

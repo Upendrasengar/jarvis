@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 8 — Route incomplete installs into onboarding
-- **Completed:** 7 of 16 tasks
+- **Current task:** Task 9 — Produce prebuilt engine artifacts
+- **Completed:** 8 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -83,10 +83,15 @@ blocked.
   - [x] Completion opens the normal overview.
   - Evidence: `GET /api/doctor` returns the same 23 checks as the CLI;
     `/onboarding` serves; calendar shows fetch time and event count only.
-- [ ] **Task 8 — Route incomplete installs into onboarding**
-  - [ ] Redirect only fresh/incomplete installations.
-  - [ ] Preserve the existing-install experience.
-  - [ ] Allow onboarding to be reopened from Settings.
+- [x] **Task 8 — Route incomplete installs into onboarding**
+  - [x] Fresh installs enter onboarding.
+  - [x] Existing installs continue opening normally.
+  - [x] Settings reopens onboarding.
+  - [x] Failed optional integrations never trap the user.
+  - Evidence: `apps/server/test/onboarding.test.ts` proves an incomplete
+    optional step leaves `setupComplete` true while an incomplete required
+    step forces it false; this install reports `setupComplete: true` and is
+    not redirected.
 
 ### Browser checkpoint
 

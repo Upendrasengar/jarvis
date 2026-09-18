@@ -1,6 +1,7 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Layout } from "./Layout";
 import { CallsPage } from "../features/calls/CallsPage";
 import { ActionsPage } from "../features/actions/ActionsPage";
@@ -32,10 +33,34 @@ function PageTitle() {
   return null;
 }
 
+// A fresh install should land in setup; an established one never should.
+//
+// The gate consults setupComplete, which counts only REQUIRED steps — if an
+// optional integration counted, declining the calendar would bounce you back
+// into onboarding on every launch with no way out. It also only ever redirects
+// from the landing route: navigating anywhere deliberately is never overridden,
+// so setup can be left at any point without a fight.
+function SetupGate() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { data } = useQuery<{ setupComplete: boolean }>({
+    queryKey: ["onboarding"],
+    queryFn: async () => (await fetch("/api/onboarding")).json(),
+    staleTime: 60_000,
+    retry: false,          // a server that cannot answer must not strand anyone
+  });
+  useEffect(() => {
+    if (!data || data.setupComplete) return;
+    if (pathname === "/" || pathname === "/overview") navigate("/onboarding", { replace: true });
+  }, [data, pathname, navigate]);
+  return null;
+}
+
 export function AppRoutes() {
   return (
     <>
       <PageTitle />
+      <SetupGate />
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/overview" replace />} />

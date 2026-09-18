@@ -184,6 +184,8 @@ export const OnboardingStep = z.object({
   id: z.string(),
   status: OnboardingStepStatus,
   completedAt: z.string().nullable(),
+  // required steps gate a working install; optional ones never block
+  required: z.boolean(),
 });
 export const InstallationProfile = z.enum(["core", "meetings", "full"]);
 export type InstallationProfile = z.infer<typeof InstallationProfile>;
@@ -195,6 +197,8 @@ export const OnboardingStatus = z.object({
   adoptedExistingInstall: z.boolean(),
   steps: z.array(OnboardingStep),
   nextStep: z.string().nullable(),
+  // nothing REQUIRED outstanding — the only thing the redirect consults
+  setupComplete: z.boolean(),
   profile: InstallationProfile.nullable(),
   integrations: z.record(z.string(), z.object({ configured: z.boolean() })),
 });

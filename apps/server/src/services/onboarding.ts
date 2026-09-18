@@ -23,6 +23,13 @@ export type Profile = (typeof PROFILES)[number];
 
 const PROFILE_FILE = path.join(MEMORY_DIR, "settings", "installation-profile.txt");
 
+// Which steps actually gate a working install. This lives on the server rather
+// than in the setup screen because the REDIRECT depends on it: if an optional
+// step counted, declining the calendar would send you back to onboarding every
+// time you opened Jarvis, with no way out. Optional means optional — Doctor
+// records it, nothing blocks on it.
+const REQUIRED_STEPS = new Set(["system", "claude", "profile", "vault"]);
+
 type StepStatus = { status: "complete" | "incomplete"; completedAt?: string };
 type StateModule = {
   ONBOARDING_STEPS: string[];
@@ -83,7 +90,12 @@ export async function onboardingStatus() {
       id,
       status: s.steps[id]?.status ?? "incomplete",
       completedAt: s.steps[id]?.completedAt ?? null,
+      required: REQUIRED_STEPS.has(id),
     })),
+    // True once nothing REQUIRED is outstanding. This is what decides whether
+    // a fresh install is sent to setup, so it deliberately ignores optional
+    // steps and integrations.
+    setupComplete: [...REQUIRED_STEPS].every((id) => s.steps[id]?.status === "complete"),
     // The screen needs to know where to resume; null means nothing is left.
     nextStep: s.nextStep,
     profile: readProfile(),

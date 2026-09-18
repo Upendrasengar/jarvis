@@ -50,6 +50,35 @@ describe("onboarding api", () => {
     expect((await post("/api/onboarding/profile", { profile: "enormous" })).status).toBe(400);
   });
 
+  it("setupComplete ignores optional steps, so they cannot trap the user", async () => {
+    const before = S.OnboardingStatus.parse(await get("/api/onboarding"));
+    const optional = before.steps.find((x) => !x.required);
+    expect(optional).toBeTruthy();
+    const wasComplete = optional!.status === "complete";
+
+    // leaving an optional step undone must not hold setup open — that is what
+    // would bounce someone back into onboarding on every launch
+    await post("/api/onboarding/step", { step: optional!.id, status: "incomplete" });
+    const withOptionalOpen = S.OnboardingStatus.parse(await get("/api/onboarding"));
+    const requiredAllDone = withOptionalOpen.steps
+      .filter((x) => x.required).every((x) => x.status === "complete");
+    expect(withOptionalOpen.setupComplete).toBe(requiredAllDone);
+
+    if (wasComplete) await post("/api/onboarding/step", { step: optional!.id, status: "complete" });
+  });
+
+  it("a required step held open keeps setup incomplete", async () => {
+    const before = S.OnboardingStatus.parse(await get("/api/onboarding"));
+    const req = before.steps.find((x) => x.required);
+    expect(req).toBeTruthy();
+    const wasComplete = req!.status === "complete";
+
+    await post("/api/onboarding/step", { step: req!.id, status: "incomplete" });
+    expect(S.OnboardingStatus.parse(await get("/api/onboarding")).setupComplete).toBe(false);
+
+    if (wasComplete) await post("/api/onboarding/step", { step: req!.id, status: "complete" });
+  });
+
   it("repeating a mutation is a no-op", async () => {
     const before = S.OnboardingStatus.parse(await get("/api/onboarding"));
     const step = before.steps[0].id;

@@ -14,28 +14,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-type Step = { id: string; status: "complete" | "incomplete"; completedAt: string | null };
+type Step = { id: string; status: "complete" | "incomplete"; completedAt: string | null; required: boolean };
 type Status = {
   steps: Step[];
   nextStep: string | null;
   profile: "core" | "meetings" | "full" | null;
+  setupComplete: boolean;
   adoptedExistingInstall: boolean;
   integrations: Record<string, { configured: boolean }>;
 };
 type Check = { id: string; label: string; section: string; status: string; message: string; remediation: string };
 
-// The state module owns the step ids; this is only how they are presented.
-// `required` is the honest part: everything below the line can be skipped and
-// Jarvis still works.
-const PLAN: Record<string, { title: string; blurb: string; required: boolean }> = {
-  system:   { title: "System check",      blurb: "Confirm the tools Jarvis needs are installed and healthy.", required: true },
-  claude:   { title: "Claude Code",       blurb: "Jarvis thinks with Claude Code. It needs to be installed and signed in.", required: true },
-  profile:  { title: "Who you are",       blurb: "Your name and role, so Jarvis writes notes about the right person.", required: true },
-  vault:    { title: "Your vault",        blurb: "Where notes, calls and memory are stored on disk.", required: true },
-  calendar: { title: "Calendar",          blurb: "Lets Jarvis see meetings and prepare for them. Configured in Settings.", required: false },
-  meetings: { title: "Meeting recording", blurb: "Record calls and transcribe them locally. Needs microphone and screen permissions.", required: false },
-  service:  { title: "Start at login",    blurb: "Keep Jarvis running in the background so calls are captured.", required: false },
-  complete: { title: "Ready",             blurb: "Everything is set up.", required: true },
+// Presentation only. Which steps are REQUIRED is decided by the server, since
+// the redirect depends on it — a second opinion here could send someone into
+// setup the gate thinks they have finished.
+const PLAN: Record<string, { title: string; blurb: string }> = {
+  system:   { title: "System check",      blurb: "Confirm the tools Jarvis needs are installed and healthy.", },
+  claude:   { title: "Claude Code",       blurb: "Jarvis thinks with Claude Code. It needs to be installed and signed in.", },
+  profile:  { title: "Who you are",       blurb: "Your name and role, so Jarvis writes notes about the right person.", },
+  vault:    { title: "Your vault",        blurb: "Where notes, calls and memory are stored on disk.", },
+  calendar: { title: "Calendar",          blurb: "Lets Jarvis see meetings and prepare for them. Configured in Settings.", },
+  meetings: { title: "Meeting recording", blurb: "Record calls and transcribe them locally. Needs microphone and screen permissions.", },
+  service:  { title: "Start at login",    blurb: "Keep Jarvis running in the background so calls are captured.", },
+  complete: { title: "Ready",             blurb: "Everything is set up.", },
 };
 
 export function OnboardingPage() {
@@ -85,7 +86,8 @@ export function OnboardingPage() {
 
   const done = steps.filter((s) => s.status === "complete").length;
   const current = steps.find((s) => s.id === active) ?? steps[0];
-  const plan = PLAN[current?.id ?? ""] ?? { title: current?.id ?? "", blurb: "", required: false };
+  const plan = PLAN[current?.id ?? ""] ?? { title: current?.id ?? "", blurb: "" };
+  const required = current?.required ?? true;
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1040px] gap-6 px-6 py-8 font-sans">
@@ -101,7 +103,7 @@ export function OnboardingPage() {
           SETUP · {done}/{steps.length}
         </div>
         {steps.map((s) => {
-          const p = PLAN[s.id] ?? { title: s.id, required: false };
+          const p = PLAN[s.id] ?? { title: s.id };
           const on = s.id === active;
           return (
             <button
@@ -118,7 +120,7 @@ export function OnboardingPage() {
                 }`}
               />
               <span className="min-w-0 flex-1 truncate">{p.title}</span>
-              {!p.required && (
+              {!s.required && s.id !== "complete" && (
                 <span className="shrink-0 font-mono text-[8.5px] uppercase tracking-[1px] opacity-60">
                   optional
                 </span>
@@ -134,13 +136,15 @@ export function OnboardingPage() {
           <h1 className="text-[19px] font-semibold text-[var(--bright)] [font-family:var(--display)]">
             {plan.title}
           </h1>
+          {current?.id !== "complete" && (
           <span className={`rounded-full border px-2 py-[1px] text-[9.5px] uppercase tracking-[1px] ${
-            plan.required
+            required
               ? "border-[var(--line)] text-[var(--dim)]"
               : "border-[var(--indigo-3)] bg-[var(--indigo-2)] text-[var(--indigo)]"
           }`}>
-            {plan.required ? "required" : "optional"}
+            {required ? "required" : "optional"}
           </span>
+          )}
         </div>
         <p className="mt-2 text-[13px] leading-relaxed text-[var(--dim)]">{plan.blurb}</p>
 
@@ -177,7 +181,7 @@ export function OnboardingPage() {
             >
               {current.status === "complete" ? "Mark not done" : "Mark done"}
             </button>
-            {!plan.required && (
+            {!required && (
               <span className="text-[11px] text-[var(--dim)]">
                 Skipping is fine — Jarvis works without this, and Doctor will list it as optional.
               </span>
