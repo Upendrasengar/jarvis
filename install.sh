@@ -80,7 +80,7 @@ else
 </plist>
 PLIST
   if swiftc -O tools/call-capture/audiocap.swift -o "$APPD/MacOS/audiocap" 2>/tmp/jarvis-swift-err \
-     && codesign --force -s - tools/call-capture/JarvisAudio.app 2>>/tmp/jarvis-swift-err; then
+     && codesign --force -s "$SIGN_ID" tools/call-capture/JarvisAudio.app 2>>/tmp/jarvis-swift-err; then
     ok "JarvisAudio.app built + signed"
   else bad "JarvisAudio.app build failed — see /tmp/jarvis-swift-err"; fi
 fi
@@ -127,7 +127,7 @@ PLIST
     rm -rf "$(dirname "$ISET")"
   fi
   if swiftc -O tools/menubar/jarvisbar.swift -o "$BARD/MacOS/jarvisbar" 2>/tmp/jarvis-swift-err \
-     && codesign --force -s - tools/menubar/JarvisBar.app 2>>/tmp/jarvis-swift-err; then
+     && codesign --force -s "$SIGN_ID" tools/menubar/JarvisBar.app 2>>/tmp/jarvis-swift-err; then
     ok "JarvisBar.app built + signed (menu-bar icon)"
   else bad "JarvisBar.app build failed — see /tmp/jarvis-swift-err"; fi
 fi
@@ -184,6 +184,18 @@ if [[ -x "$APPD/MacOS/audiocap" ]]; then
   fi
   grep -q "microphone: granted" <<<"$PERMS" && ok "microphone granted to Jarvis Audio" || warn "microphone not granted to Jarvis Audio yet (calls still record via the legacy path meanwhile)"
 fi
+
+# Signing identity: a stable one keeps macOS recording grants alive across
+# rebuilds. Ad-hoc ("-") has no identity, so TCC binds to the binary hash and
+# every rebuild silently revokes Screen Recording and Microphone.
+SIGN_ID="$(head -1 memory/settings/signing-identity.txt 2>/dev/null | tr -d '\n')"
+if [ -n "$SIGN_ID" ] && ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  warn "signing identity '$SIGN_ID' is configured but not in the keychain — falling back to ad-hoc"
+  SIGN_ID=""
+fi
+SIGN_ID="${SIGN_ID:--}"
+[ "$SIGN_ID" = "-" ] && warn "signing ad-hoc — recording permissions reset on every rebuild (fix: jarvis sign create)" \
+                     || ok "signing as '$SIGN_ID'"
 
 echo "── whisper model ──"
 WANT="$(head -1 memory/settings/whisper-model.txt 2>/dev/null || head -1 memory.example/settings/whisper-model.txt)"

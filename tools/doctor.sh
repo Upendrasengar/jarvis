@@ -98,6 +98,28 @@ for spec in "audiocap|Audio capture helper|tools/call-capture/bin/audiocap" "mic
     add_check "$id" "$label" "native helpers (optional)" optional "$label is not built" "Run 'jarvis setup' to build optional native helpers."
   fi
 done
+# Signing identity. Ad-hoc signing carries no identity, so macOS binds
+# recording grants to the exact binary hash and every rebuild silently revokes
+# them. This machine lost system audio on two calls and its own microphone on
+# eight before anyone noticed, so it earns a check of its own.
+if [[ -d "$ROOT/tools/menubar/JarvisBar.app" || -d "$ROOT/tools/call-capture/JarvisAudio.app" ]]; then
+  SIGN_WANT="$(head -1 "$ROOT/memory/settings/signing-identity.txt" 2>/dev/null | tr -d '\n')"
+  SIGN_APP="$ROOT/tools/call-capture/JarvisAudio.app"
+  [[ -d "$SIGN_APP" ]] || SIGN_APP="$ROOT/tools/menubar/JarvisBar.app"
+  SIGN_KIND="$(codesign -dv "$SIGN_APP" 2>&1 | sed -n 's/^Signature=//p' | head -1)"
+  if [[ "$SIGN_KIND" == "adhoc" ]]; then
+    add_check signing-identity "Signing identity" "meetings (optional)" warning \
+      "Native apps are signed ad-hoc, so macOS recording permissions reset on every rebuild" \
+      "Run 'jarvis sign create', then 'jarvis setup', and re-grant recording once."
+  elif [[ -n "$SIGN_KIND" ]]; then
+    add_check signing-identity "Signing identity" "meetings (optional)" pass \
+      "Native apps carry a stable signature${SIGN_WANT:+ ($SIGN_WANT)}" ""
+  else
+    add_check signing-identity "Signing identity" "meetings (optional)" warning \
+      "Native apps are unsigned" "Run 'jarvis sign create', then 'jarvis setup'."
+  fi
+fi
+
 if [[ -x "$ROOT/tools/call-capture/JarvisAudio.app/Contents/MacOS/audiocap" ]]; then
   add_check recording-permissions "Recording permissions" "meetings (optional)" warning "Recording permissions are not queried by read-only Doctor" "Open System Settings → Privacy & Security and verify Microphone and Screen Recording for Jarvis Audio."
 else

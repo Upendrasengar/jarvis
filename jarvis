@@ -9,6 +9,7 @@
 #   jarvis doctor [--json] -> read-only health report
 #   jarvis onboard [--non-interactive] -> resumable first-run setup
 #   jarvis model [size] -> list transcription models, or pick+download one
+#   jarvis sign [create] -> stable code-signing identity (keeps mac permissions)
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
 #   jarvis bar        -> open the menu-bar icon (status + record controls)
@@ -56,6 +57,10 @@ elif [[ "$1" == "telegram" ]]; then
   exec bash tools/setup-telegram.sh
 elif [[ "$1" == "init" ]]; then
   exec bash tools/init.sh
+elif [[ "$1" == "sign" ]]; then
+  # A stable signing identity is what stops every rebuild revoking the
+  # recording permissions macOS grants to Jarvis Audio.
+  exec bash tools/signing-identity.sh "${2:-status}"
 elif [[ "$1" == "model" ]]; then
   # Picking a transcription model and HAVING it were separate things: the
   # setting chose which file to load, `jarvis setup` only downloaded when
