@@ -31,8 +31,46 @@ on_interrupt() {
 trap on_interrupt INT TERM
 
 state_json() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" status; }
+
+# Read the next step, and fail in a language a person can act on.
+#
+# This used to pipe straight into JSON.parse. When the producer wrote nothing
+# — a missing state tool, an unreadable state file, a half-finished install —
+# the owner got a V8 stack trace ending in "Unexpected end of JSON input",
+# which says nothing about what to do. The parse error was never the problem;
+# it was the only thing that spoke up.
 next_step() {
-  state_json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s).nextStep;process.stdout.write(n??"")})'
+  local out
+  local err="${TMPDIR:-/tmp}/jarvis-onboard-state.$$.err"
+  if ! out="$(state_json 2>"$err")"; then
+    echo "onboarding: could not read progress state" >&2
+    # A node stack trace is 20 lines of frames wrapped around one useful
+    # sentence. Print the sentence.
+    if grep -q 'MODULE_NOT_FOUND\|Cannot find module' "$err"; then
+      echo "  the onboarding tool is missing: $STATE_TOOL" >&2
+      echo "  the install looks incomplete — run: jarvis setup" >&2
+    else
+      grep -m3 -E '^[A-Za-z].*(Error|error|Cannot|cannot)' "$err" | sed 's/^/  /' >&2 \
+        || head -3 "$err" | sed 's/^/  /' >&2
+      echo "  state file: $DATA_DIR/memory/settings/onboarding.json" >&2
+    fi
+    rm -f "$err"
+    return 1
+  fi
+  rm -f "$err"
+  if [[ -z "${out//[[:space:]]/}" ]]; then
+    echo "onboarding: progress state came back empty" >&2
+    echo "  tool: $STATE_TOOL" >&2
+    echo "  If the install is incomplete, run: jarvis setup" >&2
+    return 1
+  fi
+  printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+    let j; try { j = JSON.parse(s); } catch {
+      process.stderr.write("onboarding: progress state is not valid JSON\n");
+      process.exit(1);
+    }
+    process.stdout.write(j.nextStep ?? "");
+  })'
 }
 complete_step() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" complete "$1" >/dev/null; }
 revisit_step() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" revisit "$1" >/dev/null; }
