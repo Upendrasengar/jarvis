@@ -94,11 +94,21 @@ html.light body {
   background: var(--bg); /* flat white — no wash, per owner */
 }
 
-/* one hairline scrollbar everywhere */
+/* One hairline scrollbar everywhere, and only while the pointer is in the
+   region it scrolls.
+   The chat log is a max-width column centred in the window, so its scrollbar
+   sits at the column's edge rather than the window's. Drawn permanently, that
+   is not read as a control — it is read as a vertical rule down the middle of
+   the page. Fading it out costs nothing: the track still reserves its width,
+   so nothing reflows when it appears. */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(95, 137, 173, 0.28); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 10px; transition: background 140ms ease; }
+:hover::-webkit-scrollbar-thumb { background: rgba(95, 137, 173, 0.28); }
 ::-webkit-scrollbar-thumb:hover { background: rgba(57, 215, 255, 0.55); }
+/* Firefox has no ::-webkit pseudo-elements; this is the whole API it offers. */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: rgba(95, 137, 173, 0.28) transparent; }
 
 @keyframes blip { 50% { opacity: 0.4; } }
 .blip { animation: blip 1.1s infinite; }
