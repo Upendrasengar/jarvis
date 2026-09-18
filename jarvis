@@ -7,6 +7,7 @@
 #   jarvis digest     -> run today's digest and print it
 #   jarvis setup      -> full dependency setup (whisper model download etc.)
 #   jarvis doctor [--json] -> read-only health report
+#   jarvis onboard [--non-interactive] -> resumable first-run setup
 #   jarvis model [size] -> list transcription models, or pick+download one
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
@@ -22,6 +23,9 @@ cd "$(dirname "$0")" || exit 1
 if [[ "${1:-}" == "doctor" ]]; then
   shift
   exec bash tools/doctor.sh "$@"
+elif [[ "${1:-}" == "onboard" ]]; then
+  shift
+  exec bash tools/onboard.sh "$@"
 fi
 
 # first run: seed your private data dirs from the shipped templates

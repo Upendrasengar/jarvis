@@ -130,6 +130,10 @@ Dependencies: Task 2.
 
 ### Task 4: Add the `jarvis onboard` CLI wizard
 
+**Status: Complete.** Implemented by `tools/onboard.sh`, with clean-run,
+idempotence, interruption/resume, and blocked-Claude behavior verified by
+`tools/test-onboard.sh`.
+
 The wizard should:
 
 1. Run Doctor.
@@ -142,6 +146,20 @@ The wizard should:
 8. Verify `/api/health`.
 9. Open the browser.
 10. Print a concise completion summary.
+
+CLI contract:
+
+- `jarvis onboard` runs the interactive wizard; `jarvis onboard
+  --non-interactive` uses environment-provided profile values and skips
+  unconfigured optional integrations.
+- Each step is marked complete only after its action succeeds. `Ctrl-C` or a
+  failed command leaves that step incomplete and prints the rerun command.
+- A completed rerun performs health verification but does not rewrite user
+  files or reinstall services.
+- The wizard never asks for or persists credentials. Calendar credentials are
+  configured through the existing local Settings screen after startup.
+- Task 4 offers optional vault, meetings, and login-service setup individually;
+  Task 5 adds the named Core, Meetings, and Full profile shortcuts.
 
 Acceptance criteria:
 

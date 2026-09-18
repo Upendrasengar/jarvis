@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 4 — Add the `jarvis onboard` CLI wizard
-- **Completed:** 3 of 16 tasks
+- **Current task:** Task 5 — Add installation profiles
+- **Completed:** 4 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -37,11 +37,13 @@ blocked.
   - Evidence: `tools/test-onboarding-state.mjs` verifies clean and
     existing installations, step completion and revisiting, upgrade-safe
     reads, schema allowlisting, and rejection of credential-like fields.
-- [ ] **Task 4 — Add the `jarvis onboard` CLI wizard**
-  - [ ] Check the system and Claude Code.
-  - [ ] Configure the user profile and optional modules.
-  - [ ] Start Jarvis and verify `/api/health`.
-  - [ ] Resume safely after interruption.
+- [x] **Task 4 — Add the `jarvis onboard` CLI wizard**
+  - [x] Check the system and Claude Code.
+  - [x] Configure the user profile and offer optional modules.
+  - [x] Start Jarvis and verify `/api/health`.
+  - [x] Resume safely after interruption.
+  - Evidence: `tools/test-onboard.sh` covers clean non-interactive setup,
+    idempotent reruns, interruption/resume, and an unauthenticated Claude CLI.
 - [ ] **Task 5 — Add installation profiles**
   - [ ] Core profile
   - [ ] Meetings profile
@@ -139,6 +141,7 @@ blocked.
 | 2026-09-18 | Task 1 — Installation contract | `d0a3ee5` | `docs/install.md`, `docs/support-matrix.md` |
 | 2026-09-18 | Task 2 — Machine-readable Doctor | This commit | `tools/doctor.sh`, `tools/tests/doctor-json.test.sh` |
 | 2026-09-18 | Task 3 — Resumable onboarding state | This commit | `tools/onboarding-state.mjs`, `tools/test-onboarding-state.mjs` |
+| 2026-09-18 | Task 4 — Resumable CLI wizard | This commit | `tools/onboard.sh`, `tools/test-onboard.sh` |
 
 ## Update rule
 

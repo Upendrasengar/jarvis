@@ -66,7 +66,8 @@ The maintained platform boundary and success criteria are in the
 - **[Claude Code](https://claude.com/claude-code)** with your own account —
   Jarvis's brain; the CLI must be on your PATH (`claude --version`)
 - Node 20+ and pnpm
-- ffmpeg + whisper.cpp (`brew install ffmpeg whisper-cpp`)
+- ffmpeg + whisper.cpp are optional for meeting recording and local
+  transcription (`brew install ffmpeg whisper-cpp`)
 
 ## Quickstart
 
@@ -81,7 +82,7 @@ brew install --cask obsidian
 brew tap upendrasengar/jarvis
 brew trust upendrasengar/jarvis   # newer Homebrew requires trusting third-party taps once
 brew install jarvis
-jarvis init && jarvis start     # → http://localhost:4321 · data in ~/.jarvis
+jarvis onboard                  # resumable setup → http://localhost:4321
 ```
 
 From source:
@@ -89,11 +90,10 @@ From source:
 ```bash
 git clone https://github.com/upendrasengar/jarvis && cd jarvis
 ./install.sh          # checks deps, builds audio helpers, downloads a whisper model
-./jarvis init         # a short interview: who you are, which repos to watch
-./jarvis start        # server + call watcher → http://localhost:4321
+./jarvis onboard      # profile + optional integrations + healthy startup
 ```
 
-`jarvis init` writes `memory/` from your answers (edit `memory/*.md` anytime
+`jarvis onboard` writes `memory/` from your answers (edit `memory/*.md` anytime
 — it's all plain markdown). Or skip it and just open the dashboard and talk.
 
 `./jarvis doctor` diagnoses a broken setup; `./jarvis` opens a terminal

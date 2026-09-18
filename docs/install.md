@@ -39,8 +39,10 @@ brew install upendrasengar/jarvis/jarvis
 jarvis onboard
 ```
 
-`jarvis onboard` does not exist yet. It will become the single resumable entry
-point for first run and later integration setup.
+`jarvis onboard` is the resumable entry point for first run and later
+integration setup. Use `jarvis onboard --non-interactive` for automation; set
+`JARVIS_ONBOARD_NAME` and optionally `JARVIS_ONBOARD_ROLE` and
+`JARVIS_ONBOARD_FOCUS` when a local profile does not exist yet.
 
 ## Definition of installed
 
