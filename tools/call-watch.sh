@@ -87,6 +87,18 @@ sys.exit(0 if m and float(m.group(1)) < $SILENCE_DB else 1)
 "
 }
 
+# Mute writes ZEROED frames on purpose, which is indistinguishable from a
+# broken input by measurement alone — so the intent has to be read, not the
+# audio. Without this, muting yourself in a shared room produces "Jarvis can't
+# hear you", which is both wrong and the exact moment you least want a popup.
+mic_muted() {
+  local f="$JARVIS_DIR/data/mic-mute" until
+  [ -s "$f" ] || return 1
+  until="$(head -1 "$f" | tr -cd '0-9')"
+  [ -n "$until" ] || return 1
+  [ "$(date +%s)" -lt "$until" ]
+}
+
 silence_checked=0
 
 recording=0
@@ -338,7 +350,9 @@ while true; do
     # eight calls later that their voice was never in any of them.
     if [ "$silence_checked" = 0 ] && [ $(( $(date +%s) - rec_started )) -gt 45 ]; then
       silence_checked=1
-      if is_silent "$session/mic.wav"; then
+      if mic_muted; then
+        echo "$(date '+%H:%M:%S') mic is muted by choice — skipping the silence check"
+      elif is_silent "$session/mic.wav"; then
         echo "$(date '+%H:%M:%S') WARNING: mic channel is silent — your side is not being recorded"
         notify "⚠️ Jarvis can't hear you — your side of this call is NOT being recorded"
       elif is_silent "$session/system16.wav" || is_silent "$session/system.wav"; then
