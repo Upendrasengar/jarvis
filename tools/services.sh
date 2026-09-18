@@ -27,6 +27,21 @@ if [ -z "$NODE_BIN" ]; then
 fi
 NODE_BIN="${NODE_BIN:-node}"
 
+# A prebuilt artifact records the Node ABI its native modules were compiled
+# against. Checking it here turns the failure that actually happened — a
+# dlopen crash in api.log saying NODE_MODULE_VERSION, with the server simply
+# not there — into one sentence naming the mismatch before anything starts.
+if [ -f "$JARVIS_DIR/artifact.json" ]; then
+  want="$(python3 -c "import json;print(json.load(open('$JARVIS_DIR/artifact.json')).get('nodeAbi',''))" 2>/dev/null || true)"
+  have="$("$NODE_BIN" -p 'process.versions.modules' 2>/dev/null || true)"
+  if [ -n "$want" ] && [ -n "$have" ] && [ "$want" != "$have" ]; then
+    echo "server:     REFUSING to start — this build needs Node ABI $want, but $NODE_BIN is ABI $have" >&2
+    echo "            point Jarvis at the right runtime:" >&2
+    echo "              echo /path/to/node > memory/settings/node-bin.txt" >&2
+    exit 1
+  fi
+fi
+
 watch_pid()  { pgrep -f "bash.*call-watch\.sh" | head -1; }
 server_pid() { lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1; }
 ui_up()      { curl -s "http://localhost:$PORT/api/health" >/dev/null 2>&1; }

@@ -39,3 +39,6 @@ tools/menubar/JarvisBar.app/
 # and an untracked file in the tree blocks release.sh's dirty-tree guard.
 .DS_Store
 .agents/
+
+# release artifacts built by tools/build-artifact.sh — published, never committed
+/dist-artifact/

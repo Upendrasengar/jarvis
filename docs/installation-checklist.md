@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 9 — Produce prebuilt engine artifacts
-- **Completed:** 8 of 16 tasks
+- **Current task:** Task 10 — Publish architecture-specific Homebrew bottles
+- **Completed:** 9 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -101,11 +101,16 @@ blocked.
 
 ## Phase 4: Prebuilt distribution
 
-- [ ] **Task 9 — Produce prebuilt engine artifacts**
-  - [ ] Include production dependencies and web assets.
-  - [ ] Include compiled Swift applications and tools.
-  - [ ] Include Node/native ABI metadata.
-  - [ ] Verify archives contain no private data.
+- [x] **Task 9 — Produce prebuilt engine artifacts**
+  - [x] Installation does not run pnpm, Vite, or `swiftc`.
+  - [x] Artifacts contain no user data or secrets.
+  - [x] Pre-push audit passes.
+  - [x] Jarvis boots directly from the extracted artifact.
+  - Evidence: `tools/build-artifact.sh` produced a 15 MB arm64/ABI-127
+    archive; the extracted copy served `/api/health` with no build tooling
+    present; the archive contains no `memory/`, `reports/`, `brain/`, `data/`,
+    `secrets/`, `models/` or `.git`; the ABI guard refuses a mismatched
+    runtime and stays silent on a matching one.
 - [ ] **Task 10 — Publish architecture-specific Homebrew bottles**
   - [ ] Apple Silicon bottle
   - [ ] Intel bottle

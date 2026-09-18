@@ -356,6 +356,26 @@ On a clean macOS user account:
 
 ### Task 9: Produce prebuilt engine artifacts
 
+**Status: Complete.** Built by `tools/build-artifact.sh`, which produces
+`jarvis-engine-<arch>-node<abi>.tar.gz` plus a `.sha256`.
+
+Artifact contract:
+
+- The build refuses to run on a Node that is not the pinned one, and records
+  the version and ABI it built against in `artifact.json`. `tools/services.sh`
+  checks that number before starting and refuses with the mismatch named,
+  which turns the dlopen crash this repo has already hit into one sentence.
+- Production dependencies are installed with npm rather than `pnpm deploy`:
+  deploy requires `inject-workspace-packages`, and changing a repo-wide
+  package-manager setting to suit a release script is the wrong trade.
+- `tsx` ships despite being declared a devDependency, because `services.sh`
+  starts the server through it and `@jarvis/shared` is consumed as raw
+  TypeScript. Without it the archive cannot boot.
+- Staging uses an explicit allowlist, then re-checks the staged tree for user
+  data and credential-shaped strings. A denylist would ship whatever was added
+  since it was last reviewed.
+- Result: 15 MB compressed, against 274 MB of development `node_modules`.
+
 Artifacts should contain installed production dependencies, the Vite build,
 compiled Swift binaries, JarvisBar, Jarvis Audio, and Node/native-ABI metadata.
 
