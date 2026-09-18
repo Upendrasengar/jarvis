@@ -13,6 +13,7 @@ import Foundation
 import AVFoundation
 import CoreGraphics
 import ScreenCaptureKit
+import CoreAudio
 
 // Permission plumbing: `audiocap --check` prints machine-readable status for
 // jarvis doctor; `audiocap --request` triggers the system prompts so setup
@@ -119,6 +120,137 @@ final class SystemAudioRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 // Mic capture (Phase 2): the same app identity records YOUR side too —
 // one "Jarvis Audio" grant covers both, and no ffmpeg/terminal attribution.
 // Writes 16 kHz mono 16-bit WAV, whisper's preferred diet.
+
+// ── input device selection ─────────────────────────────────────────────────
+// macOS keeps "MacBook Pro Microphone" as the default input even with the lid
+// closed, where it is physically obstructed and delivers digital zero. TCC
+// still answers "granted", every permission check passes, and the recording is
+// silence. That is how eight calls lost one side of the conversation: nothing
+// asked whether sound was ARRIVING, only whether we were allowed to listen.
+//
+// So the default gets no benefit of the doubt. Listen to it for a moment, and
+// if nothing is coming through, record from a device where something is.
+//
+// The bar is deliberately "digital zero", not "quiet". A real microphone in a
+// silent room still has a noise floor around -60 dBFS; an obstructed or dead
+// one produces exact zeros. Switching on "quiet" would hand a live call to the
+// wrong device every time someone stopped talking.
+private let deadPeak: Float = 1e-5          // ≈ -100 dBFS: silence, not quiet
+private let probeSeconds = 0.8
+
+private func systemObjectIDs(_ selector: AudioObjectPropertySelector) -> [AudioDeviceID] {
+    var addr = AudioObjectPropertyAddress(mSelector: selector,
+                                          mScope: kAudioObjectPropertyScopeGlobal,
+                                          mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject),
+                                         &addr, 0, nil, &size) == noErr else { return [] }
+    var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                     &addr, 0, nil, &size, &ids) == noErr else { return [] }
+    return ids
+}
+
+private func deviceName(_ id: AudioDeviceID) -> String {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioObjectPropertyName,
+                                          mScope: kAudioObjectPropertyScopeGlobal,
+                                          mElement: kAudioObjectPropertyElementMain)
+    // CoreAudio hands back a +1 CFStringRef, so take it as Unmanaged and
+    // release it. Reading straight into a `var name: CFString` compiles but
+    // writes a raw pointer over a managed reference, which is a leak at best.
+    var name: Unmanaged<CFString>?
+    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+    guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &name) == noErr,
+          let n = name?.takeRetainedValue() else { return "device \(id)" }
+    return n as String
+}
+
+private func hasInputChannels(_ id: AudioDeviceID) -> Bool {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreamConfiguration,
+                                          mScope: kAudioObjectPropertyScopeInput,
+                                          mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(id, &addr, 0, nil, &size) == noErr, size > 0 else { return false }
+    let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size),
+                                               alignment: MemoryLayout<AudioBufferList>.alignment)
+    defer { raw.deallocate() }
+    guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, raw) == noErr else { return false }
+    let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+    return list.reduce(0) { $0 + Int($1.mNumberChannels) } > 0
+}
+
+private func defaultInputDevice() -> AudioDeviceID? {
+    var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice,
+                                          mScope: kAudioObjectPropertyScopeGlobal,
+                                          mElement: kAudioObjectPropertyElementMain)
+    var id: AudioDeviceID = 0
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject),
+                                     &addr, 0, nil, &size, &id) == noErr, id != 0 else { return nil }
+    return id
+}
+
+@discardableResult
+private func bindInput(_ engine: AVAudioEngine, to id: AudioDeviceID) -> Bool {
+    guard let unit = engine.inputNode.audioUnit else { return false }
+    var dev = id
+    return AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+                                kAudioUnitScope_Global, 0, &dev,
+                                UInt32(MemoryLayout<AudioDeviceID>.size)) == noErr
+}
+
+// Loudest sample seen in a short listen. Negative means the device would not
+// open at all, which is as disqualifying as silence.
+private func probePeak(_ id: AudioDeviceID) -> Float {
+    let engine = AVAudioEngine()
+    guard bindInput(engine, to: id) else { return -1 }
+    let input = engine.inputNode
+    let fmt = input.outputFormat(forBus: 0)
+    guard fmt.sampleRate > 0, fmt.channelCount > 0 else { return -1 }
+
+    let lock = NSLock()
+    var peak: Float = 0
+    input.installTap(onBus: 0, bufferSize: 4096, format: fmt) { buf, _ in
+        var local: Float = 0
+        if let ch = buf.floatChannelData {
+            for c in 0..<Int(buf.format.channelCount) {
+                for i in 0..<Int(buf.frameLength) { local = max(local, abs(ch[c][i])) }
+            }
+        } else if let ch = buf.int16ChannelData {
+            for c in 0..<Int(buf.format.channelCount) {
+                for i in 0..<Int(buf.frameLength) {
+                    local = max(local, abs(Float(ch[c][i]) / 32768.0))
+                }
+            }
+        }
+        lock.lock(); peak = max(peak, local); lock.unlock()
+    }
+    do { try engine.start() } catch { input.removeTap(onBus: 0); return -1 }
+    Thread.sleep(forTimeInterval: probeSeconds)
+    input.removeTap(onBus: 0)
+    engine.stop()
+    lock.lock(); defer { lock.unlock() }
+    return peak
+}
+
+// Default first — it is what the owner chose, and it is usually right. The
+// rest are fallbacks, tried only because the default proved deaf.
+private func liveInputDevice() -> (id: AudioDeviceID, name: String, substituted: Bool)? {
+    let fallback = systemObjectIDs(kAudioHardwarePropertyDevices).filter(hasInputChannels)
+    var order: [AudioDeviceID] = []
+    if let d = defaultInputDevice() { order.append(d) }
+    order.append(contentsOf: fallback.filter { !order.contains($0) })
+    guard !order.isEmpty else { return nil }
+
+    for (i, id) in order.enumerated() {
+        let name = deviceName(id)
+        let peak = probePeak(id)
+        if peak > deadPeak { return (id, name, i > 0) }
+        fputs("audiocap: input '\(name)' is silent (peak \(String(format: "%.7f", max(peak, 0))))\n", stderr)
+    }
+    return nil
+}
+
 final class MicRecorder {
     private let engine = AVAudioEngine()
     private var file: AVAudioFile?
@@ -161,6 +293,22 @@ final class MicRecorder {
     }
 
     func start() throws {
+        // Prove sound arrives BEFORE committing the call to this device. The
+        // cost is under a second when the default works, which is the common
+        // case; it is only slow when it is about to save the recording.
+        if let live = liveInputDevice() {
+            if live.substituted {
+                bindInput(engine, to: live.id)
+                fputs("audiocap: default input was silent — recording from '\(live.name)' instead\n", stderr)
+            } else {
+                fputs("audiocap: input '\(live.name)'\n", stderr)
+            }
+        } else {
+            // Nothing on this machine is producing audio. Record anyway rather
+            // than abort: a silent track still keeps the two channels aligned
+            // for the merge, and call-watch's silence check raises the alarm.
+            fputs("audiocap: WARNING no input device produced audio — recording will be silent\n", stderr)
+        }
         let input = engine.inputNode
         let inFmt = input.outputFormat(forBus: 0)
         guard let outFmt = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000,
