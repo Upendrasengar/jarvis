@@ -69,8 +69,21 @@ start() {
   else
     # JARVIS_NODE (set by the Homebrew wrapper) pins the exact node the
     # native modules were built against — PATH order must never decide this
+    # tsx lives in two different places depending on how Jarvis was installed.
+    # A pnpm workspace checkout has apps/server/node_modules/tsx; the published
+    # artifact installs production deps flat with npm, so it is only at the
+    # root. This resolved it RELATIVE to apps/server, which meant every
+    # Homebrew install started and immediately died with MODULE_NOT_FOUND —
+    # the server never came up and `jarvis start` just said FAILED.
+    TSX="$JARVIS_DIR/apps/server/node_modules/tsx/dist/cli.mjs"
+    [ -f "$TSX" ] || TSX="$JARVIS_DIR/node_modules/tsx/dist/cli.mjs"
+    if [ ! -f "$TSX" ]; then
+      echo "server:     FAILED — tsx not found (looked in apps/server/node_modules"
+      echo "            and node_modules). The install is incomplete."
+      return 1 2>/dev/null || exit 1
+    fi
     (cd "$JARVIS_DIR/apps/server" && \
-      JARVIS_API_PORT="$PORT" nohup "$NODE_BIN" node_modules/tsx/dist/cli.mjs src/index.ts \
+      JARVIS_API_PORT="$PORT" nohup "$NODE_BIN" "$TSX" src/index.ts \
         >> "$JARVIS_DIR/reports/api.log" 2>&1 &)
     for _ in $(seq 1 15); do ui_up && break; sleep 1; done
     if ui_up; then
