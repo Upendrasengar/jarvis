@@ -57,6 +57,10 @@ Claude Code session.
 
 ## Requirements
 
+The maintained platform boundary and success criteria are in the
+[support matrix](docs/support-matrix.md) and
+[installation contract](docs/install.md).
+
 - **macOS** (ScreenCaptureKit and CoreAudio power the call recording — this
   is Mac-only)
 - **[Claude Code](https://claude.com/claude-code)** with your own account —

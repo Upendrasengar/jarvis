@@ -28,6 +28,9 @@ steps, and leave Jarvis running and healthy.
 
 ### Task 1: Define supported Macs and success criteria
 
+**Status: Complete.** The accepted contract is recorded in
+[Installation Contract](install.md) and [Support Matrix](support-matrix.md).
+
 Document the supported combinations:
 
 - Apple Silicon and Intel
