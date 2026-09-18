@@ -20,7 +20,13 @@ JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NAME="${JARVIS_SIGNING_NAME:-Jarvis Local Signing}"
 SETTING="$JARVIS_DIR/memory/settings/signing-identity.txt"
 
-have_identity() { security find-identity -v -p codesigning 2>/dev/null | grep -q "$NAME"; }
+# Deliberately NOT `find-identity -v`. The -v list is "valid" identities, and a
+# self-signed certificate reads as CSSMERR_TP_NOT_TRUSTED until someone marks it
+# trusted — which needs an admin password. But trust governs VERIFYING a
+# signature, not producing one: codesign signs happily with an untrusted key,
+# and the resulting bundle keeps a stable identity across rebuilds, which is the
+# entire point here. Requiring -v made a working identity look like a failure.
+have_identity() { security find-identity -p codesigning 2>/dev/null | grep -q "$NAME"; }
 
 status() {
   if have_identity; then
@@ -28,7 +34,10 @@ status() {
     printf "  configured in:    %s\n" "$([ -s "$SETTING" ] && cat "$SETTING" || echo '(not written yet)')"
     for app in tools/menubar/JarvisBar.app tools/call-capture/JarvisAudio.app; do
       [ -d "$JARVIS_DIR/$app" ] || continue
-      sig="$(codesign -dv "$JARVIS_DIR/$app" 2>&1 | grep -i '^Signature' | head -1)"
+      # Authority names the identity; a real signature reports only
+      # "Signature size=NNNN", which tells the owner nothing useful.
+      sig="$(codesign -dvvv "$JARVIS_DIR/$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+      [ -n "$sig" ] || sig="$(codesign -dv "$JARVIS_DIR/$app" 2>&1 | sed -n 's/^Signature=//p' | head -1)"
       printf "  %-34s %s\n" "$(basename "$app")" "${sig:-unsigned}"
     done
   else
@@ -58,8 +67,13 @@ CNF
     openssl req -x509 -newkey rsa:2048 -keyout "$tmp/key.pem" -out "$tmp/cert.pem" \
       -days 3650 -nodes -config "$tmp/ext.cnf" >/dev/null 2>&1 \
       || { echo "  could not generate a certificate" >&2; exit 1; }
+    # macOS Security rejects the PKCS#12 MAC OpenSSL 3 writes by default
+    # (sha256), failing with "MAC verification failed ... wrong password?" —
+    # which is misleading, since the password is fine. Pin the legacy sha1 MAC
+    # and 3DES so the keychain will accept the bundle.
     openssl pkcs12 -export -inkey "$tmp/key.pem" -in "$tmp/cert.pem" -out "$tmp/id.p12" \
-      -passout pass:jarvis -name "$NAME" >/dev/null 2>&1 \
+      -passout pass:jarvis -name "$NAME" \
+      -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 >/dev/null 2>&1 \
       || { echo "  could not bundle the certificate" >&2; exit 1; }
 
     echo "  importing into your login keychain — macOS may ask for your password"
@@ -67,11 +81,19 @@ CNF
     security import "$tmp/id.p12" -k ~/Library/Keychains/login.keychain-db \
       -P jarvis -T /usr/bin/codesign >/dev/null \
       || { echo "  keychain import failed" >&2; exit 1; }
+    # Optional, and it needs an admin password, so failure is not an error:
+    # marking the certificate trusted only affects signature VERIFICATION.
+    # Signing works either way.
     security add-trusted-cert -d -r trustAsRoot -p codeSign \
       -k ~/Library/Keychains/login.keychain-db "$tmp/cert.pem" >/dev/null 2>&1 \
-      || echo "  note: could not mark it trusted automatically — open Keychain Access," \
-              "find '$NAME', and set Code Signing to Always Trust"
+      && echo "  marked trusted for code signing"
     have_identity || { echo "  the identity did not appear — see Keychain Access" >&2; exit 1; }
+    # Prove it before claiming success. A certificate in the keychain whose
+    # private key codesign cannot reach would pass every check above and then
+    # fail at the only moment that matters.
+    probe="$tmp/probe"; mkdir -p "$probe"; printf '#!/bin/sh\nexit 0\n' > "$probe/x"; chmod +x "$probe/x"
+    codesign --force -s "$NAME" "$probe/x" >/dev/null 2>&1 \
+      || { echo "  the identity exists but codesign cannot use it — see Keychain Access" >&2; exit 1; }
     echo "  identity created"
   fi
 

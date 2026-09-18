@@ -43,6 +43,48 @@ command -v ffmpeg >/dev/null 2>&1 && ok "ffmpeg" || bad "ffmpeg — brew install
 command -v whisper-cli >/dev/null 2>&1 && ok "whisper-cli" || bad "whisper-cli — brew install whisper-cpp"
 command -v python3 >/dev/null 2>&1 && ok "python3" || bad "python3"
 
+# ── signing identity ───────────────────────────────────────────────────────
+# Resolved BEFORE anything is built, because the two build steps below sign
+# with it. It used to be resolved further down, AFTER those steps: under
+# `set -u` that aborts a fresh install on an unbound SIGN_ID, and the only
+# reason nobody hit it is that a rebuild skips the build branch entirely when
+# the app is already present.
+#
+# A stable identity keeps macOS recording grants alive across rebuilds. Ad-hoc
+# ("-") has no identity, so TCC binds to the binary hash and every rebuild
+# silently revokes Screen Recording and Microphone.
+echo "── signing identity ──"
+SIGN_ID="$(head -1 memory/settings/signing-identity.txt 2>/dev/null | tr -d '\n')"
+# `find-identity -p codesigning` without -v, deliberately: -v lists only
+# "valid" identities, and a self-signed certificate reads as
+# CSSMERR_TP_NOT_TRUSTED until an admin marks it trusted. Trust governs
+# VERIFYING a signature, not producing one — codesign signs fine with it, which
+# is all a stable TCC identity needs.
+if [ -n "$SIGN_ID" ] && ! security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  warn "signing identity '$SIGN_ID' is configured but not in the keychain — falling back to ad-hoc"
+  SIGN_ID=""
+fi
+SIGN_ID="${SIGN_ID:--}"
+[ "$SIGN_ID" = "-" ] && warn "signing ad-hoc — recording permissions reset on every rebuild (fix: jarvis sign create)" \
+                     || ok "signing as '$SIGN_ID'"
+
+# Reconcile an already-built bundle with the configured identity. The build
+# branches below only run when the binary is MISSING, so without this the exact
+# sequence `jarvis sign create` prints — "now run jarvis setup" — would leave
+# both apps ad-hoc forever: they are already built, so nothing re-signs them.
+resign_if_stale() {
+  app="$1"; label="$2"
+  [ -d "$app" ] || return 0
+  [ "${CHECK_ONLY:-0}" = 1 ] && return 0
+  if codesign -dv "$app" 2>&1 | grep -q '^Signature=adhoc'; then have="-"
+  else have="$(codesign -dvvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"; fi
+  [ "$have" = "$SIGN_ID" ] && return 0
+  if codesign --force -s "$SIGN_ID" "$app" 2>>/tmp/jarvis-swift-err; then
+    ok "$label re-signed ($have → $SIGN_ID)"
+    warn "re-grant Screen Recording and Microphone once — the identity changed"
+  else warn "$label could not be re-signed — see /tmp/jarvis-swift-err"; fi
+}
+
 echo "── audio helpers (built from source in tools/call-capture) ──"
 for b in audiocap miccheck; do
   if [[ -x "tools/call-capture/bin/$b" ]]; then ok "$b"
@@ -131,6 +173,8 @@ PLIST
     ok "JarvisBar.app built + signed (menu-bar icon)"
   else bad "JarvisBar.app build failed — see /tmp/jarvis-swift-err"; fi
 fi
+resign_if_stale tools/call-capture/JarvisAudio.app JarvisAudio.app
+resign_if_stale tools/menubar/JarvisBar.app JarvisBar.app
 
 echo "── obsidian (optional — vault UI, indexed search, phone sync) ──"
 OBS_CLI_BIN="/Applications/Obsidian.app/Contents/MacOS/obsidian-cli"
@@ -185,17 +229,6 @@ if [[ -x "$APPD/MacOS/audiocap" ]]; then
   grep -q "microphone: granted" <<<"$PERMS" && ok "microphone granted to Jarvis Audio" || warn "microphone not granted to Jarvis Audio yet (calls still record via the legacy path meanwhile)"
 fi
 
-# Signing identity: a stable one keeps macOS recording grants alive across
-# rebuilds. Ad-hoc ("-") has no identity, so TCC binds to the binary hash and
-# every rebuild silently revokes Screen Recording and Microphone.
-SIGN_ID="$(head -1 memory/settings/signing-identity.txt 2>/dev/null | tr -d '\n')"
-if [ -n "$SIGN_ID" ] && ! security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
-  warn "signing identity '$SIGN_ID' is configured but not in the keychain — falling back to ad-hoc"
-  SIGN_ID=""
-fi
-SIGN_ID="${SIGN_ID:--}"
-[ "$SIGN_ID" = "-" ] && warn "signing ad-hoc — recording permissions reset on every rebuild (fix: jarvis sign create)" \
-                     || ok "signing as '$SIGN_ID'"
 
 echo "── whisper model ──"
 WANT="$(head -1 memory/settings/whisper-model.txt 2>/dev/null || head -1 memory.example/settings/whisper-model.txt)"
