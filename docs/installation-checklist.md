@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 6 — Create an onboarding status API
-- **Completed:** 5 of 16 tasks
+- **Current task:** Task 7 — Build `/onboarding`
+- **Completed:** 6 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -63,10 +63,16 @@ blocked.
 
 ## Phase 3: Browser onboarding
 
-- [ ] **Task 6 — Create an onboarding status API**
-  - [ ] Return non-secret setup state.
-  - [ ] Validate local-only mutations with Zod.
-  - [ ] Identify the next recommended step.
+- [x] **Task 6 — Create an onboarding status API**
+  - [x] Expose non-secret setup status.
+  - [x] Validate mutations with Zod and keep them local-only.
+  - [x] Make every mutation safe to repeat.
+  - [x] Report whether a secret exists, not its value.
+  - [x] Identify the next recommended step.
+  - Evidence: `apps/server/test/onboarding.test.ts` validates the payload
+    against the shared contract, asserts no secret value or extra field
+    appears, rejects unknown steps and profiles without writing them, and
+    proves a repeated mutation changes nothing.
 - [ ] **Task 7 — Build `/onboarding`**
   - [ ] Implement the complete guided flow.
   - [ ] Verify keyboard accessibility.

@@ -236,7 +236,25 @@ JARVIS_HOME="$(mktemp -d)" jarvis onboard
 
 ### Task 6: Create an onboarding status API
 
+**Status: Complete.** Implemented by `apps/server/src/services/onboarding.ts`
+and `apps/server/src/routes/onboarding.ts`, with the contract verified by
+`apps/server/test/onboarding.test.ts`.
+
 Expose non-secret setup status and narrowly scoped configuration endpoints.
+
+API contract:
+
+- `GET /api/onboarding` returns the schema version, per-step status, the next
+  incomplete step, the selected installation profile, and whether each optional
+  integration is configured. It never returns a secret value; readiness is a
+  boolean and the only field on an integration.
+- `POST /api/onboarding/step` and `POST /api/onboarding/profile` are local-only
+  and Zod-validated. Steps are validated against the CLI's own step list rather
+  than a copy of it, so the two cannot disagree about what a valid step is.
+- Both mutations are safe to repeat: completing a completed step changes
+  nothing but a timestamp, which is what keeps the flow resumable.
+- The service imports `tools/onboarding-state.mjs` instead of reimplementing
+  it. One writer, one validator, one definition of "which step is next".
 
 Acceptance criteria:
 

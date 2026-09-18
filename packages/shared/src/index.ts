@@ -174,6 +174,32 @@ export const WhisperModel = z.object({
 });
 export type WhisperModel = z.infer<typeof WhisperModel>;
 
+// Onboarding (plan Task 6). The step list is owned by
+// tools/onboarding-state.mjs and validated there; this schema describes the
+// SHAPE the browser receives, never a credential. Integration readiness is a
+// boolean on purpose — a setup screen needs to know whether to show a step,
+// not what the secret is.
+export const OnboardingStepStatus = z.enum(["complete", "incomplete"]);
+export const OnboardingStep = z.object({
+  id: z.string(),
+  status: OnboardingStepStatus,
+  completedAt: z.string().nullable(),
+});
+export const InstallationProfile = z.enum(["core", "meetings", "full"]);
+export type InstallationProfile = z.infer<typeof InstallationProfile>;
+
+export const OnboardingStatus = z.object({
+  version: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  adoptedExistingInstall: z.boolean(),
+  steps: z.array(OnboardingStep),
+  nextStep: z.string().nullable(),
+  profile: InstallationProfile.nullable(),
+  integrations: z.record(z.string(), z.object({ configured: z.boolean() })),
+});
+export type OnboardingStatus = z.infer<typeof OnboardingStatus>;
+
 export const NoteMeta = z.object({
   id: z.string(),
   title: z.string(),
