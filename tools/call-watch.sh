@@ -65,6 +65,30 @@ tab_urls() {
   done
 }
 
+# ── is a channel actually capturing? ───────────────────────────────────────
+# Permission is not outcome. TCC reported "microphone: granted" for eight calls
+# that recorded 19 minutes of digital silence — AVAudioEngine delivers zeroed
+# buffers when its input never attaches, so the file is full size, the run
+# looks healthy, and nothing downstream notices. The only honest test is the
+# audio itself: silence is provable, and -91 dB (every sample identical) is a
+# different thing from a quiet room.
+SILENCE_DB=-80
+
+# Measure and judge in one python pass: fewer moving parts than piping through
+# awk, and it returns a clean exit code. Unknown is NEVER silent — a probe that
+# cannot read the file must not raise a false alarm mid-call.
+is_silent() {    # $1 = wav (may still be being written)
+  [ -s "$1" ] || return 1
+  ffmpeg -hide_banner -nostats -t 30 -i "$1" -af volumedetect -f null - 2>&1 \
+    | python3 -c "
+import re, sys
+m = re.search(r'mean_volume:\s*(-?[\d.]+) dB', sys.stdin.read())
+sys.exit(0 if m and float(m.group(1)) < $SILENCE_DB else 1)
+"
+}
+
+silence_checked=0
+
 recording=0
 misses=0
 session=""
@@ -132,6 +156,7 @@ start_recording() {
   local url="$1"
   mode="${2:-browser}"
   rec_started=$(date +%s)
+  silence_checked=0
   session="$CALLS_DIR/$(date +%Y-%m-%d-%H%M)"
   mkdir -p "$session"
   {
@@ -307,6 +332,21 @@ while true; do
     #  manual    — mic released, after a 60s grace so you can start the
     #              recording before actually joining the meeting
     # Our own ffmpeg holds the mic, so its pid is excluded everywhere.
+    # ── mid-call: is your side actually being captured? ──────────────────
+    # 45 seconds in, once per recording. Catching this DURING the call is the
+    # whole point: the owner can fix the input and restart, instead of learning
+    # eight calls later that their voice was never in any of them.
+    if [ "$silence_checked" = 0 ] && [ $(( $(date +%s) - rec_started )) -gt 45 ]; then
+      silence_checked=1
+      if is_silent "$session/mic.wav"; then
+        echo "$(date '+%H:%M:%S') WARNING: mic channel is silent — your side is not being recorded"
+        notify "⚠️ Jarvis can't hear you — your side of this call is NOT being recorded"
+      elif is_silent "$session/system16.wav" || is_silent "$session/system.wav"; then
+        echo "$(date '+%H:%M:%S') WARNING: system channel is silent — the other side is not being recorded"
+        notify "⚠️ Jarvis isn't capturing the other side of this call"
+      fi
+    fi
+
     over=0
     if [ "$mode" = "teams-app" ]; then
       [ -z "$(teams_mic_pid)" ] && over=1
