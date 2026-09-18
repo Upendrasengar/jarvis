@@ -102,6 +102,10 @@ else
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>LSUIElement</key><true/>
+  <!-- the dashboard opens in a WKWebView window now, and its voice feature
+       calls getUserMedia; without this key macOS denies the request before
+       the app's own delegate is ever consulted -->
+  <key>NSMicrophoneUsageDescription</key><string>Jarvis uses the microphone so you can talk to it from the dashboard.</string>
   <key>JarvisDir</key><string>$PWD</string>
 </dict>
 </plist>

@@ -7,6 +7,7 @@
 // it needs no permissions of its own.
 import AppKit
 import UserNotifications
+import WebKit
 
 // ── config: repo dir comes from Info.plist (templated at build time);
 // the port follows memory/settings/port.txt like everything else
@@ -57,8 +58,120 @@ func runTool(_ args: [String]) {
     try? p.run()
 }
 
+// Shared by every menu item that shows a page. The window is created once and
+// reused; holding it here keeps the call sites unchanged.
+let dashboard = DashboardWindow()
+
 func openPage(_ path: String) {
-    if let u = URL(string: "http://localhost:\(port())" + path) { NSWorkspace.shared.open(u) }
+    guard let u = URL(string: "http://localhost:\(port())" + path) else { return }
+    dashboard.show(u)
+}
+
+// Jarvis in its own window rather than a browser tab.
+//
+// A WKWebView, not Electron: the system already has a renderer, and shipping a
+// second copy of Chromium to display a local page would cost more than the
+// rest of the app put together.
+//
+// The data store is NON-PERSISTENT on purpose. During development a browser
+// cached the built bundle so stubbornly that the dashboard kept serving a
+// version hours old — new tabs, cache-busting queries and even no-store
+// fetches returned the stale copy. A window that keeps no cache always shows
+// what the server is actually serving.
+final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
+    private var window: NSWindow?
+    private var web: WKWebView?
+    private var iconSet = false
+
+    // The Dock showed a blank generic icon because the bundle has no .icns —
+    // this app is built by swiftc from a single file, with no Xcode project to
+    // carry an asset catalogue. Drawing it at runtime keeps that property and
+    // guarantees the Dock matches the menu bar, since both come from the same
+    // symbol rather than from an exported file that can drift out of step.
+    private static func dockIcon() -> NSImage? {
+        let side: CGFloat = 512
+        // Tint through the symbol configuration rather than filling over the
+        // drawn glyph: sourceAtop paints every opaque pixel in the rect, so the
+        // background square was tinted too and the brain disappeared into it.
+        let cfg = NSImage.SymbolConfiguration(pointSize: 260, weight: .regular)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [
+                NSColor(calibratedRed: 0.36, green: 0.86, blue: 0.96, alpha: 1)]))   // dashboard cyan
+        guard let glyph = NSImage(systemSymbolName: AppDelegate.glyph + ".fill",
+                                  accessibilityDescription: "Jarvis")?
+            .withSymbolConfiguration(cfg) else { return nil }
+        glyph.isTemplate = false
+
+        let img = NSImage(size: NSSize(width: side, height: side))
+        img.lockFocus()
+        defer { img.unlockFocus() }
+
+        // macOS rounds app icons to a squircle; a bare glyph on transparency
+        // reads as a broken icon beside everything else in the Dock.
+        let inset: CGFloat = 40
+        let rect = NSRect(x: inset, y: inset, width: side - inset * 2, height: side - inset * 2)
+        NSColor(calibratedRed: 0.04, green: 0.09, blue: 0.13, alpha: 1).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 112, yRadius: 112).fill()
+
+        // fit to ~58% of the canvas rather than the symbol's intrinsic size,
+        // which at this point size fills the whole square
+        let target = side * 0.58
+        let g = glyph.size
+        let scale = min(target / g.width, target / g.height)
+        let w = g.width * scale, h = g.height * scale
+        glyph.draw(in: NSRect(x: (side - w) / 2, y: (side - h) / 2, width: w, height: h))
+        return img
+    }
+
+    func show(_ url: URL) {
+        NSApp.setActivationPolicy(.regular)     // a window needs a Dock presence
+        if NSApp.applicationIconImage == nil || !iconSet {
+            NSApp.applicationIconImage = Self.dockIcon()
+            iconSet = true
+        }
+        if let w = window {
+            if web?.url != url { web?.load(URLRequest(url: url)) }
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let cfg = WKWebViewConfiguration()
+        cfg.websiteDataStore = .nonPersistent()
+        cfg.mediaTypesRequiringUserActionForPlayback = []   // spoken replies autoplay
+        let v = WKWebView(frame: .zero, configuration: cfg)
+        v.uiDelegate = self
+        v.load(URLRequest(url: url))
+        web = v
+
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 820),
+                         styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                         backing: .buffered, defer: false)
+        w.title = "Jarvis"
+        w.contentView = v
+        w.center()
+        w.setFrameAutosaveName("JarvisDashboard")   // remembers size and position
+        w.delegate = self
+        w.isReleasedWhenClosed = false              // reused, not dangling
+        window = w
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // The dashboard's voice feature calls getUserMedia. Without this the
+    // request is denied silently and the mic simply never turns on — the same
+    // shape of failure as the notifications that went nowhere for weeks.
+    func webView(_ webView: WKWebView,
+                 requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+                 initiatedByFrame frame: WKFrameInfo,
+                 type: WKMediaCaptureType,
+                 decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        decisionHandler(origin.host == "localhost" || origin.host == "127.0.0.1" ? .grant : .deny)
+    }
+
+    // Back to a menu-bar-only app when the window closes, so Jarvis does not
+    // sit in the Dock doing nothing.
+    func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
