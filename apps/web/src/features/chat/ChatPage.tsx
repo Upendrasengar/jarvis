@@ -8,6 +8,7 @@ import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { Markdown } from "../../components/Markdown";
 import { MentionMenu } from "./MentionMenu";
+import { ActivityRows } from "./ActivityRows";
 import { useMentions, type Mention } from "./useMentions";
 import { Call, NoteMeta, type ChatRef } from "@jarvis/shared";
 import { useQuery } from "@tanstack/react-query";
@@ -405,6 +406,10 @@ export function ChatPage() {
             </div>
           </Fragment>);
         })}
+        {/* worker activity sits at the foot of the transcript, under the turn
+            that spawned it — that is where you are already looking while a
+            reply is pending */}
+        <ActivityRows sessionId={sessionId} />
       </div>
 
       <div className="relative mt-2">

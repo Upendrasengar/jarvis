@@ -295,6 +295,9 @@ export function agentList() {
   return [...agents.values()].map((a) => ({
     id: a.id, kind: a.kind, project: a.project, task: a.task, branch: a.branch,
     status: a.status, started: a.started, finished: a.finished, silent: a.silent,
+    // which conversation spawned this — the chat shows a worker inline, next
+    // to the question that caused it, and must not show another session's
+    sessionId: a.sessionId,
     lastLine: (a.log[a.log.length - 1] ?? "").slice(0, 100),
     summary: a.summary, answer: a.answer, logLines: a.log.length,
   }));
