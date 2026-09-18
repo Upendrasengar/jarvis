@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 2 — Make Doctor machine-readable
-- **Completed:** 1 of 16 tasks
+- **Current task:** Task 3 — Introduce onboarding state
+- **Completed:** 2 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -18,12 +18,15 @@ blocked.
   - [x] Define clean-install and upgrade verification scenarios.
   - Evidence: [Installation Contract](install.md) and
     [Support Matrix](support-matrix.md).
-- [ ] **Task 2 — Make Doctor machine-readable** ← current
-  - [ ] Add `jarvis doctor --json`.
-  - [ ] Classify checks as `pass`, `warning`, `blocked`, or `optional`.
-  - [ ] Give every failure one actionable remediation.
-  - [ ] Prove output contains no secret values.
-  - [ ] Preserve the existing human-readable output.
+- [x] **Task 2 — Make Doctor machine-readable**
+  - [x] Add `jarvis doctor --json`.
+  - [x] Classify checks as `pass`, `warning`, `blocked`, or `optional`.
+  - [x] Give every failure one actionable remediation.
+  - [x] Prove output contains no secret values.
+  - [x] Preserve the existing human-readable output.
+  - Evidence: `tools/tests/doctor-json.test.sh` exercises blocked and
+    configured temporary installs, validates the schema, and checks secret
+    canaries do not appear in either output stream.
 
 ## Phase 2: Resumable onboarding
 
@@ -131,6 +134,7 @@ blocked.
 | Date | Task | Commit | Evidence |
 |---|---|---|---|
 | 2026-09-18 | Task 1 — Installation contract | `d0a3ee5` | `docs/install.md`, `docs/support-matrix.md` |
+| 2026-09-18 | Task 2 — Machine-readable Doctor | This commit | `tools/doctor.sh`, `tools/tests/doctor-json.test.sh` |
 
 ## Update rule
 

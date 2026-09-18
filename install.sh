@@ -7,7 +7,10 @@
 set -uo pipefail
 cd "$(dirname "$0")" || exit 1
 CHECK_ONLY=0
-[[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+if [[ "${1:-}" == "--check" ]]; then
+  shift
+  exec bash tools/doctor.sh "$@"
+fi
 
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
 bad()  { printf "  \033[31m✗\033[0m %s\n" "$1"; MISSING=1; }

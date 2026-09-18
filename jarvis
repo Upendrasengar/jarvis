@@ -6,6 +6,7 @@
 #   jarvis stop|restart|status  -> manage those services
 #   jarvis digest     -> run today's digest and print it
 #   jarvis setup      -> full dependency setup (whisper model download etc.)
+#   jarvis doctor [--json] -> read-only health report
 #   jarvis model [size] -> list transcription models, or pick+download one
 #   jarvis logs       -> tail the server / watcher / cron logs
 #   jarvis service    -> install|uninstall|status: auto-start at login
@@ -15,6 +16,13 @@
 #   jarvis uninstall  -> remove Jarvis completely (asks about your data)
 #   jarvis "what do I know about X"  -> one-shot question
 cd "$(dirname "$0")" || exit 1
+
+# Doctor must be read-only, including on a first run. Dispatch it before the
+# private-data seeding performed by interactive commands.
+if [[ "${1:-}" == "doctor" ]]; then
+  shift
+  exec bash tools/doctor.sh "$@"
+fi
 
 # first run: seed your private data dirs from the shipped templates
 if [[ ! -d memory ]]; then
@@ -40,8 +48,6 @@ elif [[ "$1" == "ui" ]]; then
   exec bash tools/services.sh start
 elif [[ "$1" == "digest" ]]; then
   exec bash tools/run-digest.sh
-elif [[ "$1" == "doctor" ]]; then
-  exec bash install.sh --check
 elif [[ "$1" == "telegram" ]]; then
   exec bash tools/setup-telegram.sh
 elif [[ "$1" == "init" ]]; then
