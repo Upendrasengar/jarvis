@@ -64,7 +64,11 @@ export function calendarState() { return state; }
 // on-demand refresh — the Today card's resync button
 export async function refreshCalendar() {
   const url = readSecrets().CALENDAR_FEED_URL;
-  if (!url) return state;
+  if (!url) {
+    state = { enabled: false, fetchedAt: null, events: [] };
+    return state;
+  }
+  state.enabled = true;
   await poll(url);
   return state;
 }
@@ -225,11 +229,13 @@ export function startCalendar() {
   if (!url) {
     console.log("[calendar] not configured — set CALENDAR_FEED_URL in secrets/.env (optional)");
     try { fs.rmSync(FILE, { force: true }); } catch {}   // stale data never lingers
-    return;
+  } else {
+    state.enabled = true;
+    try { state = { ...JSON.parse(fs.readFileSync(FILE, "utf8")), enabled: true }; } catch {}
+    void poll(url);
+    console.log("[calendar] polling feed every 30 min");
   }
-  state.enabled = true;
-  try { state = { ...JSON.parse(fs.readFileSync(FILE, "utf8")), enabled: true }; } catch {}
-  void poll(url);
-  setInterval(() => void poll(url), POLL_MS).unref();
-  console.log("[calendar] polling feed every 30 min");
+  // Keep the timer alive even when Jarvis starts unconfigured, so a feed
+  // added in Settings begins normal polling without requiring a restart.
+  setInterval(() => void refreshCalendar(), POLL_MS).unref();
 }

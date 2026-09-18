@@ -41,6 +41,7 @@ const VOICE_MODES: Array<{ key: S.VoiceMode; title: string; desc: string; warn?:
 const SECTIONS: Array<{ id: string; label: string }> = [
   { id: "voice", label: "Voice" },
   { id: "recording", label: "Call recording" },
+  { id: "calendar", label: "Calendar" },
   { id: "speaking", label: "Speaking voice" },
   { id: "reminders", label: "Reminders" },
   { id: "vault", label: "Vault" },
@@ -60,6 +61,90 @@ function Heading({ id, title, desc, right }: { id: string; title: string; desc?:
       </div>
       {desc && <p className="mt-1 max-w-[640px] font-sans text-[12.5px] leading-relaxed text-[var(--dim)]">{desc}</p>}
     </div>
+  );
+}
+
+function CalendarSection() {
+  const qc = useQueryClient();
+  const [url, setUrl] = useState("");
+  const [key, setKey] = useState("");
+  const { data } = useQuery({
+    queryKey: ["calendar-config"],
+    queryFn: async () => S.CalendarConfig.parse(await (await fetch("/api/calendar/config")).json()),
+  });
+  const save = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/calendar/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim(), ...(key ? { key } : {}) }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? `calendar settings → ${response.status}`);
+      return S.CalendarConfig.parse(body);
+    },
+    onSuccess: (config) => {
+      qc.setQueryData(["calendar-config"], config);
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+      setUrl("");
+      setKey("");
+    },
+  });
+
+  return (
+    <section className="mb-12">
+      <Heading
+        id="calendar"
+        title="Calendar"
+        desc="Pull meetings from a private Google or Outlook ICS address, a JSON feed, or a Power Automate endpoint. This is a calendar feed—not an individual Meet or Teams join link."
+        right={data?.configured ? <span className="text-[10px] tracking-wider text-[var(--green)]">● CONFIGURED</span> : undefined}
+      />
+      <div className="rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-4 [box-shadow:var(--shadow)]">
+        {data?.configured && (
+          <p className="mb-3 text-[11px] text-[var(--dim)]">
+            Current feed: <span className="text-[var(--text)]">{data.host}</span>
+            {data.hasKey ? " · API key saved" : " · no API key"}
+          </p>
+        )}
+        <label htmlFor="calendar-feed-url" className="block text-[12px] font-semibold text-[var(--bright)]">Calendar feed URL</label>
+        <input
+          id="calendar-feed-url"
+          type="url"
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder={data?.configured ? "Paste a URL to replace the current feed" : "https://…/calendar.ics"}
+          autoComplete="off"
+          className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+        />
+        <label htmlFor="calendar-feed-key" className="mt-4 block text-[12px] font-semibold text-[var(--bright)]">
+          API key <span className="font-normal text-[var(--dim)]">— optional</span>
+        </label>
+        <input
+          id="calendar-feed-key"
+          type="password"
+          value={key}
+          onChange={(event) => setKey(event.target.value)}
+          placeholder={data?.hasKey ? "Leave blank to keep the saved key" : "Power Automate feeds only"}
+          autoComplete="new-password"
+          className="mt-2 w-full rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 font-sans text-[12px] text-[var(--text)] outline-none placeholder:text-[var(--dim)] focus:border-[var(--cyan)]"
+        />
+        <div className="mt-4 flex min-h-8 items-center gap-3">
+          <button
+            type="button"
+            disabled={!url.trim() || save.isPending}
+            onClick={() => save.mutate()}
+            className="rounded-lg border border-[var(--cyan-3)] bg-[var(--cyan-2)] px-4 py-2 text-[10px] tracking-wider text-[var(--cyan)] hover:bg-[var(--cyan-3)] disabled:cursor-default disabled:opacity-40"
+          >
+            {save.isPending ? "SAVING…" : data?.configured ? "REPLACE FEED" : "CONNECT CALENDAR"}
+          </button>
+          {save.isSuccess && <span role="status" className="text-[11px] text-[var(--green)]">✓ Saved; sync requested</span>}
+          {save.isError && <span role="alert" className="text-[11px] text-[var(--red)]">{save.error.message}</span>}
+        </div>
+        <p className="mt-2 text-[10.5px] leading-relaxed text-[var(--dim)]">
+          Stored only in the gitignored <code>secrets/.env</code>. Jarvis syncs now, then every 30 minutes.
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -600,7 +685,7 @@ export function SettingsPage() {
           </button>
         ))}
         <p className="mt-6 px-1 text-[11px] leading-relaxed text-[var(--dim)]">
-          Non-secret preferences only. Changes auto-save.
+          Preferences auto-save. Integration secrets stay local.
         </p>
       </aside>
 
@@ -758,6 +843,8 @@ export function SettingsPage() {
               </label>
             </div>
           </section>
+
+          <CalendarSection />
 
           <section className="mb-12">
             <Heading id="speaking" title="Speaking voice" />

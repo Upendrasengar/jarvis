@@ -47,6 +47,11 @@ describe("api contract", () => {
     expect(S.ActionItem.array().parse(await get("/api/actions"))).toBeTruthy();
   });
 
+  it("/api/calendar/config exposes status without exposing secrets", async () => {
+    const config = S.CalendarConfig.parse(await get("/api/calendar/config"));
+    expect(Object.keys(config).sort()).toEqual(["configured", "hasKey", "host"]);
+  });
+
   it("POST guards reject cross-origin", async () => {
     const r = await fetch(BASE + "/api/calls/toggle", {
       method: "POST",

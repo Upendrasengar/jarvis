@@ -154,6 +154,17 @@ export const Settings = z.object({
 export type Settings = z.infer<typeof Settings>;
 export const SettingsPatch = Settings.partial();
 
+export const CalendarConfig = z.object({
+  configured: z.boolean(),
+  host: z.string(),
+  hasKey: z.boolean(),
+});
+export type CalendarConfig = z.infer<typeof CalendarConfig>;
+export const CalendarConfigPatch = z.object({
+  url: z.string().trim().url().max(4096).refine((value) => /^https?:\/\//i.test(value), "calendar URL must use http or https"),
+  key: z.string().max(1000).regex(/^[^\r\n"']*$/, "key contains unsupported characters").optional(),
+});
+
 // What is actually on disk, so the picker cannot offer a model that is
 // missing nor hide one that is present.
 export const WhisperModel = z.object({

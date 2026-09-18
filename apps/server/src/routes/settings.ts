@@ -1,7 +1,7 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { SettingsPatch } from "@jarvis/shared";
+import { CalendarConfigPatch, SettingsPatch } from "@jarvis/shared";
 import { patchSettings, readSettings, setVoiceListening, voicesInfo, listWhisperModels } from "../services/settings.js";
 import { localOnly } from "../plugins/localOnly.js";
 import { voiceActive } from "../live/liveState.js";
@@ -12,6 +12,15 @@ import os from "node:os";
 import path from "node:path";
 import { JARVIS_DIR, VAULT_DIR } from "../config.js";
 import { tokenStats } from "../services/tokens.js";
+import { readSecrets } from "../services/env.js";
+import { updateEnvFile } from "../services/secretsFile.js";
+
+const calendarConfig = () => {
+  const secrets = readSecrets();
+  let host = "";
+  try { host = new URL(secrets.CALENDAR_FEED_URL ?? "").host; } catch {}
+  return { configured: !!secrets.CALENDAR_FEED_URL, host, hasKey: !!secrets.CALENDAR_FEED_KEY };
+};
 
 export function settingsRoutes(app: FastifyInstance) {
   app.get("/api/settings", async () => readSettings());
@@ -69,6 +78,18 @@ export function settingsRoutes(app: FastifyInstance) {
   });
 
   app.get("/api/calendar", async () => calendarState());
+  app.get("/api/calendar/config", async () => calendarConfig());
+  app.post("/api/calendar/config", { preHandler: localOnly }, async (req, reply) => {
+    const body = CalendarConfigPatch.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "bad request" });
+    const current = readSecrets();
+    updateEnvFile(path.join(JARVIS_DIR, "secrets", ".env"), {
+      CALENDAR_FEED_URL: body.data.url,
+      CALENDAR_FEED_KEY: body.data.key ?? current.CALENDAR_FEED_KEY ?? "",
+    });
+    await refreshCalendar();
+    return calendarConfig();
+  });
   app.post("/api/calendar/refresh", { preHandler: localOnly }, async () => refreshCalendar());
   // workers' calendar tool: any single day, fetched live from the feed
   app.get("/api/calendar/day", async (req, reply) => {
