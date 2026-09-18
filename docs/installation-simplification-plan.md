@@ -390,28 +390,58 @@ Dependencies: Phase 2 complete.
 
 ### Task 10: Publish architecture-specific Homebrew bottles
 
-**Status: Mechanism complete, Apple Silicon pending first publication; Intel
-blocked on hardware.**
+**Status: Apple Silicon published in v0.3.27. The compile is gone; the
+dependency download is not. Intel blocked on hardware.**
 
 The formula carries a per-architecture `engine` resource and installs by
 extracting it, and `release.sh` builds the artifact, attaches it to the GitHub
 release, and writes its checksum into the formula before the tap is committed.
 
-What is proven and what is not:
+First publication, v0.3.27 (2026-09-18):
 
-- Proven locally: the formula passes `brew style` with no offences, the
-  prebuilt/source predicate is correct for published, placeholder and
-  source-tarball inputs, the checksum substitution rewrites the resource block
-  and leaves the source `sha256` untouched, and the artifact itself extracts
-  and serves `/api/health`.
-- Not yet proven: an actual `brew install` of a published artifact, because
-  nothing has been published. Until the first release the checksum is an
-  all-zeros placeholder, the predicate returns false, and every install builds
-  from source exactly as before — the change is inert until it is real.
+- Published: `jarvis-engine-arm64-node127.tar.gz`, 15 MB, sha256
+  `e48d517e99b003ff937703c8084a94aa028e35b811ae6bd4278b2d8ca32a51ed`, stamped
+  with the tag and commit it was built from. The all-zeros placeholder is gone,
+  so `build_prebuilt?` now returns true and installs extract instead of
+  compiling.
+- Verified independently of `release.sh`: the published artifact was
+  re-downloaded and re-hashed against the formula, and the extracted tree boots
+  a server that answers `/api/health`, serves the UI, and loads
+  `better-sqlite3` against ABI 127.
+
+The acceptance criterion below says "downloads a bottle instead of compiling".
+Half of that is now true, and the distinction matters enough to write down:
+
+- The **compile** is gone. No pnpm, no Vite, no swiftc on the user's Mac.
+- The **dependency download is not**. Homebrew installs `:build` dependencies
+  whenever it has no bottle for the formula itself, which is always, because
+  the formula is not bottled. An install therefore still pulls `pnpm`, `rust`
+  and `llvm@22` and then never uses them. Removing that needs real Homebrew
+  bottles for the formula — a separate piece of work from the prebuilt engine
+  resource, and not what this task delivered.
+
+`whisper.cpp`, `llama.cpp` and `ggml` are not in that category: they are the
+local transcription stack, genuinely required at runtime, and install once.
+
+Two things learned publishing it, both fixed:
+
+- `build-artifact.sh` compiles into the working tree and signed with `-s -`,
+  so cutting a release re-signed the release machine's own apps ad-hoc and
+  silently revoked its macOS recording grants. It now signs with the
+  configured identity.
+- A tap clone on another machine is cached, and `brew install` will happily
+  install the previous version until `brew update` runs. The published formula
+  being correct is not sufficient; verify with `brew info jarvis` before
+  concluding anything about a test install.
+
+Still not proven: `brew upgrade` preserving `~/.jarvis` across versions.
+
 - Intel is not attempted. Cross-building a native module is not something to
   guess at, and the plan's own risk table says to secure an Intel runner before
   promising Intel support. An architecture with no artifact falls through to the
-  source build rather than failing, so Intel keeps working unchanged.
+  source build rather than failing, so Intel keeps working unchanged. The
+  `engine` resource declares only `on_arm`; on Intel it resolves to nothing,
+  `build_prebuilt?` rescues to false, and the source path runs.
 
 Produce bottles for Apple Silicon and Intel.
 
@@ -478,11 +508,33 @@ manual file editing, or native-module ABI failure.
 
 ### Task 12: Establish stable application identities
 
-**Status: Complete for permission stability; Developer ID still required for
-distribution.** `tools/signing-identity.sh` (`jarvis sign create`) creates a
-self-signed code-signing identity, `install.sh` uses it when present and warns
-when falling back to ad-hoc, and Doctor reports which kind of signature the
-apps carry.
+**Status: Complete and PROVEN for permission stability; Developer ID still
+required for distribution.** `tools/signing-identity.sh` (`jarvis sign create`)
+creates a self-signed code-signing identity, `install.sh` uses it when present
+and warns when falling back to ad-hoc, and Doctor reports which kind of
+signature the apps carry.
+
+When first exercised end to end (2026-09-18) the mechanism did not work, in
+four separate ways, each of which hid the next:
+
+- `openssl pkcs12 -export` defaults to a SHA-256 MAC under OpenSSL 3; macOS
+  verifies only SHA-1 and rejects it as `wrong password?`. The password was
+  never wrong.
+- `have_identity()` used `find-identity -v`, which lists only *valid*
+  identities. A self-signed certificate reads `CSSMERR_TP_NOT_TRUSTED` until an
+  admin marks it trusted, so a working identity was reported as missing. Trust
+  governs verifying a signature, not producing one.
+- `install.sh` resolved `SIGN_ID` after the two build steps that sign with it —
+  under `set -u` that aborts a fresh install, and only a fresh one, because a
+  rebuild skips the build branch entirely.
+- `jarvis setup` could never re-sign an already-built app, so the sequence
+  `jarvis sign create` itself prints was a no-op. `resign_if_stale()` fixes it.
+
+The proof the task actually wanted: cutting a release ad-hoc re-signed both
+apps and revoked Screen Recording and Microphone; restoring the identity
+brought **both grants back automatically, with no re-prompting**. That is the
+acceptance criterion "upgrades do not unnecessarily invalidate recording
+permissions", demonstrated rather than assumed.
 
 The distinction that matters: a Developer ID ($99/yr) is needed to hand the
 apps to OTHER people without Gatekeeper warnings. Permission stability on your
@@ -503,11 +555,28 @@ Dependencies: Apple Developer account and release CI.
 
 ### Task 13: Notarize native artifacts
 
-**Status: Blocked.** Notarization requires an Apple Developer account, a
-Developer ID certificate and an app-specific password submitted to Apple's
-service. None exist for this project, and none can be created from a
-development machine. Nothing here is partially doable: an artifact is either
-notarized by Apple or it is not.
+**Status: Blocked on a lapsed membership — one renewal away, not a fresh
+enrolment.** Checked directly on 2026-09-18: the owner's Apple Developer
+Program membership is **expired**, not absent. The account page offers Renew
+rather than Enrol, and Certificates, Identifiers & Profiles is present, which
+a free-tier account never shows.
+
+What that changes: nothing technically, everything about the cost of starting.
+Notarization and Developer ID certificate issuance both require an *active*
+membership, so both remain closed. But this is a $99 renewal on an existing
+team, not a new enrolment, and the machine already has `notarytool` and
+`stapler` from Command Line Tools — full Xcode is not needed.
+
+No Developer ID certificate exists on the machine (`security find-identity -v`
+reports none), so nothing was lost when the membership lapsed and there is
+nothing to salvage.
+
+The step most likely to be missed when this is finally done: hardened runtime,
+which notarization requires, **denies microphone access by default**. Without
+`com.apple.security.device.audio-input` in an entitlements file, notarization
+succeeds, Gatekeeper is satisfied, and recording silently dies — the same
+class of failure as Task 10's ad-hoc re-signing and the obstructed default
+microphone.
 
 Acceptance criteria:
 
