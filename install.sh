@@ -89,7 +89,7 @@ BARD="tools/menubar/JarvisBar.app/Contents"
 if [[ -x "$BARD/MacOS/jarvisbar" && "$BARD/MacOS/jarvisbar" -nt tools/menubar/jarvisbar.swift ]]; then ok "JarvisBar.app"
 elif [[ $CHECK_ONLY == 1 ]]; then bad "JarvisBar.app not built — run: jarvis setup"
 else
-  mkdir -p "$BARD/MacOS"
+  mkdir -p "$BARD/MacOS" "$BARD/Resources"
   cat > "$BARD/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -102,6 +102,7 @@ else
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>LSUIElement</key><true/>
+  <key>CFBundleIconFile</key><string>Jarvis</string>
   <!-- the dashboard opens in a WKWebView window now, and its voice feature
        calls getUserMedia; without this key macOS denies the request before
        the app's own delegate is ever consulted -->
@@ -110,6 +111,18 @@ else
 </dict>
 </plist>
 PLIST
+  # The app icon is rendered from the same SF Symbol the menu bar uses, then
+  # packed into .icns. A notification banner takes its icon from the BUNDLE —
+  # NSApp.applicationIconImage only covers the Dock — which is why alerts
+  # showed a grey placeholder while the Dock showed the brain.
+  if swiftc -O tools/menubar/make-icon.swift -o /tmp/jarvis-make-icon 2>>/tmp/jarvis-swift-err; then
+    ISET="$(mktemp -d)/Jarvis.iconset"; mkdir -p "$ISET"
+    if /tmp/jarvis-make-icon "$ISET" >/dev/null 2>&1 \
+       && iconutil -c icns "$ISET" -o "$BARD/Resources/Jarvis.icns" 2>>/tmp/jarvis-swift-err; then
+      ok "app icon rendered"
+    else warn "app icon generation failed — the app still runs, notifications show a placeholder"; fi
+    rm -rf "$(dirname "$ISET")"
+  fi
   if swiftc -O tools/menubar/jarvisbar.swift -o "$BARD/MacOS/jarvisbar" 2>/tmp/jarvis-swift-err \
      && codesign --force -s - tools/menubar/JarvisBar.app 2>>/tmp/jarvis-swift-err; then
     ok "JarvisBar.app built + signed (menu-bar icon)"
