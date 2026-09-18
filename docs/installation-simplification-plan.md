@@ -1,5 +1,9 @@
 # Implementation Plan: One-Command Jarvis Installation
 
+Progress is tracked in the
+[One-Command Installation Checklist](installation-checklist.md). Update the
+checklist in the same commit as each completed implementation slice.
+
 ## Goal
 
 A new user on either Apple Silicon or Intel Mac can install and launch Jarvis
