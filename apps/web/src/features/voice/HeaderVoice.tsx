@@ -1,3 +1,4 @@
+import { createRecognition } from "./speechRecognition";
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Header voice bar — talk to Jarvis from ANY tab without leaving it.
 // Three modes (⚙ settings):
@@ -15,6 +16,8 @@ import * as S from "@jarvis/shared";
 import { appendTranscript, currentSessionId, streamChatTurn } from "../../lib/chatTransport";
 import { speak } from "../../lib/tts";
 import { setVoicePresence } from "../../lib/live";
+import { MicrophonePicker } from "./MicrophonePicker";
+import { microphoneError, openMicrophone, savedMicrophone, startRecognition } from "./microphone";
 
 type VState = "idle" | "listening" | "thinking" | "speaking";
 
@@ -33,6 +36,12 @@ export function HeaderVoice() {
   const mode = settings?.voiceMode ?? "on-demand";
   const [state, setState] = useState<VState>("idle");
   const [persistent, setPersistent] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [micError, setMicError] = useState("");
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const deviceRef = useRef("");
+  const attemptRef = useRef(0);
+  const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -280,99 +289,137 @@ export function HeaderVoice() {
   };
 
   const makeRecognition = () => {
-    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SR) return null;
-    const rec = new SR();
+    const rec = createRecognition();
     rec.lang = "en-IN";
     rec.interimResults = true;
     rec.continuous = true;
     rec.onresult = (e: any) => {
+      if (recRef.current !== rec) return;
       const last = e.results[e.results.length - 1];
       handleStream(last[0].transcript, last.isFinal);
     };
     rec.onend = () => {
-      // Chrome self-stops on silence — in persistent modes we just restart
+      if (recRef.current !== rec) return;
       if (activeRef.current && !speakingRef.current)
-        setTimeout(() => { try { recRef.current?.start(); } catch {} }, 300);
-      else if (!activeRef.current && stateRef.current === "listening")
-        setState("idle");
+        restartTimer.current = setTimeout(restartRecognition, 300);
+      else if (!activeRef.current) {
+        releaseAudio();
+        recRef.current = null;
+        if (stateRef.current === "listening") setState("idle");
+      }
     };
-    rec.onerror = (e: any) => {
-      if (e.error === "not-allowed") stopAll();
+    rec.onerror = (event: any) => {
+      if (recRef.current !== rec || event.error === "no-speech" || event.error === "aborted") return;
+      stopAll();
+      setMicError(event.message || (event.error === "not-allowed" ? "Allow microphone access in your browser and try again." : `Speech recognition failed (${event.error}). Click the microphone to try again.`));
     };
     return rec;
   };
 
   const restartRecognition = () => {
-    try { recRef.current?.start(); } catch {}
+    if (!activeRef.current || speakingRef.current || !recRef.current) return;
+    if (restartTimer.current) clearTimeout(restartTimer.current);
+    try { startRecognition(recRef.current, streamRef.current, deviceRef.current); }
+    catch (error) {
+      if ((error as DOMException).name === "InvalidStateError") return; // already running
+      stopAll(); setMicError(microphoneError(error));
+    }
   };
 
-  const attachAnalyser = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setVoicePresence(true);   // mic is ours — tell the call watcher
-      streamRef.current = stream;
-      const actx = new AudioContext();
-      const src = actx.createMediaStreamSource(stream);
-      const analyser = actx.createAnalyser();
-      analyser.fftSize = 128;
-      src.connect(analyser);   // analyser only — never to speakers
-      analyserRef.current = analyser;
-    } catch {}
+  const releaseAudio = () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    analyserRef.current = null;
+    void audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+    setVoicePresence(false);
   };
 
   const stopAll = () => {
-    setVoicePresence(false);
+    attemptRef.current++;
     activeRef.current = false;
     setPersistent(false);
     setAttentive(false);
     bufferRef.current = "";
     holdDispatch();
+    if (restartTimer.current) clearTimeout(restartTimer.current);
     localStorage.setItem("jarvis_mic_on", "0");
-    try { recRef.current?.stop(); } catch {}
+    const rec = recRef.current;
     recRef.current = null;
-    streamRef.current?.getTracks().forEach((tr) => tr.stop());
-    streamRef.current = null;
-    analyserRef.current = null;
+    try { rec?.abort(); } catch {}
+    releaseAudio();
     setState("idle");
   };
 
-  const startPersistent = async () => {
-    const rec = makeRecognition();
-    if (!rec) return;
-    await attachAnalyser();
-    recRef.current = rec;
-    activeRef.current = true;
-    setPersistent(true);
-    localStorage.setItem("jarvis_mic_on", "1");
-    setState("listening");
-    try { rec.start(); } catch {}
+  const startListening = async (deviceId: string, keepListening: boolean) => {
+    window.dispatchEvent(new Event("jarvis:microphone-starting"));
+    const attempt = ++attemptRef.current;
+    setMicError("");
+    try {
+      const rec = makeRecognition();
+      const stream = await openMicrophone(deviceId);
+      if (attempt !== attemptRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        throw new Error("Microphone start cancelled. Please try again.");
+      }
+      streamRef.current = stream;
+      deviceRef.current = deviceId;
+      setVoicePresence(true);
+      const context = new AudioContext();
+      audioContextRef.current = context;
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 128;
+      context.createMediaStreamSource(stream).connect(analyser);
+      analyserRef.current = analyser;
+      stream.getAudioTracks()[0]?.addEventListener("ended", () => {
+        if (streamRef.current !== stream) return;
+        stopAll();
+        setMicError("Microphone disconnected. Click the microphone to choose another input.");
+      });
+      recRef.current = rec;
+      rec.continuous = keepListening;
+      activeRef.current = keepListening;
+      setPersistent(keepListening);
+      if (!keepListening) rec.onresult = (event: any) => {
+        if (recRef.current !== rec) return;
+        const last = event.results[event.results.length - 1];
+        if (!last.isFinal) return;
+        recRef.current = null;
+        try { rec.stop(); } catch {}
+        releaseAudio();
+        handleFinal(last[0].transcript);
+        if (locationRef.current.startsWith("/chat")) setState("idle");
+      };
+      startRecognition(rec, stream, deviceId);
+      setState("listening");
+      localStorage.setItem("jarvis_mic_on", keepListening ? "1" : "0");
+    } catch (error) {
+      if (attempt === attemptRef.current) stopAll();
+      throw error;
+    }
   };
 
-  const startOnDemand = async () => {
-    const rec = makeRecognition();
-    if (!rec) return;
-    rec.continuous = false;
-    await attachAnalyser();
-    recRef.current = rec;
-    activeRef.current = false;
-    setState("listening");
-    rec.onresult = (e: any) => {
-      const last = e.results[e.results.length - 1];
-      if (!last.isFinal) return;
-      try { rec.stop(); } catch {}
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
-      analyserRef.current = null;
-      handleFinal(last[0].transcript);
+  useEffect(() => {
+    const stop = () => stopAll();
+    window.addEventListener("jarvis:microphone-starting", stop);
+    return () => {
+      window.removeEventListener("jarvis:microphone-starting", stop);
+      // Preserve the resume preference while releasing hardware on unmount.
+      attemptRef.current++;
+      activeRef.current = false;
+      holdDispatch();
+      if (restartTimer.current) clearTimeout(restartTimer.current);
+      const rec = recRef.current;
+      recRef.current = null;
+      try { rec?.abort(); } catch {}
+      releaseAudio();
     };
-    try { rec.start(); } catch {}
-  };
+  }, []);
 
   const onMicClick = () => {
     if (state === "listening" || persistent) { stopAll(); return; }
-    if (mode === "on-demand") void startOnDemand();
-    else void startPersistent();
+    setMicError("");
+    setPickerOpen(true);
   };
 
   // Arm the mic the moment a persistent mode is chosen in settings; on plain
@@ -389,7 +436,7 @@ export function HeaderVoice() {
     }
     const explicitSwitch = prev !== null && prev !== mode;  // just picked in ⚙
     const resume = localStorage.getItem("jarvis_mic_on") === "1";
-    if (!activeRef.current && (explicitSwitch || resume)) void startPersistent();
+    if (!activeRef.current && (explicitSwitch || resume)) void startListening(savedMicrophone(), true).catch(error => setMicError(microphoneError(error)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, !!settings]);
 
@@ -401,13 +448,16 @@ export function HeaderVoice() {
     : "VOICE READY";
 
   return (
+    <>
+    {pickerOpen && <MicrophonePicker onStart={id => startListening(id, modeRef.current !== "on-demand")} onClose={() => setPickerOpen(false)} onCancel={() => { stopAll(); setPickerOpen(false); }} />}
     <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surf-2)] py-1 pl-1 pr-3">
       <button
         onClick={onMicClick}
+        aria-label={state === "listening" || persistent ? "Stop listening" : "Choose microphone"}
         title={
           mode === "on-demand"
-            ? "Click to talk to Jarvis"
-            : persistent ? "Listening — click to stop" : "Click to start listening"
+            ? "Choose microphone and talk to Jarvis"
+            : persistent ? "Listening — click to stop" : "Choose microphone and start listening"
         }
         className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border text-[14px] ${
           state === "listening"
@@ -432,5 +482,7 @@ export function HeaderVoice() {
         {status}
       </span>
     </div>
+    {micError && <span role="alert" className="max-w-xs text-xs text-[var(--red)]">{micError}</span>}
+    </>
   );
 }

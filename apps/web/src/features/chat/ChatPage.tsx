@@ -1,3 +1,4 @@
+import { createRecognition } from "../voice/speechRecognition";
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // The operator comms log — port of the legacy chat design: Jarvis speaks as
 // the system (node + mono eyebrow, no bubble), you transmit in capsules.
@@ -16,6 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 import { callTitle } from "../calls/hooks";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
+import { MicrophonePicker } from "../voice/MicrophonePicker";
+import { openMicrophone, startRecognition } from "../voice/microphone";
+import { setVoicePresence } from "../../lib/live";
 
 // "SOURCES: /calls/x /notes/y" (from recall workers) renders as link chips
 // replies carry a screen part (markdown) and a final "SPOKEN: ..." line for
@@ -147,6 +151,10 @@ export function ChatPage() {
     () => (cachedUiState().voice ?? localStorage.getItem("jarvis_voice")) === "on",
   );
   const [listening, setListening] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [micError, setMicError] = useState("");
+  const micRef = useRef<{ rec: any; stream: MediaStream } | null>(null);
+  const micAttempt = useRef(0);
   const [pendingImgs, setPendingImgs] = useState<ChatImage[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -290,21 +298,71 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const mic = () => {
-    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SR) return;
-    const rec = new SR();
-    rec.lang = "en-IN";
-    rec.interimResults = true;
-    setListening(true);
-    rec.onresult = (e: any) => {
-      const t = [...e.results].map((r: any) => r[0].transcript).join("");
-      setInput(t);
-      if (e.results[e.results.length - 1].isFinal) { rec.stop(); submit(t, true); }
+  const stopMic = () => {
+    micAttempt.current++;
+    const current = micRef.current;
+    micRef.current = null;
+    if (current) {
+      try { current.rec.abort(); } catch {}
+      current.stream.getTracks().forEach(track => track.stop());
+      setVoicePresence(false);
+    }
+    setListening(false);
+  };
+
+  useEffect(() => {
+    window.addEventListener("jarvis:microphone-starting", stopMic);
+    return () => {
+      window.removeEventListener("jarvis:microphone-starting", stopMic);
+      stopMic();
     };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.start();
+  }, [sessionId]);
+
+  const startMic = async (deviceId: string) => {
+    window.dispatchEvent(new Event("jarvis:microphone-starting"));
+    const attempt = ++micAttempt.current;
+    const stream = await openMicrophone(deviceId);
+    if (attempt !== micAttempt.current) {
+      stream.getTracks().forEach(track => track.stop());
+      throw new Error("Microphone start cancelled. Please try again.");
+    }
+    try {
+      const rec = createRecognition();
+      micRef.current = { rec, stream };
+      setVoicePresence(true);
+      rec.lang = "en-IN";
+      rec.interimResults = true;
+      rec.onresult = (event: any) => {
+        if (micRef.current?.rec !== rec) return;
+        const text = [...event.results].map((result: any) => result[0].transcript).join("");
+        setInput(text);
+        if (event.results[event.results.length - 1].isFinal) { stopMic(); submit(text, true); }
+      };
+      rec.onend = () => { if (micRef.current?.rec === rec) stopMic(); };
+      rec.onerror = (event: any) => {
+        if (micRef.current?.rec !== rec) return;
+        stopMic();
+        if (event.error !== "no-speech" && event.error !== "aborted")
+          setMicError(event.message || (event.error === "not-allowed" ? "Allow microphone access in your browser and try again." : `Speech recognition failed (${event.error}). Please try again.`));
+      };
+      stream.getAudioTracks()[0]?.addEventListener("ended", () => {
+        if (micRef.current?.rec !== rec) return;
+        stopMic();
+        setMicError("Microphone disconnected. Choose another input.");
+      });
+      startRecognition(rec, stream, deviceId);
+      setListening(true);
+    } catch (error) {
+      stream.getTracks().forEach(track => track.stop());
+      stopMic();
+      throw error;
+    }
+  };
+
+  const mic = () => {
+    if (listening) { stopMic(); return; }
+    setMicError("");
+    setPickerOpen(true);
   };
 
   const newChat = () => {
@@ -325,6 +383,7 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full">
+    {pickerOpen && <MicrophonePicker onStart={startMic} onClose={() => setPickerOpen(false)} onCancel={() => { stopMic(); setPickerOpen(false); }} />}
     <div className="relative mx-auto flex h-full w-full max-w-[780px] flex-col px-6 py-4">
       {messages.length === 0 && (
         <div className="absolute inset-x-6 bottom-[120px] top-0 z-10 flex flex-col items-center justify-center gap-2 text-center">
@@ -487,10 +546,12 @@ export function ChatPage() {
               ))}
             </div>
           )}
+          {micError && <p role="alert" className="mb-2 text-xs text-[var(--red)]">{micError}</p>}
           <div className="flex items-center gap-[6px]">
           <button
             onClick={mic}
-            title="Click to speak"
+            title={listening ? "Stop listening" : "Choose microphone and speak"}
+            aria-label={listening ? "Stop dictation" : "Choose dictation microphone"}
             className={`h-[38px] w-[38px] shrink-0 rounded-full border text-[15px] ${
               listening
                 ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[#012] shadow-[0_0_22px_var(--cyan)]"
