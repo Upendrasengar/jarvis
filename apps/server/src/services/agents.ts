@@ -16,6 +16,7 @@ import { recordResult } from "./chatSessions.js";
 import { SCREEN_FORMAT } from "@jarvis/shared";
 import { pushEvent } from "../live/liveState.js";
 import { modelFor } from "./models.js";
+import { whereThingsAre } from "./whereThings.js";
 import { claimRound, recordResult as recordTurnResult } from "./chatSessions.js";
 
 // How much of a worker report survives into the chat context.
@@ -171,6 +172,7 @@ export function spawnAsk(task: string, sessionId = "") {
     "",
     "You MAY read files, run read-only shell (git log/status, grep, the tools/*.sh scripts in ~/jarvis),",
     "and search the Obsidian vaults. Do NOT write or modify anything. Be quick.",
+    whereThingsAre(),
     ...(readSecrets().CALENDAR_FEED_URL ? [
       `CALENDAR TOOL: the owner's work calendar is live. For ANY question about meetings/schedule on a`,
       `specific day, run: curl -s 'http://127.0.0.1:${PORT}/api/calendar/day?date=YYYY-MM-DD' — it returns`,
