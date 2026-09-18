@@ -121,7 +121,26 @@ if [[ -d "$ROOT/tools/menubar/JarvisBar.app" || -d "$ROOT/tools/call-capture/Jar
 fi
 
 if [[ -x "$ROOT/tools/call-capture/JarvisAudio.app/Contents/MacOS/audiocap" ]]; then
-  add_check recording-permissions "Recording permissions" "meetings (optional)" warning "Recording permissions are not queried by read-only Doctor" "Open System Settings → Privacy & Security and verify Microphone and Screen Recording for Jarvis Audio."
+  # Ask the app rather than assume. Inference is exactly what failed here
+  # before: TCC answered "granted" while the recorder wrote silence.
+  PERM_FILE="$(mktemp)"
+  open -n -g -a "$ROOT/tools/call-capture/JarvisAudio.app" --args --check "$PERM_FILE" 2>/dev/null || true
+  PERM_I=0
+  while [[ $PERM_I -lt 16 && ! -s "$PERM_FILE" ]]; do sleep 0.25; PERM_I=$((PERM_I+1)); done
+  PERM_MIC="$(sed -n 's/^microphone: //p' "$PERM_FILE" 2>/dev/null | head -1)"
+  PERM_SCR="$(sed -n 's/^screen-recording: //p' "$PERM_FILE" 2>/dev/null | head -1)"
+  rm -f "$PERM_FILE"
+  case "${PERM_MIC:-unknown}" in
+    granted) add_check permission-microphone "Microphone" "meetings (optional)" pass "Microphone granted to Jarvis Audio" "" ;;
+    not-determined) add_check permission-microphone "Microphone" "meetings (optional)" optional "Microphone has not been requested yet" "Grant it in System Settings > Privacy & Security > Microphone, or start a recording." ;;
+    denied) add_check permission-microphone "Microphone" "meetings (optional)" warning "Microphone denied - your side of calls records silence" "System Settings > Privacy & Security > Microphone > enable Jarvis Audio." ;;
+    *) add_check permission-microphone "Microphone" "meetings (optional)" warning "Microphone state could not be read" "Run 'jarvis setup' and grant Microphone when prompted." ;;
+  esac
+  case "${PERM_SCR:-unknown}" in
+    granted) add_check permission-screen "Screen and system audio" "meetings (optional)" pass "Screen recording granted to Jarvis Audio" "" ;;
+    denied) add_check permission-screen "Screen and system audio" "meetings (optional)" warning "Screen recording denied or never requested - the other side of calls is not captured" "System Settings > Privacy & Security > Screen & System Audio Recording > enable Jarvis Audio." ;;
+    *) add_check permission-screen "Screen and system audio" "meetings (optional)" warning "Screen recording state could not be read" "Run 'jarvis setup' and grant Screen Recording when prompted." ;;
+  esac
 else
   add_check recording-permissions "Recording permissions" "meetings (optional)" optional "Recording permissions are not needed until JarvisAudio.app is built" "Run 'jarvis setup', then grant Microphone and Screen Recording when prompted."
 fi

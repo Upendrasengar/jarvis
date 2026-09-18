@@ -457,6 +457,17 @@ manual file editing, or native-module ABI failure.
 
 ### Task 12: Establish stable application identities
 
+**Status: Complete for permission stability; Developer ID still required for
+distribution.** `tools/signing-identity.sh` (`jarvis sign create`) creates a
+self-signed code-signing identity, `install.sh` uses it when present and warns
+when falling back to ad-hoc, and Doctor reports which kind of signature the
+apps carry.
+
+The distinction that matters: a Developer ID ($99/yr) is needed to hand the
+apps to OTHER people without Gatekeeper warnings. Permission stability on your
+own Mac needs only a stable identity, which a free certificate provides. The
+keychain import is left to the owner to run deliberately.
+
 Sign Jarvis Audio and JarvisBar with a Developer ID certificate.
 
 Acceptance criteria:
@@ -471,6 +482,12 @@ Dependencies: Apple Developer account and release CI.
 
 ### Task 13: Notarize native artifacts
 
+**Status: Blocked.** Notarization requires an Apple Developer account, a
+Developer ID certificate and an app-specific password submitted to Apple's
+service. None exist for this project, and none can be created from a
+development machine. Nothing here is partially doable: an artifact is either
+notarized by Apple or it is not.
+
 Acceptance criteria:
 
 - Applications are notarized and stapled.
@@ -481,6 +498,20 @@ Acceptance criteria:
 Dependencies: Task 12.
 
 ### Task 14: Improve permission onboarding
+
+**Status: Complete.** `GET /api/permissions` asks JarvisAudio.app for its own
+state, `POST /api/permissions/open` opens the exact System Settings pane, and
+the onboarding Meeting-recording step shows both permissions with the reason
+each is needed before offering to prompt.
+
+- Doctor now separates granted, denied and never-requested for the microphone.
+  Screen capture's preflight returns a bool, so denied and never-asked are
+  reported together and labelled as such rather than guessed apart.
+- Permissions are requested only when recording is enabled; Core installs
+  never reach this step.
+- The state is re-read on window focus, because granting happens in System
+  Settings and the moment the owner returns is exactly when a cached "denied"
+  becomes a lie.
 
 Acceptance criteria:
 

@@ -337,22 +337,87 @@ function CalendarStep({ configured }: { configured?: boolean }) {
   );
 }
 
+type Perms = { microphone: string; screen: string; appBuilt: boolean; screenNote: string };
+
 function MeetingsStep() {
   const { data } = useQuery<{ whisperModel?: string }>({
     queryKey: ["settings"],
     queryFn: async () => (await fetch("/api/settings")).json(),
   });
+
+  // Permissions are asked of JarvisAudio itself, not inferred. They are also
+  // re-read when the window regains focus: granting happens in System
+  // Settings, so the moment the owner comes back is exactly when the answer
+  // has changed and a stale "denied" would be actively misleading.
+  const { data: perms, refetch, isFetching } = useQuery<Perms>({
+    queryKey: ["permissions"],
+    queryFn: async () => (await fetch("/api/permissions")).json(),
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+
+  const openPane = (pane: "microphone" | "screen") =>
+    fetch("/api/permissions/open", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pane }),
+    });
+
+  const row = (label: string, state: string | undefined, pane: "microphone" | "screen", why: string) => {
+    const granted = state === "granted";
+    return (
+      <div className="mt-2 flex items-start gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--surf-2)] p-3">
+        <span className={`mt-[5px] h-[7px] w-[7px] shrink-0 rounded-full ${
+          granted ? "bg-[var(--green)]" : "bg-[var(--amber)]"
+        }`} />
+        <span className="min-w-0 flex-1">
+          <span className="text-[12.5px] text-[var(--text)]">{label}</span>
+          <span className="ml-2 font-mono text-[9.5px] uppercase tracking-[1px] text-[var(--dim)]">
+            {state ?? "checking"}
+          </span>
+          {/* the explanation comes BEFORE the prompt, not after it */}
+          <span className="mt-1 block text-[11px] text-[var(--dim)]">{why}</span>
+        </span>
+        {!granted && (
+          <button
+            onClick={() => openPane(pane)}
+            className="shrink-0 rounded-full border border-[var(--cyan)] px-3 py-1 text-[11px] text-[var(--cyan)] hover:bg-[var(--cyan-2)]"
+          >
+            Open Settings
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="text-[12.5px] leading-relaxed text-[var(--dim)]">
-      Recording needs a transcription model and two macOS permissions.
+      Recording needs a transcription model and two macOS permissions. Nothing is requested
+      unless you turn recording on.
       <code className="mt-2 block rounded-lg bg-[var(--field)] px-2 py-1 font-mono text-[11px] text-[var(--cyan)]">
         jarvis model medium
       </code>
       <span className="mt-2 block">
-        Model in use: <b className="text-[var(--text)]">{data?.whisperModel ?? "none"}</b>. Grant Microphone and
-        Screen Recording to <b className="text-[var(--text)]">Jarvis Audio</b> in System Settings → Privacy &amp;
-        Security — system audio is how Jarvis hears the other side of a call.
+        Model in use: <b className="text-[var(--text)]">{data?.whisperModel ?? "none"}</b>
       </span>
+
+      {perms?.appBuilt === false ? (
+        <div className="mt-3 text-[11.5px]">
+          Jarvis Audio is not built yet — run <code className="text-[var(--cyan)]">jarvis setup</code> first.
+        </div>
+      ) : (
+        <>
+          {row("Microphone", perms?.microphone, "microphone",
+               "Records your side of a call. Without it, notes capture only the other person.")}
+          {row("Screen &amp; System Audio", perms?.screen, "screen",
+               `How Jarvis hears the other side. ${perms?.screenNote || ""}`)}
+          <button
+            onClick={() => void refetch()}
+            className="mt-3 rounded-full border border-[var(--line)] px-3 py-1 text-[11px] text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+          >
+            {isFetching ? "Checking…" : "Re-check"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
