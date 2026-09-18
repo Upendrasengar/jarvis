@@ -95,6 +95,8 @@ git clone https://github.com/upendrasengar/jarvis && cd jarvis
 
 `jarvis onboard` writes `memory/` from your answers (edit `memory/*.md` anytime
 — it's all plain markdown). Or skip it and just open the dashboard and talk.
+Core is the safe default; use `jarvis onboard --profile meetings` or
+`jarvis onboard --profile full` to add optional capabilities later.
 
 `./jarvis doctor` diagnoses a broken setup; `./jarvis` opens a terminal
 session; `./jarvis digest` runs the morning brief on demand.

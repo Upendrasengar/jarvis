@@ -6,12 +6,18 @@ ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${JARVIS_DIR:-$ENGINE_DIR}"
 STATE_TOOL="$ENGINE_DIR/tools/onboarding-state.mjs"
 NON_INTERACTIVE=0
+REQUESTED_PROFILE=""
 
-case "${1:-}" in
-  "") ;;
-  --non-interactive) NON_INTERACTIVE=1 ;;
-  *) echo "usage: jarvis onboard [--non-interactive]" >&2; exit 2 ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --non-interactive) NON_INTERACTIVE=1; shift ;;
+    --profile)
+      [[ $# -ge 2 ]] || { echo "--profile requires core, meetings, or full" >&2; exit 2; }
+      REQUESTED_PROFILE="$2"; shift 2 ;;
+    *) echo "usage: jarvis onboard [--profile core|meetings|full] [--non-interactive]" >&2; exit 2 ;;
+  esac
+done
+case "$REQUESTED_PROFILE" in ""|core|meetings|full) ;; *) echo "invalid profile: $REQUESTED_PROFILE" >&2; exit 2 ;; esac
 
 command -v node >/dev/null 2>&1 || {
   echo "Jarvis onboarding requires Node.js 20 or newer. Install Node, then rerun: jarvis onboard" >&2
@@ -29,6 +35,7 @@ next_step() {
   state_json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s).nextStep;process.stdout.write(n??"")})'
 }
 complete_step() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" complete "$1" >/dev/null; }
+revisit_step() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" revisit "$1" >/dev/null; }
 pause_after() {
   if [[ "${JARVIS_ONBOARD_STOP_AFTER:-}" == "$1" ]]; then on_interrupt; fi
 }
@@ -121,8 +128,13 @@ profile_step() {
 }
 
 vault_step() {
-  local target
+  local report="$1" target
   echo "[4/8] Optional unified vault..."
+  if [[ "$PROFILE" != full ]]; then
+    echo "  ○ $PROFILE_NAME profile: unified vault and Obsidian skipped"
+    complete_step vault
+    return
+  fi
   if [[ -n "${JARVIS_VAULT:-}" || -s "$DATA_DIR/memory/settings/vault-dir.txt" ]]; then
     echo "  ✓ Vault already configured"
   elif ask_yes "Configure a unified Markdown/Obsidian vault now?"; then
@@ -133,12 +145,24 @@ vault_step() {
   else
     echo "  ○ Skipped — add later with: jarvis vault"
   fi
+  if [[ "$(doctor_status "$report" obsidian)" == pass ]]; then
+    echo "  ✓ Obsidian is available"
+  elif ask_yes "Install Obsidian now?"; then
+    brew install --cask obsidian || return 1
+  else
+    echo "  ○ Obsidian skipped — add later with: brew install --cask obsidian"
+  fi
   complete_step vault
 }
 
 calendar_step() {
   local report="$1"
   echo "[5/8] Optional calendar feed..."
+  if [[ "$PROFILE" == core ]]; then
+    echo "  ○ Core profile: calendar skipped"
+    complete_step calendar
+    return
+  fi
   if [[ "$(doctor_status "$report" calendar)" == pass ]]; then
     echo "  ✓ Calendar feed already configured"
   else
@@ -150,6 +174,11 @@ calendar_step() {
 meetings_step() {
   local report="$1"
   echo "[6/8] Optional meeting recording..."
+  if [[ "$PROFILE" == core ]]; then
+    echo "  ○ Core profile: meeting recording skipped"
+    complete_step meetings
+    return
+  fi
   if node - "$report" <<'NODE'
 const fs = require("fs");
 const report = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
@@ -158,6 +187,9 @@ process.exit(ids.every((id) => report.checks.find((check) => check.id === id)?.s
 NODE
   then
     echo "  ✓ Meeting transcription components are ready"
+  elif [[ $NON_INTERACTIVE -eq 1 ]]; then
+    echo "  ✗ $PROFILE_NAME requires meeting components. Run 'jarvis setup', then rerun: jarvis onboard --profile $PROFILE" >&2
+    return 1
   elif ask_yes "Install optional meeting recording components now?"; then
     [[ "$DATA_DIR" == "$ENGINE_DIR" ]] || { echo "Meeting setup requires the active Jarvis installation." >&2; return 1; }
     bash "$ENGINE_DIR/install.sh" || return 1
@@ -169,7 +201,19 @@ NODE
 
 service_step() {
   local report="$1"
-  echo "[7/8] Optional start at login..."
+  echo "[7/8] Optional integrations and start at login..."
+  if [[ "$PROFILE" != full ]]; then
+    echo "  ○ $PROFILE_NAME profile: Telegram and background service skipped"
+    complete_step service
+    return
+  fi
+  if [[ "$(doctor_status "$report" telegram)" == pass ]]; then
+    echo "  ✓ Telegram is configured"
+  elif ask_yes "Configure Telegram now?"; then
+    bash "$ENGINE_DIR/tools/setup-telegram.sh" || return 1
+  else
+    echo "  ○ Telegram skipped — add later with: jarvis telegram"
+  fi
   if [[ "$(doctor_status "$report" login-service)" == pass ]]; then
     echo "  ✓ Login service is already installed"
   elif ask_yes "Start Jarvis automatically when you log in?"; then
@@ -210,6 +254,37 @@ on_exit() {
 }
 trap 'on_exit $?' EXIT
 
+PROFILE_FILE="$DATA_DIR/memory/settings/installation-profile.txt"
+STORED_PROFILE="$(head -1 "$PROFILE_FILE" 2>/dev/null | tr -d '[:space:]')"
+case "$STORED_PROFILE" in ""|core|meetings|full) ;; *) STORED_PROFILE="" ;; esac
+if [[ -n "$REQUESTED_PROFILE" ]]; then
+  PROFILE="$REQUESTED_PROFILE"
+elif [[ -n "$STORED_PROFILE" ]]; then
+  PROFILE="$STORED_PROFILE"
+elif [[ $NON_INTERACTIVE -eq 1 ]]; then
+  PROFILE=core
+else
+  echo "Choose an installation profile:"
+  echo "  1) Core (recommended) — assistant, memory, dashboard"
+  echo "  2) Meetings — Core plus calendar, recording, transcription"
+  echo "  3) Full — Meetings plus Obsidian, Telegram, background service"
+  read -r -p "Profile [1]: " profile_choice
+  case "$profile_choice" in 2|meetings) PROFILE=meetings ;; 3|full) PROFILE=full ;; *) PROFILE=core ;; esac
+fi
+case "$PROFILE" in core) PROFILE_NAME=Core; PROFILE_RANK=1 ;; meetings) PROFILE_NAME=Meetings; PROFILE_RANK=2 ;; full) PROFILE_NAME=Full; PROFILE_RANK=3 ;; esac
+case "${STORED_PROFILE:-core}" in core) STORED_RANK=1 ;; meetings) STORED_RANK=2 ;; full) STORED_RANK=3 ;; esac
+
+echo "Selected profile: $PROFILE_NAME"
+mkdir -p "$(dirname "$PROFILE_FILE")"
+PROFILE_TEMP="${PROFILE_FILE}.$$"
+printf '%s\n' "$PROFILE" >"$PROFILE_TEMP"
+mv "$PROFILE_TEMP" "$PROFILE_FILE"
+if [[ $PROFILE_RANK -gt $STORED_RANK ]]; then
+  if [[ $PROFILE_RANK -ge 2 ]]; then revisit_step calendar; revisit_step meetings; fi
+  if [[ $PROFILE_RANK -ge 3 ]]; then revisit_step vault; revisit_step service; fi
+  revisit_step complete
+fi
+
 NEXT="$(next_step)" || exit 1
 if [[ -z "$NEXT" ]]; then
   echo "Jarvis onboarding is already complete; verifying health..."
@@ -232,7 +307,7 @@ for step in "${STEPS[@]}"; do
     system) system_step "$TMP_REPORT" || exit 1 ;;
     claude) claude_step "$TMP_REPORT" || exit 1 ;;
     profile) profile_step || exit 1 ;;
-    vault) vault_step || exit 1 ;;
+    vault) vault_step "$TMP_REPORT" || exit 1 ;;
     calendar) calendar_step "$TMP_REPORT" || exit 1 ;;
     meetings) meetings_step "$TMP_REPORT" || exit 1 ;;
     service) service_step "$TMP_REPORT" || exit 1 ;;

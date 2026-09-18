@@ -139,6 +139,17 @@ if has_nonempty_secret CALENDAR_FEED_URL; then
 else
   add_check calendar "Calendar feed" configuration optional "No calendar feed URL is configured" "Open Jarvis Settings to add a calendar feed URL."
 fi
+PROFILE="$(head -1 "$ROOT/memory/settings/installation-profile.txt" 2>/dev/null | tr -d '[:space:]')"
+case "$PROFILE" in
+  core|meetings|full) add_check installation-profile "Installation profile" configuration pass "The ${PROFILE} installation profile is selected" "" ;;
+  "") add_check installation-profile "Installation profile" configuration optional "No installation profile is selected" "Run 'jarvis onboard --profile core'." ;;
+  *) add_check installation-profile "Installation profile" configuration warning "The installation profile setting is invalid" "Run 'jarvis onboard --profile core|meetings|full'." ;;
+esac
+if has_nonempty_secret TELEGRAM_BOT_TOKEN && has_nonempty_secret TELEGRAM_CHAT_ID; then
+  add_check telegram "Telegram" "integrations (optional)" pass "Telegram is configured" ""
+else
+  add_check telegram "Telegram" "integrations (optional)" optional "Telegram is not configured" "Run 'jarvis telegram' to connect it."
+fi
 
 PORT="$(head -1 "$ROOT/memory/settings/port.txt" 2>/dev/null || true)"; PORT="${PORT:-4321}"
 if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then

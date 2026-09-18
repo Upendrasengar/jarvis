@@ -6,8 +6,8 @@ it in the same commit whenever work completes, changes scope, or becomes
 blocked.
 
 - **Last updated:** 2026-09-18
-- **Current task:** Task 5 — Add installation profiles
-- **Completed:** 4 of 16 tasks
+- **Current task:** Task 6 — Create an onboarding status API
+- **Completed:** 5 of 16 tasks
 
 ## Phase 1: Installation contract
 
@@ -44,11 +44,14 @@ blocked.
   - [x] Resume safely after interruption.
   - Evidence: `tools/test-onboard.sh` covers clean non-interactive setup,
     idempotent reruns, interruption/resume, and an unauthenticated Claude CLI.
-- [ ] **Task 5 — Add installation profiles**
-  - [ ] Core profile
-  - [ ] Meetings profile
-  - [ ] Full profile
-  - [ ] Allow optional modules to be added later.
+- [x] **Task 5 — Add installation profiles**
+  - [x] Core profile
+  - [x] Meetings profile
+  - [x] Full profile
+  - [x] Allow optional modules to be added later.
+  - Evidence: `tools/test-onboard.sh` verifies profile selection and display,
+    Core isolation from recording setup, Meetings requirements, Full
+    integrations, invalid selection, and additive Core-to-Meetings upgrades.
 
 ### CLI checkpoint
 
@@ -142,6 +145,7 @@ blocked.
 | 2026-09-18 | Task 2 — Machine-readable Doctor | This commit | `tools/doctor.sh`, `tools/tests/doctor-json.test.sh` |
 | 2026-09-18 | Task 3 — Resumable onboarding state | This commit | `tools/onboarding-state.mjs`, `tools/test-onboarding-state.mjs` |
 | 2026-09-18 | Task 4 — Resumable CLI wizard | This commit | `tools/onboard.sh`, `tools/test-onboard.sh` |
+| 2026-09-18 | Task 5 — Installation profiles | This commit | `tools/onboard.sh`, `tools/doctor.sh`, `tools/test-onboard.sh` |
 
 ## Update rule
 

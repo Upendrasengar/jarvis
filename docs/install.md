@@ -63,14 +63,15 @@ configured must be reported separately from Core health.
 
 ## Installation profiles
 
-The planned onboarding flow offers:
+Choose a profile with `jarvis onboard --profile <name>`:
 
 - **Core:** assistant, memory, and dashboard
 - **Meetings:** Core plus calendar, recording, and transcription
 - **Full:** Meetings plus Obsidian, Telegram, and background jobs
 
 Core is the default recommendation for the first successful launch. Optional
-profiles can be added later by rerunning onboarding.
+capabilities can be added later by rerunning onboarding with a larger profile;
+existing user files and already-completed steps are preserved.
 
 ## Responsibility boundaries
 

@@ -181,11 +181,32 @@ Dependencies: Tasks 2–3.
 
 ### Task 5: Add installation profiles
 
+**Status: Complete.** Core, Meetings, and Full selection, persistence, and
+additive upgrades are implemented in `tools/onboard.sh` and verified by
+`tools/test-onboard.sh`.
+
 Offer three profiles:
 
 - **Core:** assistant, memory, and dashboard
 - **Meetings:** Core plus calendar, recording, and transcription
 - **Full:** Meetings plus Obsidian, Telegram, and background jobs
+
+Profile contract:
+
+- `core` is the safe default. It never downloads a Whisper model, builds
+  recording helpers, or requests recording permissions.
+- The selected non-secret profile is stored in
+  `memory/settings/installation-profile.txt` and printed before any setup
+  action begins.
+- `jarvis onboard --profile core|meetings|full` works in interactive and
+  non-interactive runs. Interactive runs without a stored selection prompt
+  once, defaulting to Core.
+- Selecting a larger profile later reopens only the newly relevant onboarding
+  steps; it never rewrites the local profile or removes configured features.
+- Meetings and Full require meeting components to be ready. Non-interactive
+  runs stop with a repair command instead of starting large downloads.
+- Full offers Obsidian, Telegram, and start-at-login setup. Declined or
+  unconfigured integrations remain optional Doctor findings.
 
 Acceptance criteria:
 

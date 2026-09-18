@@ -14,12 +14,27 @@ make_fixture() {
   chmod +x "$bin/claude" "$bin/pnpm" "$bin/curl"
 }
 
+enable_meetings() {
+  local root="$1" bin="$2"
+  mkdir -p "$root/tools/call-capture/bin" \
+    "$root/tools/call-capture/JarvisAudio.app/Contents/MacOS" "$root/models"
+  : >"$root/tools/call-capture/bin/audiocap"
+  : >"$root/tools/call-capture/bin/miccheck"
+  : >"$root/tools/call-capture/JarvisAudio.app/Contents/MacOS/audiocap"
+  : >"$root/models/ggml-base.bin"
+  chmod +x "$root/tools/call-capture/bin/audiocap" "$root/tools/call-capture/bin/miccheck" \
+    "$root/tools/call-capture/JarvisAudio.app/Contents/MacOS/audiocap"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$bin/ffmpeg"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$bin/whisper-cli"
+  chmod +x "$bin/ffmpeg" "$bin/whisper-cli"
+}
+
 ROOT_ONE="$TMP/complete"
 BIN_ONE="$TMP/bin-complete"
 make_fixture "$ROOT_ONE" "$BIN_ONE"
 PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" JARVIS_ONBOARD_NAME="Test User" \
   JARVIS_ONBOARD_ROLE="Tester" JARVIS_ONBOARD_FOCUS="Reliable setup" \
-  "$ENGINE/jarvis" onboard --non-interactive >"$TMP/first.txt"
+  "$ENGINE/jarvis" onboard --profile core --non-interactive >"$TMP/first.txt"
 
 STATE_ONE="$ROOT_ONE/memory/settings/onboarding.json"
 node - "$STATE_ONE" <<'NODE'
@@ -30,7 +45,18 @@ for (const [step, progress] of Object.entries(state.steps)) {
 }
 NODE
 rg -q 'Test User' "$ROOT_ONE/memory/about-me.md"
+[[ "$(<"$ROOT_ONE/memory/settings/installation-profile.txt")" == core ]]
+rg -q 'Selected profile: Core' "$TMP/first.txt"
+rg -q 'Core profile: meeting recording skipped' "$TMP/first.txt"
 rg -q 'Onboarding complete' "$TMP/first.txt"
+PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" JARVIS_DOCTOR_SKIP_CLAUDE_PROBE=1 \
+  "$ENGINE/jarvis" doctor --json >"$TMP/core-doctor.json"
+node - "$TMP/core-doctor.json" <<'NODE'
+const fs = require("fs");
+const report = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (report.checks.find((check) => check.id === "installation-profile")?.status !== "pass") process.exit(1);
+if (report.checks.find((check) => check.id === "telegram")?.status !== "optional") process.exit(2);
+NODE
 
 BEFORE="$(shasum -a 256 "$STATE_ONE" "$ROOT_ONE/memory/about-me.md")"
 PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" \
@@ -38,6 +64,18 @@ PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" \
 AFTER="$(shasum -a 256 "$STATE_ONE" "$ROOT_ONE/memory/about-me.md")"
 [[ "$BEFORE" == "$AFTER" ]] || { echo "completed onboarding rewrote user state" >&2; exit 1; }
 rg -q 'already complete' "$TMP/second.txt"
+
+# A larger profile reopens only its newly relevant steps and preserves the
+# local user profile.
+enable_meetings "$ROOT_ONE" "$BIN_ONE"
+PROFILE_BEFORE="$(shasum -a 256 "$ROOT_ONE/memory/about-me.md")"
+PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" \
+  "$ENGINE/jarvis" onboard --profile meetings --non-interactive >"$TMP/upgrade.txt"
+[[ "$(<"$ROOT_ONE/memory/settings/installation-profile.txt")" == meetings ]]
+[[ "$PROFILE_BEFORE" == "$(shasum -a 256 "$ROOT_ONE/memory/about-me.md")" ]]
+rg -q 'Selected profile: Meetings' "$TMP/upgrade.txt"
+rg -q 'Resuming at: calendar' "$TMP/upgrade.txt"
+rg -q 'Meeting transcription components are ready' "$TMP/upgrade.txt"
 
 ROOT_TWO="$TMP/interrupted"
 BIN_TWO="$TMP/bin-interrupted"
@@ -75,5 +113,39 @@ BLOCKED_NEXT="$(JARVIS_DIR="$ROOT_THREE" node "$ENGINE/tools/onboarding-state.mj
 [[ "$BLOCKED_NEXT" == "claude" ]] || { echo "expected blocked resume at claude, got $BLOCKED_NEXT" >&2; exit 1; }
 rg -q 'complete /login' "$TMP/blocked.txt"
 rg -q 'rerun: jarvis onboard' "$TMP/blocked.txt"
+
+ROOT_FOUR="$TMP/full"
+BIN_FOUR="$TMP/bin-full"
+make_fixture "$ROOT_FOUR" "$BIN_FOUR"
+enable_meetings "$ROOT_FOUR" "$BIN_FOUR"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$BIN_FOUR/obsidian"
+chmod +x "$BIN_FOUR/obsidian"
+mkdir -p "$ROOT_FOUR/secrets"
+printf 'TELEGRAM_BOT_TOKEN=full-profile-secret-canary\nTELEGRAM_CHAT_ID=123\n' >"$ROOT_FOUR/secrets/.env"
+PATH="$BIN_FOUR:$PATH" JARVIS_DIR="$ROOT_FOUR" JARVIS_ONBOARD_NAME="Full User" \
+  "$ENGINE/jarvis" onboard --profile full --non-interactive >"$TMP/full.txt"
+[[ "$(<"$ROOT_FOUR/memory/settings/installation-profile.txt")" == full ]]
+rg -q 'Selected profile: Full' "$TMP/full.txt"
+rg -q 'Obsidian is available' "$TMP/full.txt"
+rg -q 'Telegram is configured' "$TMP/full.txt"
+! rg -q 'full-profile-secret-canary' "$TMP/full.txt"
+
+ROOT_FIVE="$TMP/meetings-missing"
+BIN_FIVE="$TMP/bin-meetings-missing"
+make_fixture "$ROOT_FIVE" "$BIN_FIVE"
+set +e
+PATH="$BIN_FIVE:$PATH" JARVIS_DIR="$ROOT_FIVE" JARVIS_ONBOARD_NAME="Meetings User" \
+  "$ENGINE/jarvis" onboard --profile meetings --non-interactive >"$TMP/meetings-missing.txt" 2>&1
+MISSING_STATUS=$?
+set -e
+[[ $MISSING_STATUS -eq 1 ]] || { echo "expected missing Meetings components to fail" >&2; exit 1; }
+rg -q "Run 'jarvis setup'" "$TMP/meetings-missing.txt"
+
+set +e
+"$ENGINE/jarvis" onboard --profile impossible --non-interactive >"$TMP/invalid.txt" 2>&1
+INVALID_STATUS=$?
+set -e
+[[ $INVALID_STATUS -eq 2 ]] || { echo "expected invalid profile exit 2" >&2; exit 1; }
+rg -q 'invalid profile' "$TMP/invalid.txt"
 
 echo "onboarding wizard contract: ok"

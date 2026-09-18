@@ -15,3 +15,4 @@
 | `port.txt` | Port for the dashboard + API server | `4321` |
 | `ui.json` | UI prefs (voice mode etc.) — managed from the ⚙ Settings page | on-demand |
 | `onboarding.json` | Non-secret resumable onboarding step status — managed by Jarvis | on-demand |
+| `installation-profile.txt` | Selected onboarding profile: `core`, `meetings`, or `full` | `core` |
