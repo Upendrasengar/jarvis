@@ -390,6 +390,29 @@ Dependencies: Phase 2 complete.
 
 ### Task 10: Publish architecture-specific Homebrew bottles
 
+**Status: Mechanism complete, Apple Silicon pending first publication; Intel
+blocked on hardware.**
+
+The formula carries a per-architecture `engine` resource and installs by
+extracting it, and `release.sh` builds the artifact, attaches it to the GitHub
+release, and writes its checksum into the formula before the tap is committed.
+
+What is proven and what is not:
+
+- Proven locally: the formula passes `brew style` with no offences, the
+  prebuilt/source predicate is correct for published, placeholder and
+  source-tarball inputs, the checksum substitution rewrites the resource block
+  and leaves the source `sha256` untouched, and the artifact itself extracts
+  and serves `/api/health`.
+- Not yet proven: an actual `brew install` of a published artifact, because
+  nothing has been published. Until the first release the checksum is an
+  all-zeros placeholder, the predicate returns false, and every install builds
+  from source exactly as before — the change is inert until it is real.
+- Intel is not attempted. Cross-building a native module is not something to
+  guess at, and the plan's own risk table says to secure an Intel runner before
+  promising Intel support. An architecture with no artifact falls through to the
+  source build rather than failing, so Intel keeps working unchanged.
+
 Produce bottles for Apple Silicon and Intel.
 
 Acceptance criteria:

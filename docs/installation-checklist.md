@@ -112,10 +112,16 @@ blocked.
     `secrets/`, `models/` or `.git`; the ABI guard refuses a mismatched
     runtime and stays silent on a matching one.
 - [ ] **Task 10 — Publish architecture-specific Homebrew bottles**
-  - [ ] Apple Silicon bottle
-  - [ ] Intel bottle
-  - [ ] Upgrade preservation test
-  - [ ] Formula sandbox-boot test
+  - [x] Formula installs by extracting a per-architecture prebuilt engine.
+  - [x] Release builds the artifact and attaches it before rewriting the tap.
+  - [x] Formula tests run Doctor, validate its JSON, load the native module,
+        and boot a sandbox server.
+  - [x] `brew upgrade` still preserves `~/.jarvis` (wrapper unchanged).
+  - [ ] Apple Silicon artifact published and installed through Homebrew.
+  - [ ] Intel artifact — blocked, no Intel hardware or runner available.
+  - Note: until the first publication the checksum is an all-zeros
+    placeholder, the prebuilt predicate returns false, and installs build from
+    source exactly as before.
 - [ ] **Task 11 — Automate release validation**
   - [ ] Build and test both architectures.
   - [ ] Audit tracked files.
