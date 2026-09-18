@@ -99,6 +99,37 @@ mic_muted() {
   [ "$(date +%s)" -lt "$until" ]
 }
 
+# Choose an input that is actually producing sound, rather than trusting the
+# one macOS nominates. ffmpeg's ":default" follows the system default, and
+# macOS keeps the built-in microphone as default even with the lid closed,
+# where it is obstructed and delivers digital zero. That is how eight calls
+# lost one side of the conversation: ffmpeg started fine, ran to completion,
+# and wrote silence. The old fallback here only fired if ffmpeg DIED, which it
+# never does — starting successfully proves nothing.
+#
+# audiocap does the same check in Swift for the JarvisAudio.app path; this
+# covers the ffmpeg path used until that app's mic grant exists.
+pick_live_mic() {
+  local probe dir spec
+  local -a candidates=(":default")
+  while IFS= read -r idx; do candidates+=(":$idx"); done < <(
+    ffmpeg -hide_banner -f avfoundation -list_devices true -i "" 2>&1 \
+      | sed -n '/AVFoundation audio devices/,$p' \
+      | sed -n 's/.*\[\([0-9]\{1,\}\)\].*/\1/p')
+  dir="$(mktemp -d)"; probe="$dir/probe.wav"
+  for spec in "${candidates[@]}"; do
+    rm -f "$probe"
+    ffmpeg -hide_banner -loglevel error -y -f avfoundation -i "$spec" \
+      -ac 1 -ar 16000 -t 1 "$probe" 2>/dev/null || continue
+    if [ -s "$probe" ] && ! is_silent "$probe"; then
+      rm -rf "$dir"; printf '%s' "$spec"; return 0
+    fi
+  done
+  rm -rf "$dir"
+  printf ':default'      # nothing worked — record anyway so the alarm can fire
+  return 1
+}
+
 silence_checked=0
 
 recording=0
@@ -226,16 +257,19 @@ CALPY
     ffmpeg_pid="$(pgrep -nf 'audiocap --mic' 2>/dev/null | head -1)"
     echo "$(date '+%H:%M:%S') mic: JarvisAudio.app (pid ${ffmpeg_pid:-?})"
   else
-  ffmpeg -hide_banner -loglevel error -f avfoundation -i ":default" \
-    -ac 1 -ar 16000 "$session/mic.wav" 2>> "$session/capture.log" &
-  ffmpeg_pid=$!
-  sleep 2
-  if ! kill -0 "$ffmpeg_pid" 2>/dev/null; then
-    # ":default" not accepted on some setups — fall back to device 0
-    ffmpeg -hide_banner -loglevel error -f avfoundation -i ":0" \
+    # A deliberate mute writes zeroed frames, which measures exactly like a
+    # dead input — so do not probe while muted, or every device looks broken
+    # and the substitution fires for no reason.
+    if mic_muted; then
+      mic_spec=":default"
+    elif ! mic_spec="$(pick_live_mic)"; then
+      echo "$(date '+%H:%M:%S') mic: no input produced audio — recording anyway" \
+        >> "$session/capture.log"
+    fi
+    ffmpeg -hide_banner -loglevel error -f avfoundation -i "$mic_spec" \
       -ac 1 -ar 16000 "$session/mic.wav" 2>> "$session/capture.log" &
     ffmpeg_pid=$!
-  fi
+    echo "$(date '+%H:%M:%S') mic: ffmpeg $mic_spec (pid $ffmpeg_pid)"
   fi
 
   recording=1
