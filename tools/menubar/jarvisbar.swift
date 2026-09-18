@@ -82,13 +82,14 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
     private var window: NSWindow?
     private var web: WKWebView?
     private var iconSet = false
+    private var titleObs: NSKeyValueObservation?
 
     // The Dock showed a blank generic icon because the bundle has no .icns —
     // this app is built by swiftc from a single file, with no Xcode project to
     // carry an asset catalogue. Drawing it at runtime keeps that property and
     // guarantees the Dock matches the menu bar, since both come from the same
     // symbol rather than from an exported file that can drift out of step.
-    private static func dockIcon() -> NSImage? {
+    static func dockIcon() -> NSImage? {
         let side: CGFloat = 512
         // Tint through the symbol configuration rather than filling over the
         // drawn glyph: sourceAtop paints every opaque pixel in the rect, so the
@@ -139,6 +140,12 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
         cfg.mediaTypesRequiringUserActionForPlayback = []   // spoken replies autoplay
         let v = WKWebView(frame: .zero, configuration: cfg)
         v.uiDelegate = self
+        // "Jarvis" on every route tells you nothing. The page already sets a
+        // title per view, so follow it and fall back when it is empty.
+        titleObs = v.observe(\.title, options: [.new]) { [weak self] _, _ in
+            guard let t = self?.web?.title, !t.isEmpty else { return }
+            self?.window?.title = t
+        }
         v.load(URLRequest(url: url))
         web = v
 
@@ -146,6 +153,14 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
                          backing: .buffered, defer: false)
         w.title = "Jarvis"
+        // A native window shows its document icon beside the title. There is no
+        // file here, so represent the app itself: the same brain the Dock, the
+        // menu bar and notifications use, drawn once and reused.
+        w.representedURL = URL(fileURLWithPath: "/")
+        if let btn = w.standardWindowButton(.documentIconButton) {
+            btn.image = Self.dockIcon()
+            btn.action = nil            // not a file — clicking it should do nothing
+        }
         w.contentView = v
         w.center()
         w.setFrameAutosaveName("JarvisDashboard")   // remembers size and position

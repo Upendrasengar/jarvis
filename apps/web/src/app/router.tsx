@@ -1,5 +1,6 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./Layout";
 import { CallsPage } from "../features/calls/CallsPage";
 import { ActionsPage } from "../features/actions/ActionsPage";
@@ -12,8 +13,28 @@ import { SettingsPage } from "../features/settings/SettingsPage";
 import { LogsPage } from "../features/logs/LogsPage";
 import { NotesPage } from "../features/notes/NotesPage";
 
+// The window title is how this app is identified in Mission Control, cmd-tab
+// and the Window menu. Nothing set a per-view title, so every route read
+// "J.A.R.V.I.S" and three open windows were indistinguishable.
+const TITLES: Record<string, string> = {
+  overview: "Overview", chat: "Chat", brain: "Brain", projects: "Projects",
+  calls: "Calls", actions: "Actions", digest: "Digest", settings: "Settings",
+  logs: "Activity", notes: "Notes",
+};
+
+function PageTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const section = TITLES[pathname.split("/")[1] ?? ""];
+    document.title = section ? `Jarvis — ${section}` : "J.A.R.V.I.S";
+  }, [pathname]);
+  return null;
+}
+
 export function AppRoutes() {
   return (
+    <>
+      <PageTitle />
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/overview" replace />} />
@@ -34,5 +55,6 @@ export function AppRoutes() {
         <Route path="*" element={<Navigate to="/overview" replace />} />
       </Route>
     </Routes>
+    </>
   );
 }
