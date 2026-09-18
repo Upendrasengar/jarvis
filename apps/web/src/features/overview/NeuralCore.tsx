@@ -5,7 +5,9 @@
 // icons, labels, dashed connectors toward the ring, JARVIS badge below.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ParticleCore, type CoreStatus } from "./ParticleCore";
+// ParticleCore still supplies the CoreStatus type; the component itself is
+// unused while the particle style is disabled.
+import { type CoreStatus } from "./ParticleCore";
 import { ArcReactorCore } from "./ArcReactorCore";
 
 type CoreStyle = "particles" | "reactor" | "eye";
@@ -47,9 +49,13 @@ function Icon({ name, size = 17 }: { name: string; size?: number }) {
 }
 
 export function NeuralCore({ status }: { status: CoreStatus }) {
-  const [style, setStyle] = useState<CoreStyle>(
-    () => (localStorage.getItem("jarvis_core_style") as CoreStyle) || "particles",
-  );
+  const [style, setStyle] = useState<CoreStyle>(() => {
+    const saved = localStorage.getItem("jarvis_core_style") as CoreStyle | null;
+    // "particles" is commented out below rather than deleted. Anyone already
+    // stored on it would otherwise land on a style the picker no longer offers
+    // and have no way to switch off it.
+    return !saved || saved === "particles" ? "reactor" : saved;
+  });
   const navigate = useNavigate();
 
   const pick = (s: CoreStyle) => {
@@ -63,11 +69,17 @@ export function NeuralCore({ status }: { status: CoreStatus }) {
         NEURAL CORE · JARVIS
       </div>
 
-      {style === "particles" ? (
-        <ParticleCore status={status} />
-      ) : (
+{/* Particle core disabled — kept, not deleted. To restore: put "particles"
+            back in the picker list below, drop the coercion in useState above,
+            and swap the line after this comment for:
+
+              {style === "particles" ? (
+                <ParticleCore status={status} />
+              ) : (
+                <ArcReactorCore status={status} center={style === "eye" ? "eye" : "glow"} />
+              )}
+        */}
         <ArcReactorCore status={status} center={style === "eye" ? "eye" : "glow"} />
-      )}
 
       {/* dashed connectors: satellite → ring */}
       <svg
@@ -124,7 +136,8 @@ export function NeuralCore({ status }: { status: CoreStatus }) {
 
       {/* core style switcher — new styles get added, old ones never deleted */}
       <div className="absolute bottom-2 left-1/2 z-[2] flex -translate-x-1/2 gap-1">
-        {(["particles", "reactor", "eye"] as CoreStyle[]).map((s) => (
+        {/* "particles" disabled — restore it to this list to bring it back */}
+        {(["reactor", "eye"] as CoreStyle[]).map((s) => (
           <button
             key={s}
             onClick={() => pick(s)}
