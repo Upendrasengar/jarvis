@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# grep, not ripgrep: these tests are the evidence that Jarvis installs on a
+# clean Mac, and ripgrep is not on a clean Mac. Depending on it meant the
+# suites could not run on the very machines the support matrix promises.
+
 ENGINE="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/jarvis-onboard-test.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -44,11 +48,11 @@ for (const [step, progress] of Object.entries(state.steps)) {
   if (progress.status !== "complete") throw new Error(`${step} was not completed`);
 }
 NODE
-rg -q 'Test User' "$ROOT_ONE/memory/about-me.md"
+grep -q 'Test User' "$ROOT_ONE/memory/about-me.md"
 [[ "$(<"$ROOT_ONE/memory/settings/installation-profile.txt")" == core ]]
-rg -q 'Selected profile: Core' "$TMP/first.txt"
-rg -q 'Core profile: meeting recording skipped' "$TMP/first.txt"
-rg -q 'Onboarding complete' "$TMP/first.txt"
+grep -q 'Selected profile: Core' "$TMP/first.txt"
+grep -q 'Core profile: meeting recording skipped' "$TMP/first.txt"
+grep -q 'Onboarding complete' "$TMP/first.txt"
 PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" JARVIS_DOCTOR_SKIP_CLAUDE_PROBE=1 \
   "$ENGINE/jarvis" doctor --json >"$TMP/core-doctor.json"
 node - "$TMP/core-doctor.json" <<'NODE'
@@ -63,7 +67,7 @@ PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" \
   "$ENGINE/jarvis" onboard --non-interactive >"$TMP/second.txt"
 AFTER="$(shasum -a 256 "$STATE_ONE" "$ROOT_ONE/memory/about-me.md")"
 [[ "$BEFORE" == "$AFTER" ]] || { echo "completed onboarding rewrote user state" >&2; exit 1; }
-rg -q 'already complete' "$TMP/second.txt"
+grep -q 'already complete' "$TMP/second.txt"
 
 # A larger profile reopens only its newly relevant steps and preserves the
 # local user profile.
@@ -73,9 +77,9 @@ PATH="$BIN_ONE:$PATH" JARVIS_DIR="$ROOT_ONE" \
   "$ENGINE/jarvis" onboard --profile meetings --non-interactive >"$TMP/upgrade.txt"
 [[ "$(<"$ROOT_ONE/memory/settings/installation-profile.txt")" == meetings ]]
 [[ "$PROFILE_BEFORE" == "$(shasum -a 256 "$ROOT_ONE/memory/about-me.md")" ]]
-rg -q 'Selected profile: Meetings' "$TMP/upgrade.txt"
-rg -q 'Resuming at: calendar' "$TMP/upgrade.txt"
-rg -q 'Meeting transcription components are ready' "$TMP/upgrade.txt"
+grep -q 'Selected profile: Meetings' "$TMP/upgrade.txt"
+grep -q 'Resuming at: calendar' "$TMP/upgrade.txt"
+grep -q 'Meeting transcription components are ready' "$TMP/upgrade.txt"
 
 ROOT_TWO="$TMP/interrupted"
 BIN_TWO="$TMP/bin-interrupted"
@@ -93,8 +97,8 @@ NEXT="$(JARVIS_DIR="$ROOT_TWO" node "$ENGINE/tools/onboarding-state.mjs" status 
 
 PATH="$BIN_TWO:$PATH" JARVIS_DIR="$ROOT_TWO" \
   "$ENGINE/jarvis" onboard --non-interactive >"$TMP/resumed.txt"
-rg -q 'Resuming at: vault' "$TMP/resumed.txt"
-rg -q 'Onboarding complete' "$TMP/resumed.txt"
+grep -q 'Resuming at: vault' "$TMP/resumed.txt"
+grep -q 'Onboarding complete' "$TMP/resumed.txt"
 
 ROOT_THREE="$TMP/claude-blocked"
 BIN_THREE="$TMP/bin-claude-blocked"
@@ -111,8 +115,8 @@ set -e
 BLOCKED_NEXT="$(JARVIS_DIR="$ROOT_THREE" node "$ENGINE/tools/onboarding-state.mjs" status \
   | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).nextStep))')"
 [[ "$BLOCKED_NEXT" == "claude" ]] || { echo "expected blocked resume at claude, got $BLOCKED_NEXT" >&2; exit 1; }
-rg -q 'complete /login' "$TMP/blocked.txt"
-rg -q 'rerun: jarvis onboard' "$TMP/blocked.txt"
+grep -q 'complete /login' "$TMP/blocked.txt"
+grep -q 'rerun: jarvis onboard' "$TMP/blocked.txt"
 
 ROOT_FOUR="$TMP/full"
 BIN_FOUR="$TMP/bin-full"
@@ -125,10 +129,10 @@ printf 'TELEGRAM_BOT_TOKEN=full-profile-secret-canary\nTELEGRAM_CHAT_ID=123\n' >
 PATH="$BIN_FOUR:$PATH" JARVIS_DIR="$ROOT_FOUR" JARVIS_ONBOARD_NAME="Full User" \
   "$ENGINE/jarvis" onboard --profile full --non-interactive >"$TMP/full.txt"
 [[ "$(<"$ROOT_FOUR/memory/settings/installation-profile.txt")" == full ]]
-rg -q 'Selected profile: Full' "$TMP/full.txt"
-rg -q 'Obsidian is available' "$TMP/full.txt"
-rg -q 'Telegram is configured' "$TMP/full.txt"
-! rg -q 'full-profile-secret-canary' "$TMP/full.txt"
+grep -q 'Selected profile: Full' "$TMP/full.txt"
+grep -q 'Obsidian is available' "$TMP/full.txt"
+grep -q 'Telegram is configured' "$TMP/full.txt"
+! grep -q 'full-profile-secret-canary' "$TMP/full.txt"
 
 ROOT_FIVE="$TMP/meetings-missing"
 BIN_FIVE="$TMP/bin-meetings-missing"
@@ -139,13 +143,13 @@ PATH="$BIN_FIVE:$PATH" JARVIS_DIR="$ROOT_FIVE" JARVIS_ONBOARD_NAME="Meetings Use
 MISSING_STATUS=$?
 set -e
 [[ $MISSING_STATUS -eq 1 ]] || { echo "expected missing Meetings components to fail" >&2; exit 1; }
-rg -q "Run 'jarvis setup'" "$TMP/meetings-missing.txt"
+grep -q "Run 'jarvis setup'" "$TMP/meetings-missing.txt"
 
 set +e
 "$ENGINE/jarvis" onboard --profile impossible --non-interactive >"$TMP/invalid.txt" 2>&1
 INVALID_STATUS=$?
 set -e
 [[ $INVALID_STATUS -eq 2 ]] || { echo "expected invalid profile exit 2" >&2; exit 1; }
-rg -q 'invalid profile' "$TMP/invalid.txt"
+grep -q 'invalid profile' "$TMP/invalid.txt"
 
 echo "onboarding wizard contract: ok"

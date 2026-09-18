@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# grep, not ripgrep: these tests are the evidence that Jarvis installs on a
+# clean Mac, and ripgrep is not on a clean Mac. Depending on it meant the
+# suites could not run on the very machines the support matrix promises.
+
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/jarvis-doctor-test.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -39,7 +43,7 @@ set +e
 JARVIS_DIR="$TMP/empty-install" JARVIS_DOCTOR_SKIP_CLAUDE_PROBE=1 "$ROOT/jarvis" doctor --json >"$TMP/redacted.json" 2>"$TMP/redacted.err"
 set -e
 assert_json_contract "$TMP/redacted.json"
-if rg -q 'jarvis-doctor-secret-canary' "$TMP/redacted.json" "$TMP/redacted.err"; then
+if grep -q 'jarvis-doctor-secret-canary' "$TMP/redacted.json" "$TMP/redacted.err"; then
   echo "doctor leaked a secret value" >&2
   exit 1
 fi
@@ -63,11 +67,11 @@ const fs = require('fs');
 const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 if (!report.ok || report.checks.some((check) => check.status === 'blocked')) process.exit(1);
 NODE
-! rg -q 'jarvis-doctor-configured-secret' "$TMP/configured.json"
+! grep -q 'jarvis-doctor-configured-secret' "$TMP/configured.json"
 
 JARVIS_DIR="$TMP/empty-install" JARVIS_DOCTOR_SKIP_CLAUDE_PROBE=1 "$ROOT/jarvis" doctor >"$TMP/human.txt" 2>&1 || true
-rg -q '^Jarvis doctor$' "$TMP/human.txt"
-rg -q '^── platform ──$' "$TMP/human.txt"
+grep -q '^Jarvis doctor$' "$TMP/human.txt"
+grep -q '^── platform ──$' "$TMP/human.txt"
 if node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$TMP/human.txt" 2>/dev/null; then
   echo "human output unexpectedly contained only JSON" >&2
   exit 1
