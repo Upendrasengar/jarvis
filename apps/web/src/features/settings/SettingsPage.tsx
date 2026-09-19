@@ -714,9 +714,6 @@ export function SettingsPage() {
             {s.label}
           </button>
         ))}
-        <p className="mt-6 px-1 text-[11px] leading-relaxed text-[var(--dim)]">
-          Preferences auto-save. Integration secrets stay local.
-        </p>
       </aside>
 
       {/* content */}
