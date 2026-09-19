@@ -47,8 +47,14 @@ git -C "$TAP_DIR" fetch --quiet origin 2>/dev/null || true
 # This is not hypothetical: a machine that had not fetched the newest tag ran
 # this with no argument, defaulted to the tag it knew, and patched a formula
 # that had already moved on.
-TAP_VERSION="$(sed -n 's|.*archive/refs/tags/v\([0-9][0-9.]*\)\.tar\.gz.*|\1|p' \
-  "$TAP_DIR/Formula/jarvis.rb" | head -1)"
+# Read the formula from origin/main, not the working tree. The fetch above
+# updates the remote ref but not the checkout, and the fast-forward happens
+# further down — so reading the file here compared against whatever that Mac
+# last pulled, and refused a correct release because its own clone was stale.
+TAP_FORMULA="$(git -C "$TAP_DIR" show origin/main:Formula/jarvis.rb 2>/dev/null \
+  || cat "$TAP_DIR/Formula/jarvis.rb" 2>/dev/null)"
+TAP_VERSION="$(printf '%s' "$TAP_FORMULA" \
+  | sed -n 's|.*archive/refs/tags/v\([0-9][0-9.]*\)\.tar\.gz.*|\1|p' | head -1)"
 if [ -n "$TAP_VERSION" ] && [ "$TAP_VERSION" != "$VERSION" ]; then
   fail "the tap is on $TAP_VERSION but this is $VERSION — run 'git fetch --tags' and build $TAP_VERSION, or cut the release for $VERSION first"
 fi
