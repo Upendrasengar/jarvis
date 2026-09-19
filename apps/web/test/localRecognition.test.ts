@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { LocalRecognition } from '../src/features/voice/LocalRecognition.ts';

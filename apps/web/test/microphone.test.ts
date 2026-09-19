@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openMicrophone, startRecognition, supportsAudioTrack } from '../src/features/voice/microphone.ts';

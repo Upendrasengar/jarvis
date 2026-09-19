@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # eod-digest.sh — end-of-day Telegram digest from the Jarvis action ledger.
 # Reads today's digest (or latest), summarises open action items and top
 # focuses, then POSTs a short plain-text message to Telegram.

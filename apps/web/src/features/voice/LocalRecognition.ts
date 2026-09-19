@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // WebKit exposes SpeechRecognition in the native app but rejects its service.
 // Record the chosen track and transcribe each utterance with Jarvis's local Whisper.
 export class LocalRecognition {

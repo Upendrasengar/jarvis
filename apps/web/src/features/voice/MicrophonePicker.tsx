@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { useEffect, useId, useRef, useState } from 'react';
 import { microphoneError, openMicrophone, savedMicrophone, saveMicrophone } from './microphone';
 

@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Device IDs are browser-local; never sync them to the server or another computer.
 const INPUT_KEY = 'jarvis_audio_input';
 export const savedMicrophone = () => {

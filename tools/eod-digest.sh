@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # eod-digest.sh — daily 7 PM end-of-day digest to Telegram
 # Reads today's digest file, summarizes open items and completed work, posts to Telegram
 set -uo pipefail

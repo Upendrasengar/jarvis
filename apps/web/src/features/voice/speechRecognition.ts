@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { LocalRecognition } from "./LocalRecognition";
 import { supportsAudioTrack } from "./microphone";
 

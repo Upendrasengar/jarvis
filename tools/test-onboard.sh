@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 set -euo pipefail
 
 # grep, not ripgrep: these tests are the evidence that Jarvis installs on a

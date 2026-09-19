@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # Read-only Jarvis health report. Keep this script safe to run on any install.
 set -uo pipefail
 

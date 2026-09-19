@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import type { FastifyInstance } from "fastify";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";

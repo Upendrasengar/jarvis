@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 # Resumable first-run wizard. Secrets are configured later through Settings.
 set -uo pipefail
 

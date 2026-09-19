@@ -1,3 +1,4 @@
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
 import { voiceRoutes } from "../src/routes/voice.js";

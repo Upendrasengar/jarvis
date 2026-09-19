@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // Persistent, non-secret progress for the resumable onboarding flows.
 import fs from "node:fs";
 import path from "node:path";
