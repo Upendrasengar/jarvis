@@ -152,10 +152,24 @@ else
   add_check recording-permissions "Recording permissions" "meetings (optional)" optional "Recording permissions are not needed until JarvisAudio.app is built" "Run 'jarvis setup', then grant Microphone and Screen Recording when prompted."
 fi
 
+# Obsidian is not just a viewer here. Workers are told to reach for the
+# `obsidian` CLI FIRST for vault lookups (see OBSIDIAN_CLI_LINES in
+# services/agents.ts): indexed full-text search, backlinks, and tag inventory,
+# all of which understand frontmatter and wikilinks. tools/vault-search.sh is
+# the fallback, and it is plain keyword grep — it cannot answer "what links to
+# [[X]]" at all.
+#
+# So this check is tri-state. The CLI also needs the Obsidian APP to be
+# running, which is the state most likely to be true one minute and false the
+# next, and the one that silently downgrades every recall answer.
 if command -v obsidian >/dev/null 2>&1 || [[ -x /Applications/Obsidian.app/Contents/MacOS/obsidian-cli ]]; then
-  add_check obsidian "Obsidian" "integrations (optional)" pass "Obsidian CLI is available" ""
+  if pgrep -x Obsidian >/dev/null 2>&1; then
+    add_check obsidian "Obsidian" "integrations (optional)" pass       "Obsidian CLI is available and the app is running — indexed search, backlinks and tags are in use" ""
+  else
+    add_check obsidian "Obsidian" "integrations (optional)" warning       "Obsidian CLI is installed but the app is not running — recall falls back to keyword grep, with no backlinks or tag queries"       "Open Obsidian. The CLI talks to the running app; with it closed the index is unreachable."
+  fi
 else
-  add_check obsidian "Obsidian" "integrations (optional)" optional "Obsidian is not installed; plain Markdown storage remains available" "Run 'brew install --cask obsidian' to enable the Obsidian UI."
+  add_check obsidian "Obsidian" "integrations (optional)" optional     "Obsidian is not installed — recall uses keyword grep only, losing indexed search, backlinks and tag inventory"     "Run 'brew install --cask obsidian' and open it. Your notes stay plain Markdown either way."
 fi
 
 if compgen -G "$ROOT/models/ggml-*.bin" >/dev/null 2>&1; then
