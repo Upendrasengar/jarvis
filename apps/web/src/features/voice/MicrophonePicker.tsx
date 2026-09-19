@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { microphoneError, openMicrophone, savedMicrophone, saveMicrophone, supportsAudioTrack } from './microphone';
+import { microphoneError, openMicrophone, savedMicrophone, saveMicrophone } from './microphone';
 
 export function MicrophonePicker({ onStart, onClose, onCancel }: {
   onStart: (deviceId: string) => Promise<void>;
@@ -15,7 +15,6 @@ export function MicrophonePicker({ onStart, onClose, onCancel }: {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
-  const canSelect = supportsAudioTrack();
 
   useEffect(() => {
     alive.current = true;
@@ -87,7 +86,6 @@ export function MicrophonePicker({ onStart, onClose, onCancel }: {
         {devices.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
       </select>
       <p className="mt-2 text-xs text-[var(--dim)]" role="status">{loading ? 'Finding microphones…' : 'Your choice is remembered in this browser.'}</p>
-      {!canSelect && <p className="mt-3 text-xs text-[var(--amber)]">Speech is transcribed locally on your Mac. Pause after speaking to send your message.</p>}
       {error && <p role="alert" className="mt-3 text-xs text-[var(--red)]">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--line)] px-4 py-2 text-xs disabled:opacity-50">Cancel</button>
