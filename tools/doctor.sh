@@ -57,16 +57,46 @@ else
   add_check claude-cli "Claude CLI" "core dependencies" blocked "Claude CLI is not installed" "Install Claude Code from https://claude.com/claude-code, then run 'claude' to log in."
 fi
 
-if command -v node >/dev/null 2>&1; then
-  NODE_VERSION="$(node --version 2>/dev/null)"
-  NODE_MAJOR="${NODE_VERSION#v}"; NODE_MAJOR="${NODE_MAJOR%%.*}"
-  if [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] && [[ "$NODE_MAJOR" -ge 20 ]]; then
-    add_check node "Node.js" "core dependencies" pass "Node.js $NODE_VERSION" ""
+# Report the Node that Jarvis will ACTUALLY run, not whatever is first on
+# PATH. A published engine carries its own interpreter, so doctor was naming a
+# version — "Node.js v26.8.2" — that nothing would ever load the server with.
+#
+# Same precedence as tools/services.sh, and it has to stay that way: if these
+# two disagree, doctor blesses one runtime while the server boots another,
+# which is how a green report accompanies a dlopen failure.
+NODE_SRC=""
+if [ -n "${JARVIS_NODE:-}" ] && [ -x "${JARVIS_NODE}" ]; then
+  NODE_EXE="$JARVIS_NODE"; NODE_SRC="JARVIS_NODE"
+elif [ -x "$ROOT/runtime/node" ]; then
+  NODE_EXE="$ROOT/runtime/node"; NODE_SRC="bundled with the engine"
+else
+  PINNED="$(head -1 "$ROOT/memory/settings/node-bin.txt" 2>/dev/null | tr -d '[:space:]')"
+  if [ -n "$PINNED" ] && [ -x "$PINNED" ]; then
+    NODE_EXE="$PINNED"; NODE_SRC="memory/settings/node-bin.txt"
+  elif command -v node >/dev/null 2>&1; then
+    NODE_EXE="$(command -v node)"; NODE_SRC="PATH"
   else
-    add_check node "Node.js" "core dependencies" blocked "Node.js 20 or newer is required (found ${NODE_VERSION:-unknown})" "Install Node.js 20 or newer with Homebrew."
+    NODE_EXE=""
+  fi
+fi
+
+if [ -n "$NODE_EXE" ]; then
+  NODE_VERSION="$("$NODE_EXE" --version 2>/dev/null)"
+  NODE_MODULES_ABI="$("$NODE_EXE" -p 'process.versions.modules' 2>/dev/null || echo "")"
+  NODE_MAJOR="${NODE_VERSION#v}"; NODE_MAJOR="${NODE_MAJOR%%.*}"
+  # The artifact records the ABI its native modules were compiled for. A
+  # mismatch is not a warning sign, it is a guaranteed crash at better-sqlite3's
+  # dlopen — so check the two against each other rather than trusting a version.
+  WANT_ABI="$(sed -n 's/.*"nodeAbi"[[:space:]]*:[[:space:]]*"\([0-9]*\)".*/\1/p' "$ROOT/artifact.json" 2>/dev/null | head -1)"
+  if [ -n "$WANT_ABI" ] && [ -n "$NODE_MODULES_ABI" ] && [ "$WANT_ABI" != "$NODE_MODULES_ABI" ]; then
+    add_check node "Node.js" "core dependencies" blocked       "Node.js $NODE_VERSION ($NODE_SRC) is ABI $NODE_MODULES_ABI, but this engine's native modules need ABI $WANT_ABI"       "Point Jarvis at the matching Node: set JARVIS_NODE, or reinstall so the bundled runtime is used."
+  elif [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] && [[ "$NODE_MAJOR" -ge 20 ]]; then
+    add_check node "Node.js" "core dependencies" pass "Node.js $NODE_VERSION ($NODE_SRC)" ""
+  else
+    add_check node "Node.js" "core dependencies" blocked "Node.js 20 or newer is required (found ${NODE_VERSION:-unknown}, $NODE_SRC)" "Install Node.js 20 or newer with Homebrew."
   fi
 else
-  add_check node "Node.js" "core dependencies" blocked "Node.js 20 or newer is not installed" "Install Node.js 20 or newer with Homebrew."
+  add_check node "Node.js" "core dependencies" blocked "Node.js 20 or newer is not installed" "Install Node.js 20 or newer with Homebrew, or reinstall Jarvis so it brings its own."
 fi
 
 if command -v pnpm >/dev/null 2>&1; then
