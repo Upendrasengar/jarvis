@@ -34,6 +34,25 @@ VERSION="${VERSION#v}"
 TAG="v$VERSION"
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || fail "tag $TAG does not exist — cut the release first"
 
+# Before anything is built, uploaded, OR checked out. Checking this at the
+# formula step meant the mismatch surfaced after the artifact was published,
+# overwriting the other release's asset on the way — and left the repo on a
+# detached tag afterwards.
+git -C "$TAP_DIR" fetch --quiet origin 2>/dev/null || true
+# The formula has ONE version, and its engine urls interpolate it. Publishing
+# an older version's checksum into it points that architecture at an artifact
+# that does not exist — a 404 on install instead of the clean "not published"
+# message the placeholder gives.
+#
+# This is not hypothetical: a machine that had not fetched the newest tag ran
+# this with no argument, defaulted to the tag it knew, and patched a formula
+# that had already moved on.
+TAP_VERSION="$(sed -n 's|.*archive/refs/tags/v\([0-9][0-9.]*\)\.tar\.gz.*|\1|p' \
+  "$TAP_DIR/Formula/jarvis.rb" | head -1)"
+if [ -n "$TAP_VERSION" ] && [ "$TAP_VERSION" != "$VERSION" ]; then
+  fail "the tap is on $TAP_VERSION but this is $VERSION — run 'git fetch --tags' and build $TAP_VERSION, or cut the release for $VERSION first"
+fi
+
 # Build from EXACTLY the tagged tree. Building from whatever happens to be
 # checked out is how an artifact came to claim a version it was not built from.
 HEAD_SHA="$(git rev-parse HEAD)"
@@ -44,6 +63,8 @@ if [ "$HEAD_SHA" != "$TAG_SHA" ]; then
   git checkout --quiet "$TAG" || fail "could not check out $TAG"
 fi
 ok "building from $TAG ($(git rev-parse --short HEAD))"
+
+
 
 OUT="$(mktemp -d)"
 say "building the engine — this takes a few minutes"
@@ -96,19 +117,6 @@ git -C "$TAP_DIR" fetch --quiet origin || true
 git -C "$TAP_DIR" merge --ff-only origin/main >/dev/null 2>&1 \
   || fail "tap cannot fast-forward to origin/main — reconcile it by hand"
 
-# The formula has ONE version, and its engine urls interpolate it. Publishing
-# an older version's checksum into it points that architecture at an artifact
-# that does not exist — a 404 on install instead of the clean "not published"
-# message the placeholder gives.
-#
-# This is not hypothetical: a machine that had not fetched the newest tag ran
-# this with no argument, defaulted to the tag it knew, and patched a formula
-# that had already moved on.
-TAP_VERSION="$(sed -n 's|.*archive/refs/tags/v\([0-9][0-9.]*\)\.tar\.gz.*|\1|p' \
-  "$TAP_DIR/Formula/jarvis.rb" | head -1)"
-if [ -n "$TAP_VERSION" ] && [ "$TAP_VERSION" != "$VERSION" ]; then
-  fail "the tap is on $TAP_VERSION but this is $VERSION — run 'git fetch --tags' and build $TAP_VERSION, or cut the release for $VERSION first"
-fi
 
 python3 - "$TAP_DIR/Formula/jarvis.rb" "$ARCH_BLOCK" "$ART_SHA" <<'PYEOF'
 import re, sys
