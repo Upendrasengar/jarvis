@@ -33,21 +33,21 @@ fail=0
 say() { echo "pre-push-audit: $*" >&2; }
 
 audit_range() {
-  local range="$1"
+  local range=("$@")
   # 1) files introduced anywhere in the outgoing commits
   local files
-  files="$(git log --name-only --format= "$range" 2>/dev/null | sort -u)"
+  files="$(git log --name-only --format= "${range[@]}" 2>/dev/null | sort -u)"
   local badf
   badf="$(printf '%s\n' "$files" | grep -E "$BADPATHS" | grep -vE "$ALLOW_PATHS" || true)"
   if [ -n "$badf" ]; then say "BLOCKED — user-data paths in outgoing commits:"; printf '   %s\n' $badf >&2; fail=1; fi
   # 2) secret values / private identifiers in outgoing content
   local pat="$SECRETS"; [ -n "$EXTRA" ] && pat="$pat|$EXTRA"
   local hits
-  hits="$(git log -p --format= "$range" 2>/dev/null | grep -iEn "^\+.*($pat)" | head -5 || true)"
+  hits="$(git log -p --format= "${range[@]}" 2>/dev/null | grep -iEn "^\+.*($pat)" | head -5 || true)"
   if [ -n "$hits" ]; then say "BLOCKED — secret-like or private strings in outgoing diffs:"; printf '%s\n' "$hits" | cut -c1-120 >&2; fail=1; fi
   # 3) author/committer emails
   local emails
-  emails="$(git log --format='%ae%n%ce' "$range" 2>/dev/null | sort -u | grep -vE "$ALLOW_EMAIL" || true)"
+  emails="$(git log --format='%ae%n%ce' "${range[@]}" 2>/dev/null | sort -u | grep -vE "$ALLOW_EMAIL" || true)"
   if [ -n "$emails" ]; then say "BLOCKED — non-noreply email in outgoing commits: $emails"; fail=1; fi
 }
 
@@ -58,7 +58,12 @@ if [ ! -t 0 ]; then
     [ -z "${local_sha:-}" ] && continue
     [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
     if [ "${remote_sha:-}" = "0000000000000000000000000000000000000000" ] || [ -z "${remote_sha:-}" ]; then
-      audit_range "$local_sha"
+      # A new ref — a tag, or a branch pushed for the first time. Everything
+      # reachable from it is NOT new: a tag on an already-published commit
+      # reaches the entire history, which is how pushing v0.3.30 re-audited
+      # every commit ever made and blocked on one from months earlier.
+      # Exclude whatever this remote already has.
+      audit_range "$local_sha" --not --remotes=origin
     else
       audit_range "$remote_sha..$local_sha"
     fi
