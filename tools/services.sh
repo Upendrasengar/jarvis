@@ -92,9 +92,13 @@ start() {
     # root. This resolved it RELATIVE to apps/server, which meant every
     # Homebrew install started and immediately died with MODULE_NOT_FOUND —
     # the server never came up and `jarvis start` just said FAILED.
-    TSX="$JARVIS_DIR/apps/server/node_modules/tsx/dist/cli.mjs"
-    [ -f "$TSX" ] || TSX="$JARVIS_DIR/node_modules/tsx/dist/cli.mjs"
-    if [ ! -f "$TSX" ]; then
+    # Source it from beside THIS script, not from $JARVIS_DIR. The resolver
+    # always ships with the engine; the data directory is a different thing
+    # that merely usually points at one.
+    # shellcheck source=tools/runtime.sh
+    . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/runtime.sh"
+    TSX="$(jarvis_tsx)" || TSX=""
+    if [ -z "$TSX" ]; then
       echo "server:     FAILED — tsx not found (looked in apps/server/node_modules"
       echo "            and node_modules). The install is incomplete."
       return 1 2>/dev/null || exit 1

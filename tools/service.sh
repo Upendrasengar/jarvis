@@ -25,10 +25,18 @@ case "${1:-status}" in
         echo "  or keep starting manually with: jarvis start"
         exit 1 ;;
     esac
-    NODE_BIN="${JARVIS_NODE:-$(command -v node)}"
-    TSX="$JARVIS_DIR/apps/server/node_modules/tsx/dist/cli.mjs"
-    [ -x "$NODE_BIN" ] || { echo "✗ node not found"; exit 1; }
-    [ -f "$TSX" ] || { echo "✗ tsx not found — run: jarvis setup"; exit 1; }
+    # Source it from beside THIS script, not from $JARVIS_DIR. The resolver
+    # always ships with the engine; the data directory is a different thing
+    # that merely usually points at one.
+    # shellcheck source=tools/runtime.sh
+    . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/runtime.sh"
+    NODE_BIN="$(jarvis_node)"
+    [ -n "$NODE_BIN" ] && [ -x "$NODE_BIN" ] || { echo "✗ node not found"; exit 1; }
+    TSX="$(jarvis_tsx)" || {
+      echo "✗ tsx not found in this install"
+      echo "  looked in: $JARVIS_DIR/apps/server/node_modules and $JARVIS_DIR/node_modules"
+      exit 1
+    }
     PORT="$(head -1 "$JARVIS_DIR/memory/settings/port.txt" 2>/dev/null | tr -cd '0-9')"
     mkdir -p "$HOME/Library/LaunchAgents" "$JARVIS_DIR/reports"
     cat > "$PLIST" <<PL
