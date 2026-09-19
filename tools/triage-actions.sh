@@ -119,7 +119,13 @@ $ITEMS
 CALL NOTES WRITTEN SINCE (newest first) — the only place closure evidence may come from:
 $LATER
 PROMPT
-RAW="$(claude -p --model "$(jarvis_model model-worker sonnet)" < "$TMPD/prompt.txt" 2>/dev/null)"
+# No tools. Everything it needs is in the prompt, and it returns JSON — there
+# is nothing here that should be able to touch a file. process-call.sh has
+# always been locked down this way; the digest was not, and 282 action items
+# across 56 notes were flipped to done in bulk on 2026-09-19.
+RAW="$(claude -p --model "$(jarvis_model model-worker sonnet)" \
+  --disallowedTools="Bash,Read,Edit,Write,Grep,Glob,WebFetch,WebSearch,Task,NotebookEdit" \
+  < "$TMPD/prompt.txt" 2>/dev/null)"
 
 printf '%s' "$ITEMS" > "$TMPD/items.json"
 printf '%s' "$RAW" > "$TMPD/raw.txt"

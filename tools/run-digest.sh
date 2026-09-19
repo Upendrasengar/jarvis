@@ -107,16 +107,41 @@ fi
 # dashboard's attention bucket both read it.
 bash "$JARVIS_DIR/tools/triage-actions.sh" || true
 
-# 2. LLM step: write the digest from the raw data (Sonnet is plenty)
+# 2. LLM step: the model COMPOSES the digest; this script writes it.
+#
+# It used to be handed --allowedTools "Read,Write" and told to write the file
+# itself. That gave a summariser write access to the very notes it was
+# summarising — and on 2026-09-19, 282 action items across 56 call-note files
+# were flipped to [x] in bulk, none carrying the `<!-- done -->` stamp the API
+# always adds. Whatever did it, no component that only needs to produce one
+# file should be able to edit the ledger it reads.
+#
+# So: output to stdout, the write happens here where the path is fixed and
+# checkable, and the edit tools are DENIED rather than merely un-approved.
+#
+# Both flags, because they do different jobs. --allowedTools is an
+# auto-approval list, not a sandbox: with `--allowedTools "Read"` alone a note
+# was still edited during a run. --disallowedTools is what actually blocks,
+# and is what process-call.sh has always used. But denying tools also drops
+# the auto-approval, and the vault lives outside the repo — so the run then
+# stopped to ask for permission to read the Digests folder and produced
+# prose instead of a digest.
+#
+# Approve the reads it genuinely needs; deny everything that can change
+# anything.
 cd "$JARVIS_DIR"
+DIGEST_OUT="$(mktemp)"
 "$CLAUDE" -p "Read CLAUDE.md, then $DIGESTS_DIR/raw-$DATE.md. \
 CONTINUITY: read the previous digest $DIGESTS_DIR/digest-$PREV_DATE.md — it \
 distills everything before it; treat it as narrative context, NOT as truth \
 for open items (the OPEN ACTION ITEMS ledger in the raw file is the \
 deterministic truth — always trust it over the previous digest). Then read \
 the call notes since that digest:$RECENT_CALLS (skip ones titled 'No speech \
-detected' or similar phantom/silent calls). Write $DIGESTS_DIR/digest-$DATE.md \
-following the Daily Project Digest format — START the file with Obsidian \
+detected' or similar phantom/silent calls). Then OUTPUT the digest as \
+markdown on stdout — do not create, edit or write any file, and do not tick \
+or alter any checkbox in any note; you are composing a document, not \
+changing my records. Emit nothing but the digest itself: no preamble, no \
+commentary, no closing remarks. Follow the Daily Project Digest format — START the file with Obsidian \
 frontmatter: --- / title: Daily Digest — $DATE / type: digest / date: $DATE \
 / tags: (digest + 2-4 lowercase project tags) / --- then '# Daily Digest — \
 $DATE'. Under '## Momentum' write the summary as an Obsidian callout: \
@@ -150,7 +175,23 @@ NO dates, deadlines, or urgency words (URGENT, due, days left); deadlines \
 live ONLY in the trailing (due: YYYY-MM-DD) tag, included when a real \
 deadline exists (from triage or the item text) and omitted otherwise. Example: '1. **EC Oct 1 promotion** — All approval \
 steps must clear by Thursday, not just be submitted. Irreversible if \
-missed. (due: 2026-08-27)'. Keep it scannable. Then print the digest file path." \
-  --model "$(jarvis_model model-worker sonnet)" --allowedTools "Read,Write" 2>&1 | tail -3
+missed. (due: 2026-08-27)'. Keep it scannable." \
+  --model "$(jarvis_model model-worker sonnet)" \
+  --allowedTools "Read,Grep,Glob" \
+  --disallowedTools="Bash,Edit,Write,NotebookEdit,Task,WebFetch,WebSearch" \
+  > "$DIGEST_OUT" 2>/dev/null
+
+# Check what came back before overwriting a good digest with it. A truncated
+# or chatty reply used to land straight on disk.
+if [ ! -s "$DIGEST_OUT" ]; then
+  echo "[run-digest] the model returned nothing — keeping the existing digest" >&2
+  rm -f "$DIGEST_OUT"; exit 1
+fi
+if ! head -3 "$DIGEST_OUT" | grep -q '^---'; then
+  echo "[run-digest] output does not start with frontmatter — refusing to write it" >&2
+  echo "[run-digest] first line: $(head -1 "$DIGEST_OUT" | cut -c1-100)" >&2
+  rm -f "$DIGEST_OUT"; exit 1
+fi
+mv "$DIGEST_OUT" "$DIGESTS_DIR/digest-$DATE.md"
 
 echo "[run-digest] done: $DIGESTS_DIR/digest-$DATE.md"
