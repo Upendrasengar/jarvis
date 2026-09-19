@@ -5,7 +5,11 @@
 # brief. Written to survive launchd's minimal environment (no nvm, sparse PATH).
 set -uo pipefail
 
-JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Prefer an inherited JARVIS_DIR; fall back to this script's location.
+# See tools/call-watch.sh for why: under Homebrew the engine is read-only in
+# the cellar and symlinked into ~/.jarvis, so a caller reaching this by its
+# real path would resolve data/ somewhere the server never writes.
+JARVIS_DIR="${JARVIS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
 # Model routing is configurable in settings (memory/settings/model-*.txt).
 # Falls back to the previous hardcoded tier when unset or unreadable, so an

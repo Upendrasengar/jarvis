@@ -4,7 +4,11 @@
 # on stdout. Same local whisper.cpp + model-resolution as process-call.sh;
 # nothing leaves the machine.
 set -euo pipefail
-JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Prefer an inherited JARVIS_DIR; fall back to this script's location.
+# See tools/call-watch.sh for why: under Homebrew the engine is read-only in
+# the cellar and symlinked into ~/.jarvis, so a caller reaching this by its
+# real path would resolve data/ somewhere the server never writes.
+JARVIS_DIR="${JARVIS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 IN="${1:?audio file required}"
 
 PREF="$(tr -d '[:space:]' < "$JARVIS_DIR/memory/settings/whisper-model.txt" 2>/dev/null || true)"

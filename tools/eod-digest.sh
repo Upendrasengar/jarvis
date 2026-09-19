@@ -3,7 +3,11 @@
 # Reads today's digest file, summarizes open items and completed work, posts to Telegram
 set -uo pipefail
 
-JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Prefer an inherited JARVIS_DIR; fall back to this script's location.
+# See tools/call-watch.sh for why: under Homebrew the engine is read-only in
+# the cellar and symlinked into ~/.jarvis, so a caller reaching this by its
+# real path would resolve data/ somewhere the server never writes.
+JARVIS_DIR="${JARVIS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SECRETS_FILE="$JARVIS_DIR/secrets/.env"
 REPORTS_DIR="$JARVIS_DIR/reports"
 LOG_FILE="$REPORTS_DIR/eod-digest.log"

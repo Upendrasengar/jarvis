@@ -4,7 +4,11 @@
 # Writes memory/ from the memory.example templates plus your answers.
 # Safe to re-run: existing files are only touched if you say so.
 set -uo pipefail
-JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Prefer an inherited JARVIS_DIR; fall back to this script's location.
+# See tools/call-watch.sh for why: under Homebrew the engine is read-only in
+# the cellar and symlinked into ~/.jarvis, so a caller reaching this by its
+# real path would resolve data/ somewhere the server never writes.
+JARVIS_DIR="${JARVIS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$JARVIS_DIR"
 
 echo "── Jarvis setup — a few questions, all stored locally in memory/ ──"
