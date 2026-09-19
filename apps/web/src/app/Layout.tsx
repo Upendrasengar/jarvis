@@ -65,16 +65,16 @@ const MARKS: Record<string, React.ReactNode> = {
     // cannot be shipped in a web page. Lucide is the honest way to get the
     // same mascot.
     brain: (
-      <>
-        <path d="M12 18V5" />
-        <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" />
-        <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" />
-        <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" />
-        <path d="M18 18a4 4 0 0 0 2-7.464" />
-        <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
-        <path d="M6 18a4 4 0 0 1-2-7.464" />
-        <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
-      </>
+        <>
+            <path d="M12 18V5" />
+            <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" />
+            <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" />
+            <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" />
+            <path d="M18 18a4 4 0 0 0 2-7.464" />
+            <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
+            <path d="M6 18a4 4 0 0 1-2-7.464" />
+            <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
+        </>
     ),
     // a spoken waveform — Jarvis is voice-first before it is anything else
     wave: (
@@ -131,12 +131,24 @@ function VersionTag() {
     const v = data?.version?.version;
     if (!v) return null;            // server down or too old to report it
     const commit = data?.version?.commit;
+    const latest = data?.update?.latest as string | undefined;
     return (
         <span
-            title={commit ? `${v} · ${commit}` : v}
-            className="select-all font-mono text-[8px] tracking-[0.5px] text-[var(--dim)] opacity-60 hover:opacity-100"
+            title={
+                latest
+                    ? `${latest} is available — run: brew update && brew upgrade jarvis`
+                    : commit ? `${v} · ${commit}` : v
+            }
+            className={`select-all font-mono text-[8px] tracking-[0.5px] ${
+                latest
+                    ? "text-[var(--cyan)] opacity-90"
+                    : "text-[var(--dim)] opacity-60 hover:opacity-100"
+            }`}
         >
-            {v}
+            {/* An update is worth one arrow, not a banner. The version is
+                already here and already read when something looks wrong;
+                "→ v0.3.33" beside it needs no new furniture. */}
+            {v}{latest ? ` → ${latest}` : ""}
         </span>
     );
 }

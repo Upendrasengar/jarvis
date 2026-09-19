@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { JARVIS_DIR } from "../config.js";
+import { updateState, isNewer } from "../services/updateCheck.js";
 import type { FastifyInstance } from "fastify";
 import { digestFor, listDigests } from "../services/digest.js";
 import { listProjects , setProjectStatus } from "../services/projects.js";
@@ -59,5 +60,18 @@ export function contentRoutes(app: FastifyInstance) {
   // inside it — that is the truth for anyone reporting a problem. A dev
   // checkout has neither, so fall back to the nearest tag. package.json is
   // last and has said "1.0.0" since the first commit.
-  app.get("/api/health", async () => ({ ok: true, server: "fastify", version: jarvisVersion() }));
+  app.get("/api/health", async () => {
+    const version = jarvisVersion();
+    const upd = updateState();
+    return {
+      ok: true,
+      server: "fastify",
+      version,
+      // null unless there is genuinely something newer. The check runs in the
+      // background on a daily cache, so this never delays a page load.
+      update: upd.latest && isNewer(upd.latest, version.version)
+        ? { latest: upd.latest }
+        : null,
+    };
+  });
 }

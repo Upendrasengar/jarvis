@@ -202,6 +202,25 @@ fi
 # So this check is tri-state. The CLI also needs the Obsidian APP to be
 # running, which is the state most likely to be true one minute and false the
 # next, and the one that silently downgrades every recall answer.
+# A newer Jarvis, if the server has noticed one. Doctor does NOT reach the
+# network itself — it reads what the daily background check already cached, so
+# `jarvis doctor` stays a local, read-only report even when offline.
+UPD_FILE="$ROOT/data/update-check.json"
+if [[ -f "$UPD_FILE" ]]; then
+  UPD_LATEST="$(sed -n 's/.*"latest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$UPD_FILE" | head -1)"
+  CUR="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/artifact.json" 2>/dev/null | head -1)"
+  [[ -z "$CUR" ]] && CUR="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null)"
+  if [[ -n "$UPD_LATEST" && -n "$CUR" && "$UPD_LATEST" != "$CUR" ]]; then
+    # Numeric compare, so 0.3.10 is not judged older than 0.3.9.
+    NEWER="$(printf '%s\n%s\n' "${UPD_LATEST#v}" "${CUR#v}" | sort -V | tail -1)"
+    if [[ "$NEWER" == "${UPD_LATEST#v}" ]]; then
+      add_check update "Update" "integrations (optional)" optional \
+        "$UPD_LATEST is available (you have $CUR)" \
+        "Run 'brew update && brew upgrade jarvis', or 'jarvis upgrade'."
+    fi
+  fi
+fi
+
 if command -v obsidian >/dev/null 2>&1 || [[ -x /Applications/Obsidian.app/Contents/MacOS/obsidian-cli ]]; then
   if pgrep -x Obsidian >/dev/null 2>&1; then
     add_check obsidian "Obsidian" "integrations (optional)" pass       "Obsidian CLI is available and the app is running — indexed search, backlinks and tags are in use" ""
