@@ -16,7 +16,7 @@ On the Mac you cut releases from (Apple Silicon here):
 
 ```bash
 cd homebrew-jarvis
-./release.sh 0.3.30
+./release.sh 0.4.1
 ```
 
 On the second Mac (Intel here), any time afterwards:
@@ -24,7 +24,7 @@ On the second Mac (Intel here), any time afterwards:
 ```bash
 cd jarvis
 git fetch --tags
-bash tools/release-artifact.sh 0.3.30      # version optional — defaults to the newest tag
+bash tools/release-artifact.sh 0.4.1       # pass it explicitly; see the guard below
 ```
 
 Both run the *same* script for the engine step; `release.sh` calls
@@ -68,6 +68,8 @@ Every one of those checks exists because the matching mistake was made:
 | Archive contains a runtime | A 15 MB engine with no Node, which installed "successfully" |
 | Re-download and compare | Nothing yet — it is the cheap insurance |
 | Patch one architecture only | A blanket `sed` that would have stamped one checksum onto the other's entry |
+| Reset both checksums on a bump | A new version left the other architecture pointing at an artifact that did not exist yet, under the previous one's checksum — a 404 on install |
+| Refuse a version the tap has passed | A machine with stale tags ran this with no argument, defaulted to the tag it knew, and published to an old release while patching the current formula |
 
 ## Until the second architecture is published
 
@@ -81,7 +83,7 @@ That is intentional: a clear refusal beats a silent hour of compiling.
 ## Checking a release landed
 
 ```bash
-gh release view v0.3.30 --repo upendrasengar/jarvis --json assets \
+gh release view v0.4.1 --repo upendrasengar/jarvis --json assets \
   -q '.assets[] | "\(.name) \(.size)"'
 ```
 
@@ -99,9 +101,22 @@ Neither checksum should be all zeros.
 > CDN caches for several minutes and has already reported a stale formula as
 > current during a release.
 
+## When the second machine refuses
+
+```
+✗ the tap is on 0.4.1 but this is 0.4.0
+```
+
+The version being published must match the version the tap is on. Pass the
+version explicitly rather than relying on the default — it is the newest tag
+*that machine* knows, which on a Mac that has not fetched is the wrong one.
+
+The check reads the formula from `origin/main`, not the local checkout, so a
+stale tap clone is not mistaken for a stale release.
+
 ## Versioning
 
-Plain `MAJOR.MINOR.PATCH`, no `v` in the argument (`./release.sh 0.3.30`); the
+Plain `MAJOR.MINOR.PATCH`, no `v` in the argument (`./release.sh 0.4.1`); the
 tag gets the `v`. Tags are never moved — if a release is wrong, cut the next
 patch version. A moved tag leaves Homebrew caches pointing at content that no
 longer exists.

@@ -16,7 +16,7 @@ matrix.
 
 ## Installation path
 
-The supported flow, as of v0.3.29:
+The supported flow, as of v0.4.0:
 
 ```bash
 brew tap upendrasengar/jarvis

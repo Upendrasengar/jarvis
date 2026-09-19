@@ -23,6 +23,11 @@ Claude Code session.
   duplicate clusters across meetings; the digest and dashboard lead with a
   ranked bucket (overdue → yours → blocking → repeated → aging), and one
   checkbox completes an item in every call it was raised in.
+- **Closure proposals** — when a later call reports an earlier item finished,
+  the digest says so above the ledger with the sentence that proves it, quoted
+  from those notes. It never ticks anything itself: the quote must actually
+  appear in the call it cites and post-date the item, or it is dropped. You
+  confirm with the checkbox that was already there.
 - **Call Notes** — detects meetings (Google Meet, Teams desktop/web, Zoom,
   Webex in browser tabs), records both sides, transcribes locally
   (multilingual), and writes Copilot-style minutes with named speaker
@@ -115,6 +120,11 @@ and `jarvis digest` runs the morning brief on demand.
 Releasing a new version is documented in [docs/releasing.md](docs/releasing.md).
 
 ## Upgrading and uninstalling
+
+Jarvis tells you when a newer version exists — the version in the sidebar
+becomes `v0.4.0 → v0.4.1`, and `jarvis doctor` says the same. That is one
+request a day to GitHub's public releases endpoint, nothing sent; put `off`
+in `memory/settings/update-check.txt` to stop it.
 
 `jarvis upgrade` updates to the latest release and restarts (brew or git,
 it figures it out). `jarvis uninstall` removes everything honestly: stops

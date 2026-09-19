@@ -390,8 +390,24 @@ Dependencies: Phase 2 complete.
 
 ### Task 10: Publish architecture-specific Homebrew bottles
 
-**Status: Apple Silicon published in v0.3.27. The compile is gone; the
-dependency download is not. Intel blocked on hardware.**
+**Status: Complete for both architectures as of v0.4.0. The compile is gone
+AND so is the dependency download.**
+
+Intel was never a hardware problem — it was a toolchain one. Homebrew
+publishes no macOS Intel bottles for node@22, pnpm, llvm@22, rust, ffmpeg,
+whisper.cpp, llama.cpp or ggml, so an Intel install compiled all eight before
+Jarvis could start once. Two changes removed the whole class:
+
+- the engine carries its own Node runtime, so node@22 stops being a dependency
+  and an ABI mismatch becomes structurally impossible rather than a rule
+  someone must keep obeying
+- ffmpeg and whisper.cpp became optional, since nothing outside call recording
+  and voice touches them and recording is off by default
+
+A prebuilt install now has no Homebrew dependencies beyond macOS itself, on
+either architecture. An engine can only be built on the architecture it
+targets, so a release is two runs of the same script on two Macs — see
+[releasing.md](releasing.md).
 
 The formula carries a per-architecture `engine` resource and installs by
 extracting it, and `release.sh` builds the artifact, attaches it to the GitHub
@@ -457,7 +473,12 @@ Dependencies: Task 9.
 
 ### Task 11: Automate release validation
 
-**Status: Complete for the single architecture this project can build.**
+**Status: Complete for both architectures.** Release validation runs as four
+gates before anything is tagged, and the engine step verifies the archive
+before publishing and re-downloads it afterwards to confirm the published
+bytes. Each guard in tools/release-artifact.sh exists because the matching
+mistake was made at least once; they are catalogued in
+[releasing.md](releasing.md).
 `release.sh` now gates, publishes, verifies and reports.
 
 - Four gates run BEFORE anything is tagged: the doctor JSON contract, the
