@@ -96,6 +96,20 @@ git -C "$TAP_DIR" fetch --quiet origin || true
 git -C "$TAP_DIR" merge --ff-only origin/main >/dev/null 2>&1 \
   || fail "tap cannot fast-forward to origin/main — reconcile it by hand"
 
+# The formula has ONE version, and its engine urls interpolate it. Publishing
+# an older version's checksum into it points that architecture at an artifact
+# that does not exist — a 404 on install instead of the clean "not published"
+# message the placeholder gives.
+#
+# This is not hypothetical: a machine that had not fetched the newest tag ran
+# this with no argument, defaulted to the tag it knew, and patched a formula
+# that had already moved on.
+TAP_VERSION="$(sed -n 's|.*archive/refs/tags/v\([0-9][0-9.]*\)\.tar\.gz.*|\1|p' \
+  "$TAP_DIR/Formula/jarvis.rb" | head -1)"
+if [ -n "$TAP_VERSION" ] && [ "$TAP_VERSION" != "$VERSION" ]; then
+  fail "the tap is on $TAP_VERSION but this is $VERSION — run 'git fetch --tags' and build $TAP_VERSION, or cut the release for $VERSION first"
+fi
+
 python3 - "$TAP_DIR/Formula/jarvis.rb" "$ARCH_BLOCK" "$ART_SHA" <<'PYEOF'
 import re, sys
 path, block, sha = sys.argv[1], sys.argv[2], sys.argv[3]
