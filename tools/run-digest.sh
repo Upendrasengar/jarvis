@@ -128,13 +128,20 @@ were real calls since the previous digest — a 'Calls' section with one line pe
 then — ONLY if the raw file has a TODAY'S MEETINGS section — a 'Today' \
 section listing those meetings, cross-referencing open action items that \
 involve the same people or topics, \
+then — ONLY if data/triage.json has a non-empty 'resolved' object — a \
+'Looks done — confirm?' section ABOVE the ledger. One line per entry: \
+'- [ ] <the item text> — <quote>' then ' (<source>, <date>)'. These are \
+items a LATER call reported as finished. Do NOT tick them and do NOT remove \
+them from the ledger below; they stay open until I confirm. Quote the \
+evidence exactly as triage.json gives it — it is there so I can check the \
+claim, and a paraphrase cannot be checked. \
 then an 'Open action items' section built from the OPEN ACTION ITEMS ledger \
 in the raw file: EVERY unchecked item, grouped by source with its date, \
 oldest debts first. Never drop an unchecked item because its call is old — \
 it stays in every digest until someone checks it off. If the ledger is \
 empty, say 'All clear.' Then a calendar line (say 'not checked in headless \
 mode'), and 1-3 suggested focuses — read data/triage.json (attention annotations: \
-deadlines, blocked flags, duplicate clusters) and lead with overdue items, \
+deadlines, blocked flags, duplicate clusters, likely-resolved items) and lead with overdue items, \
 then items I own that block others, then the oldest or most blocking \
 open items. EACH focus item MUST follow this exact structure on one line: \
 'N. **Short title (3-6 words)** — one or two sentences of why it matters \
