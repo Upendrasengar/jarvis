@@ -416,8 +416,29 @@ export function HeaderVoice() {
     };
   }, []);
 
+  // The mic button starts the mic. It used to open the device picker every
+  // single time, which asks a question that was already answered — the choice
+  // is remembered, and re-confirming it before every sentence is a toll, not a
+  // feature. Pick up the saved microphone and go; only ask when there is
+  // genuinely nothing to use.
   const onMicClick = () => {
     if (state === "listening" || persistent) { stopAll(); return; }
+    setMicError("");
+    const saved = savedMicrophone();
+    if (!saved) { setPickerOpen(true); return; }
+    void startListening(saved, modeRef.current !== "on-demand").catch(() => {
+      // The remembered device is gone (unplugged, or permissions changed).
+      // That is the one case where asking again is the right thing to do.
+      setMicError("");
+      setPickerOpen(true);
+    });
+  };
+
+  // Changing the device is a separate, rarer intent, so it gets its own
+  // control rather than being bundled into "start talking".
+  const onChooseMic = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    e.preventDefault();
+    e.stopPropagation();
     setMicError("");
     setPickerOpen(true);
   };
@@ -453,11 +474,12 @@ export function HeaderVoice() {
     <div className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surf-2)] py-1 pl-1 pr-3">
       <button
         onClick={onMicClick}
-        aria-label={state === "listening" || persistent ? "Stop listening" : "Choose microphone"}
+        onContextMenu={onChooseMic}
+        aria-label={state === "listening" || persistent ? "Stop listening" : "Start listening"}
         title={
           mode === "on-demand"
-            ? "Choose microphone and talk to Jarvis"
-            : persistent ? "Listening — click to stop" : "Choose microphone and start listening"
+            ? "Talk to Jarvis (▾ to change microphone)"
+            : persistent ? "Listening — click to stop" : "Start listening (▾ to change microphone)"
         }
         className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border text-[14px] ${
           state === "listening"
@@ -466,6 +488,14 @@ export function HeaderVoice() {
         }`}
       >
         🎙️
+      </button>
+      <button
+        onClick={onChooseMic}
+        aria-label="Change microphone"
+        title="Change microphone"
+        className="-ml-[3px] flex h-[18px] w-[13px] items-center justify-center rounded text-[8px] text-[var(--dim)] hover:text-[var(--cyan)]"
+      >
+        ▾
       </button>
       <canvas ref={canvasRef} width={120} height={26} className="h-[26px] w-[120px]" />
       <span
