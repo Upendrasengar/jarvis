@@ -18,7 +18,7 @@ import { callTitle } from "../calls/hooks";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
 import { MicrophonePicker } from "../voice/MicrophonePicker";
-import { openMicrophone, startRecognition } from "../voice/microphone";
+import { openMicrophone, savedMicrophone, startRecognition } from "../voice/microphone";
 import { setVoicePresence } from "../../lib/live";
 
 // "SOURCES: /calls/x /notes/y" (from recall workers) renders as link chips
@@ -359,10 +359,17 @@ export function ChatPage() {
     }
   };
 
+  // Same as the header mic: use the device already chosen rather than opening
+  // a dialog to re-ask. The picker is a repair path, not a step on the way to
+  // talking, so it appears only when nothing is saved or the saved device
+  // refuses to open.
   const mic = () => {
     if (listening) { stopMic(); return; }
     setMicError("");
-    setPickerOpen(true);
+    const saved = savedMicrophone();
+    if (!saved) { setPickerOpen(true); return; }
+    void startMic(saved).catch(() => { setMicError(""); setPickerOpen(true); });
+    return;
   };
 
   const newChat = () => {
