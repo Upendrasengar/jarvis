@@ -118,6 +118,49 @@ cp -R packages/shared "$STAGE/node_modules/@jarvis/shared"
 rm -rf "$STAGE/tools/tests" "$STAGE/apps/web/src"
 ok "staged"
 
+echo "── node runtime ──"
+# Ship the interpreter with the code it was compiled against.
+#
+# better-sqlite3 is built for one Node ABI and fails at dlopen on any other —
+# that is how `jarvis start` broke when Homebrew put node 26 ahead of nvm's 22
+# on PATH. Pinning a version in a settings file makes that a rule someone has
+# to keep obeying. Carrying the runtime makes it structural.
+#
+# It also removes node@22 as a Homebrew dependency, which matters more than it
+# sounds: Homebrew publishes NO macOS Intel bottles for node@22, so an Intel
+# install compiles Node from source before it can start.
+#
+# Deliberately the official nodejs.org build, not the Homebrew one. Homebrew's
+# node links against /opt/homebrew dylibs (icu4c, brotli, libuv…) that are not
+# present on a machine that never installed them; the official build is
+# self-contained, which is checked below rather than assumed.
+case "$ARCH" in
+  arm64)  NODE_ARCH=arm64 ;;
+  x86_64) NODE_ARCH=x64 ;;
+  *) fail "unsupported architecture for a bundled runtime: $ARCH" ;;
+esac
+NODE_TGZ="node-${NODE_VERSION}-darwin-${NODE_ARCH}.tar.gz"
+NODE_TMP="$(mktemp -d)"
+curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/${NODE_TGZ}" -o "$NODE_TMP/$NODE_TGZ"   || fail "could not download the official Node runtime ($NODE_TGZ)"
+tar -xzf "$NODE_TMP/$NODE_TGZ" -C "$NODE_TMP" "node-${NODE_VERSION}-darwin-${NODE_ARCH}/bin/node"   || fail "the Node tarball did not contain bin/node"
+mkdir -p "$STAGE/runtime"
+cp "$NODE_TMP/node-${NODE_VERSION}-darwin-${NODE_ARCH}/bin/node" "$STAGE/runtime/node"
+chmod +x "$STAGE/runtime/node"
+rm -rf "$NODE_TMP"
+
+# It must be the SAME ABI the native modules were just built against,
+# otherwise this ships a runtime guaranteed to fail at dlopen.
+BUNDLED_ABI="$("$STAGE/runtime/node" -p 'process.versions.modules' 2>/dev/null || echo "")"
+[ "$BUNDLED_ABI" = "$NODE_ABI" ]   || fail "bundled runtime is ABI ${BUNDLED_ABI:-unknown}, but the modules were built for $NODE_ABI"
+
+# Self-contained means it references only the OS. A link into /opt/homebrew or
+# /usr/local would work here and fail on the user's Mac, which is the worst
+# possible place to find out.
+if otool -L "$STAGE/runtime/node" 2>/dev/null | grep -qE '/opt/homebrew|/usr/local'; then
+  fail "the bundled runtime links against local Homebrew libraries — it would not run elsewhere"
+fi
+ok "node ${NODE_VERSION} (${NODE_ARCH}, ABI ${BUNDLED_ABI}) bundled and self-contained"
+
 echo "── metadata ──"
 cat > "$STAGE/artifact.json" <<JSON
 {
@@ -126,7 +169,8 @@ cat > "$STAGE/artifact.json" <<JSON
   "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "arch": "$ARCH",
   "node": "$NODE_VERSION",
-  "nodeAbi": "$NODE_ABI"
+  "nodeAbi": "$NODE_ABI",
+  "bundledRuntime": "runtime/node"
 }
 JSON
 ok "artifact.json written (node $NODE_VERSION, ABI $NODE_ABI, $ARCH)"

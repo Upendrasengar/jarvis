@@ -28,6 +28,13 @@ PORT="${PORT:-4321}"
 # an ABI the native modules were not built for and better-sqlite3 refuses to
 # load. The failure is a stack trace at startup, not a hint, so name it.
 NODE_BIN="${JARVIS_NODE:-}"
+# A published artifact carries the exact interpreter its native modules were
+# compiled against. When it is present it wins over everything except an
+# explicit JARVIS_NODE, because an ABI match is not a preference — it is the
+# difference between starting and a dlopen failure.
+if [ -z "$NODE_BIN" ] && [ -x "$JARVIS_DIR/runtime/node" ]; then
+  NODE_BIN="$JARVIS_DIR/runtime/node"
+fi
 if [ -z "$NODE_BIN" ]; then
   NODE_BIN="$(head -1 "$JARVIS_DIR/memory/settings/node-bin.txt" 2>/dev/null | tr -d '[:space:]')"
   if [ -n "$NODE_BIN" ] && [ ! -x "$NODE_BIN" ]; then
