@@ -7,7 +7,17 @@
 # Usage: jarvis start|stop|restart|status   (routed here by the launcher)
 set -uo pipefail
 
-JARVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Prefer an inherited JARVIS_DIR over this script's own location.
+#
+# Homebrew keeps the engine read-only in the cellar and symlinks it into
+# ~/.jarvis, where the data lives. Deriving the root from __file__ happens to
+# agree when everything is reached through those symlinks — but a launchd job
+# pointed straight at the cellar path (a reasonable thing to write) would
+# resolve to the read-only cellar while the server uses ~/.jarvis. The two
+# would then disagree about where data/ is, which is exactly how muting the
+# microphone silently stopped working: the writer and the reader were looking
+# at different files.
+JARVIS_DIR="${JARVIS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 # Port precedence: JARVIS_UI_PORT env > memory/settings/port.txt > 4321
 PORT="${JARVIS_UI_PORT:-$(head -1 "$JARVIS_DIR/memory/settings/port.txt" 2>/dev/null | tr -cd '0-9')}"
 PORT="${PORT:-4321}"
