@@ -28,10 +28,17 @@ ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
 # Same precedence the launcher uses, so the artifact is compiled against the
 # runtime that will actually load it.
 NODE_BIN="${JARVIS_NODE:-}"
-[ -n "$NODE_BIN" ] || NODE_BIN="$(head -1 memory/settings/node-bin.txt 2>/dev/null | tr -d '[:space:]')"
+if [ -z "$NODE_BIN" ] && [ -f memory/settings/node-bin.txt ]; then
+  NODE_BIN="$(head -1 memory/settings/node-bin.txt | tr -d '[:space:]')"
+fi
 NODE_BIN="${NODE_BIN:-node}"
 command -v "$NODE_BIN" >/dev/null 2>&1 || [ -x "$NODE_BIN" ] \
   || fail "node not found at '$NODE_BIN' — set JARVIS_NODE or memory/settings/node-bin.txt"
+
+# Put the resolved Node's directory first on PATH so pnpm/npm/tsx use the same
+# runtime — prevents a broken Homebrew node from being picked up by children.
+NODE_DIR="$(dirname "$(command -v "$NODE_BIN" 2>/dev/null || echo "$NODE_BIN")")"
+export PATH="$NODE_DIR:$PATH"
 
 NODE_VERSION="$("$NODE_BIN" -p 'process.version')"
 NODE_ABI="$("$NODE_BIN" -p 'process.versions.modules')"
@@ -58,7 +65,10 @@ done
 # as a side effect of cutting a release — silently revoking the macOS
 # recording grants that a stable identity exists to preserve. Building a
 # release must not break the machine doing the building.
-SIGN_ID="$(head -1 memory/settings/signing-identity.txt 2>/dev/null | tr -d '\n')"
+SIGN_ID=""
+if [ -f memory/settings/signing-identity.txt ]; then
+  SIGN_ID="$(head -1 memory/settings/signing-identity.txt | tr -d '\n')"
+fi
 if [ -n "$SIGN_ID" ] && ! security find-identity -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
   SIGN_ID=""
 fi
