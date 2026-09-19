@@ -20,9 +20,11 @@ type Run = {
   summary: string; sessionId: string; silent: boolean;
 };
 
-// A finished row lingers briefly so the work that produced the answer is still
-// visible when the answer arrives, then gets out of the way.
-const LINGER_MS = 45_000;
+// A FAILED row lingers, because it is the only explanation for an answer that
+// never came. A successful one does not: the answer is the outcome, and a
+// completed "ASK …" sitting under the reply for another 45 seconds reads as
+// work still in progress. It was lingering long after it had anything to say.
+const FAILED_LINGER_MS = 45_000;
 
 // A worker's log carries the reply protocol too — ANSWER:, SPOKEN:, SOURCES:,
 // FOLLOWUPS:. Those are machine lines meant for the dispatcher, and showing
@@ -107,7 +109,8 @@ export function ActivityRows({ sessionId }: { sessionId: string }) {
     (r) =>
       r.sessionId === sessionId &&
       !r.silent &&
-      (r.status === "working" || (r.finished ?? 0) > Date.now() - LINGER_MS),
+      (r.status === "working" ||
+        (r.status === "failed" && (r.finished ?? 0) > Date.now() - FAILED_LINGER_MS)),
   );
   if (!mine.length) return null;
 
