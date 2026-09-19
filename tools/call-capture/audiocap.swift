@@ -269,10 +269,19 @@ final class MicRecorder {
     private var muteTimer: DispatchSourceTimer?
     private let muteFile: URL
 
-    init(url: URL) {
+    // The directory is passed IN rather than read from the environment.
+    // call-watch launches this app with `open`, which does not forward the
+    // caller's environment — so JARVIS_DIR was never set, the path fell back
+    // to the working directory ("/"), and mute was read from /data/mic-mute,
+    // which does not exist. readMute() answered "not muted" every time and
+    // nothing said otherwise: muting yourself did nothing on this path, while
+    // the menu bar and the watcher both reported the mute as active.
+    init(url: URL, jarvisDir: String) {
         self.url = url
-        let dir = ProcessInfo.processInfo.environment["JARVIS_DIR"] ?? FileManager.default.currentDirectoryPath
-        self.muteFile = URL(fileURLWithPath: dir).appendingPathComponent("data/mic-mute")
+        self.muteFile = URL(fileURLWithPath: jarvisDir).appendingPathComponent("data/mic-mute")
+        if !FileManager.default.fileExists(atPath: URL(fileURLWithPath: jarvisDir).path) {
+            fputs("audiocap: WARNING jarvis dir '\(jarvisDir)' does not exist — mute cannot be read\n", stderr)
+        }
     }
 
     // File holds the epoch second the mute expires. An expired file is not
@@ -355,16 +364,28 @@ guard args.count >= 2 else {
     fputs("usage: audiocap <output.wav> [log] | --mic <output.wav> [log] | --check [file] | --request [file]\n", stderr)
     exit(2)
 }
+// Explicit beats ambient: `open` drops the environment, so the caller states
+// the directory outright. The env var remains a fallback for direct execution.
+func argValue(_ flag: String) -> String? {
+    guard let i = args.firstIndex(of: flag), i + 1 < args.count else { return nil }
+    return args[i + 1]
+}
+let jarvisDir = argValue("--dir")
+    ?? ProcessInfo.processInfo.environment["JARVIS_DIR"]
+    ?? FileManager.default.currentDirectoryPath
+
 let micMode = args[1] == "--mic"
 let outPath = micMode ? args[2] : args[1]
 let logIdx = micMode ? 3 : 2
 // optional log arg — `open` gives us no stderr, so redirect
-if args.count > logIdx { freopen(args[logIdx], "a", stderr) }
+// Only a real path is a log path. Without this, `--mic out.wav --dir /x`
+// would freopen stderr onto a file literally named "--dir".
+if args.count > logIdx, !args[logIdx].hasPrefix("--") { freopen(args[logIdx], "a", stderr) }
 if micMode && args.count < 3 { fputs("usage: audiocap --mic <output.wav> [log]\n", stderr); exit(2) }
 
 let outURL = URL(fileURLWithPath: outPath)
 let sysRecorder: SystemAudioRecorder? = micMode ? nil : SystemAudioRecorder(url: outURL)
-let micRecorder: MicRecorder? = micMode ? MicRecorder(url: outURL) : nil
+let micRecorder: MicRecorder? = micMode ? MicRecorder(url: outURL, jarvisDir: jarvisDir) : nil
 
 for sig in [SIGINT, SIGTERM] {
     signal(sig, SIG_IGN)

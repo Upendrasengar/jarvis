@@ -238,7 +238,7 @@ CALPY
 
   APP_PERMS="$(app_perms || true)"
   if grep -q "screen-recording: granted" <<<"$APP_PERMS"; then
-    open -n -g -a "$APP" --args "$session/system.wav" "$session/capture.log" 2>> "$session/capture.log"
+    open -n -g -a "$APP" --args "$session/system.wav" "$session/capture.log" --dir "$JARVIS_DIR" 2>> "$session/capture.log"
     sleep 1
     audiocap_pid="$(pgrep -nf "MacOS/audiocap [^-]" 2>/dev/null | head -1)"
     echo "$(date '+%H:%M:%S') recorder: JarvisAudio.app (pid ${audiocap_pid:-?})"
@@ -252,7 +252,7 @@ CALPY
   # JarvisAudio.app identity (no ffmpeg/terminal attribution); ffmpeg remains
   # the fallback until the app's mic grant exists.
   if grep -q "microphone: granted" <<<"${APP_PERMS:-}"; then
-    open -n -g -a "$APP" --args --mic "$session/mic.wav" "$session/capture.log" 2>> "$session/capture.log"
+    open -n -g -a "$APP" --args --mic "$session/mic.wav" "$session/capture.log" --dir "$JARVIS_DIR" 2>> "$session/capture.log"
     sleep 1
     ffmpeg_pid="$(pgrep -nf 'audiocap --mic' 2>/dev/null | head -1)"
     echo "$(date '+%H:%M:%S') mic: JarvisAudio.app (pid ${ffmpeg_pid:-?})"
