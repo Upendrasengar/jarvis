@@ -141,7 +141,22 @@ function main() {
   process.stdout.write(`${JSON.stringify(status(state), null, 2)}\n`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Compare REAL paths, not the strings each side happens to carry.
+//
+// Homebrew installs the engine read-only in the cellar and symlinks it into
+// ~/.jarvis, so this file is invoked as ~/.jarvis/tools/onboarding-state.mjs
+// while import.meta.url reports the resolved cellar path — Node resolves
+// symlinks, argv does not. The two never matched, so main() never ran: exit 0,
+// no output, no error. onboard.sh then piped that empty stdout into JSON.parse
+// and every Homebrew user got "Unexpected end of JSON input" from a tool that
+// had politely done nothing.
+function isDirectlyInvoked() {
+  if (!process.argv[1]) return false;
+  const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  return real(process.argv[1]) === real(fileURLToPath(import.meta.url));
+}
+
+if (isDirectlyInvoked()) {
   try { main(); }
   catch (error) { process.stderr.write(`jarvis onboarding state: ${error.message}\n`); process.exitCode = 1; }
 }
