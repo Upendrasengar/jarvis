@@ -927,10 +927,6 @@ export function SettingsPage() {
 
           <TopicsSection />
 
-          <p className="text-[11px] text-[var(--dim)]">
-            Model provider settings (OpenAI / Google for summarization) are planned — API keys will
-            live only in the gitignored <code>secrets/.env</code>, never in the repo.
-          </p>
         </div>
       </div>
     </div>
