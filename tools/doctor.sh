@@ -105,7 +105,10 @@ else
   add_check pnpm "pnpm" "core dependencies" blocked "pnpm is not installed" "Run 'npm install -g pnpm'."
 fi
 
-for spec in "ffmpeg|FFmpeg|brew install ffmpeg" "whisper-cli|Whisper CLI|brew install whisper-cpp"; do
+# Homebrew renamed whisper-cpp to whisper.cpp; the old name still resolves via
+# oldnames, but printing a deprecated name in a remediation someone is meant to
+# copy is how instructions rot.
+for spec in "ffmpeg|FFmpeg|brew install ffmpeg" "whisper-cli|Whisper CLI|brew install whisper.cpp"; do
   IFS='|' read -r command label remediation <<<"$spec"
   if command -v "$command" >/dev/null 2>&1; then
     add_check "$command" "$label" "meetings (optional)" pass "$label installed" ""

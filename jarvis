@@ -19,6 +19,58 @@
 #   jarvis "what do I know about X"  -> one-shot question
 cd "$(dirname "$0")" || exit 1
 
+# Colour only when a person is watching. Piping `jarvis help` into a file or
+# grep should produce plain text, and NO_COLOR is the convention for "never".
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  B=$'\033[1m'; DIM=$'\033[2m'; CY=$'\033[36m'; GR=$'\033[32m'; YL=$'\033[33m'; R=$'\033[0m'
+else
+  B=""; DIM=""; CY=""; GR=""; YL=""; R=""
+fi
+
+jarvis_version() {
+  [ -f artifact.json ] && sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' artifact.json | head -1 && return
+  git describe --tags --abbrev=0 2>/dev/null || echo "dev"
+}
+
+# One screen. Grouped by WHEN you need it, not alphabetically, and leading with
+# the single command that gets a new install working — the old caveats listed
+# six commands with no indication which to run first.
+show_help() {
+  cat <<HELP
+${B}JARVIS${R} ${DIM}$(jarvis_version)${R}  — your AI agent, running locally
+
+${B}Start here${R}
+  ${CY}jarvis onboard${R}          ${DIM}guided setup — checks everything, fixes what it can${R}
+  ${CY}jarvis doctor${R}           ${DIM}what is working and what is not${R}
+
+${B}Every day${R}
+  ${CY}jarvis${R}                  ${DIM}chat (type, or hold space to talk)${R}
+  ${CY}jarvis "question"${R}       ${DIM}ask one thing and exit${R}
+  ${CY}jarvis digest${R}           ${DIM}today's brief across your projects${R}
+  ${CY}jarvis start${R}            ${DIM}server + call watcher${R}
+  ${CY}jarvis stop${R} ${DIM}·${R} ${CY}restart${R} ${DIM}·${R} ${CY}status${R} ${DIM}·${R} ${CY}logs${R}
+
+${B}Setup and upkeep${R}
+  ${CY}jarvis setup${R}            ${DIM}build the native helpers, fetch the speech model${R}
+  ${CY}jarvis sign create${R}      ${DIM}stable signature — keeps recording permissions${R}
+  ${CY}jarvis model${R} ${DIM}[size]${R}     ${DIM}choose a transcription model${R}
+  ${CY}jarvis service install${R}  ${DIM}start automatically at login${R}
+  ${CY}jarvis vault${R} ${DIM}<path>${R}     ${DIM}move where your notes live${R}
+  ${CY}jarvis telegram${R}         ${DIM}talk to Jarvis from your phone${R}
+  ${CY}jarvis upgrade${R} ${DIM}·${R} ${CY}uninstall${R}
+
+${B}Meetings${R} ${DIM}(optional — install when you want call recording)${R}
+  ${YL}brew install ffmpeg whisper.cpp${R}
+  ${DIM}then${R} ${CY}jarvis sign create${R} ${DIM}and${R} ${CY}jarvis setup${R} ${DIM}to grant recording${R}
+
+${DIM}Your data lives in ~/.jarvis and is never touched by upgrades.${R}
+HELP
+}
+
+if [[ "${1:-}" == "help" || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  show_help; exit 0
+fi
+
 # Doctor must be read-only, including on a first run. Dispatch it before the
 # private-data seeding performed by interactive commands.
 if [[ "${1:-}" == "doctor" ]]; then
