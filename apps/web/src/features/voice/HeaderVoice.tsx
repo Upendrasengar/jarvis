@@ -485,7 +485,7 @@ export function HeaderVoice() {
         }
         className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border text-[14px] ${
           state === "listening"
-            ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[#012] shadow-[0_0_18px_var(--cyan)]"
+            ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[var(--cyan-ink)] shadow-[0_0_18px_var(--cyan)]"
             : "border-[var(--cyan-3)] bg-[var(--cyan-2)] text-[var(--cyan)]"
         }`}
       >

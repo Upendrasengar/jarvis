@@ -244,7 +244,7 @@ export function OnboardingPage() {
                 </p>
                 <button
                   onClick={() => navigate("/overview")}
-                  className="self-start rounded-full bg-[var(--cyan)] px-5 py-2 text-[13px] font-semibold text-[#02121a]"
+                  className="self-start rounded-full bg-[var(--cyan)] px-5 py-2 text-[13px] font-semibold text-[var(--cyan-ink)]"
                 >
                   Open Jarvis →
                 </button>

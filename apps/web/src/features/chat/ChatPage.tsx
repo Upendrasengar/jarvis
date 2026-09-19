@@ -564,7 +564,7 @@ export function ChatPage() {
             aria-label={listening ? "Stop dictation" : "Choose dictation microphone"}
             className={`h-[38px] w-[38px] shrink-0 rounded-full border text-[15px] ${
               listening
-                ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[#012] shadow-[0_0_22px_var(--cyan)]"
+                ? "blip border-[var(--cyan)] bg-[var(--cyan)] text-[var(--cyan-ink)] shadow-[0_0_22px_var(--cyan)]"
                 : "border-[var(--line)] text-[var(--cyan)] hover:border-[var(--cyan)]"
             }`}
           >
@@ -623,7 +623,7 @@ export function ChatPage() {
             onClick={() => submit()}
             disabled={streaming}
             title="Send"
-            className="h-[38px] w-[38px] shrink-0 rounded-full bg-[var(--cyan)] text-[15px] font-extrabold text-[#02121a] transition hover:shadow-[0_0_16px_var(--cyan-3)] disabled:opacity-50"
+            className="h-[38px] w-[38px] shrink-0 rounded-full bg-[var(--cyan)] text-[15px] font-extrabold text-[var(--cyan-ink)] transition hover:shadow-[0_0_16px_var(--cyan-3)] disabled:opacity-50"
           >
             ❯
           </button>

@@ -32,6 +32,11 @@
   --line: rgba(140, 175, 215, 0.13);
   --line-2: rgba(140, 175, 215, 0.24);
   --cyan: #22d3ee;
+  /* Text that sits ON a --cyan fill. It has to flip with the theme: the fill
+     is bright cyan here and a dark teal in light mode, so a single hardcoded
+     ink is unreadable in one of them. It was #02121a in both, which put
+     near-black on dark teal. */
+  --cyan-ink: #02121a;
   --cyan-2: rgba(34, 211, 238, 0.10);
   --cyan-3: rgba(34, 211, 238, 0.34);
   --cyan-dim: #58b7cf;
@@ -62,6 +67,7 @@ html.light {
   --line: rgba(20, 55, 95, 0.13);
   --line-2: rgba(20, 55, 95, 0.24);
   --cyan: #0e7490;
+  --cyan-ink: #ffffff;
   --cyan-2: rgba(14, 116, 144, 0.09);
   --cyan-3: rgba(14, 116, 144, 0.32);
   --cyan-dim: #48788f;
