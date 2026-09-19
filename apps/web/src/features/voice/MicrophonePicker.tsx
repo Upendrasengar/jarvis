@@ -85,7 +85,11 @@ export function MicrophonePicker({ onStart, onClose, onCancel }: {
         {missing && <option value={selected} disabled>Saved microphone unavailable</option>}
         {devices.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
       </select>
-      <p className="mt-2 text-xs text-[var(--dim)]" role="status">{loading ? 'Finding microphones…' : 'Your choice is remembered in this browser.'}</p>
+      {/* Kept as a live region while enumerating — it announces progress. The
+          idle half said the choice is remembered, which is both obvious once
+          it happens and now rarely seen at all, since the picker only opens
+          when there is nothing remembered. */}
+      {loading && <p className="mt-2 text-xs text-[var(--dim)]" role="status">Finding microphones…</p>}
       {error && <p role="alert" className="mt-3 text-xs text-[var(--red)]">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--line)] px-4 py-2 text-xs disabled:opacity-50">Cancel</button>
