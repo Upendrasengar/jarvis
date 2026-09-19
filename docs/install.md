@@ -14,30 +14,44 @@ from working.
 See [Support Matrix](support-matrix.md) for the complete boundary and test
 matrix.
 
-## Current installation path
+## Installation path
 
-The current released flow is:
+The supported flow, as of v0.3.29:
 
 ```bash
 brew tap upendrasengar/jarvis
-brew trust upendrasengar/jarvis
+brew trust upendrasengar/jarvis    # newer Homebrew asks this once per third-party tap
 brew install jarvis
-jarvis init
-jarvis start
-```
-
-This works, but it does not yet satisfy the final installation contract: it
-has multiple setup commands, performs build work during installation, and
-configures optional capabilities separately.
-
-## Target installation path
-
-The planned supported flow is:
-
-```bash
-brew install upendrasengar/jarvis/jarvis
 jarvis onboard
 ```
+
+Nothing is compiled. The install downloads a prebuilt engine for the machine's
+architecture — around 50 MB, carrying the built web UI, the Swift helpers,
+production dependencies, and the Node runtime its native modules were compiled
+against — and extracts it.
+
+That last part is what makes the install both fast and reliable. Carrying the
+runtime removes `node@22` as a dependency and makes an ABI mismatch
+structurally impossible: `better-sqlite3` compiled for one Node fails at
+`dlopen` on another, and pinning a version in a settings file only works while
+everyone keeps obeying it.
+
+It matters most on Intel, where Homebrew publishes no macOS bottles for
+`node@22`, `pnpm`, `llvm@22`, `rust`, `ffmpeg`, `whisper.cpp`, `llama.cpp` or
+`ggml`. Before the engine carried its own runtime, an Intel install compiled
+Node, then LLVM and Rust purely to build pnpm — most of a day on a 2019 i5.
+
+A prebuilt install has no Homebrew dependencies beyond macOS itself.
+`ffmpeg` and `whisper.cpp` are needed only for call recording and
+transcription, which are off by default, so they are installed on request:
+
+```bash
+brew install ffmpeg whisper.cpp
+```
+
+If no engine has been published for an architecture yet, the install stops and
+says so rather than attempting a source build it has no toolchain for. See
+[releasing.md](releasing.md) — publishing is one command per architecture.
 
 `jarvis onboard` is the resumable entry point for first run and later
 integration setup. Use `jarvis onboard --non-interactive` for automation; set

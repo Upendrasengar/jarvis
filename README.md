@@ -62,12 +62,22 @@ The maintained platform boundary and success criteria are in the
 [installation contract](docs/install.md).
 
 - **macOS** (ScreenCaptureKit and CoreAudio power the call recording — this
-  is Mac-only)
+  is Mac-only). Apple Silicon and Intel are both supported.
 - **[Claude Code](https://claude.com/claude-code)** with your own account —
   Jarvis's brain; the CLI must be on your PATH (`claude --version`)
-- Node 20+ and pnpm
-- ffmpeg + whisper.cpp are optional for meeting recording and local
-  transcription (`brew install ffmpeg whisper-cpp`)
+
+That is the whole list for a Homebrew install. The released engine carries its
+own Node runtime, so nothing is compiled on your Mac and no Node or pnpm needs
+to be installed. Building **from source** does need Node 22 and pnpm.
+
+Two optional extras, only for meeting recording and transcription:
+
+```bash
+brew install ffmpeg whisper.cpp
+```
+
+They are not dependencies. Recording is off by default, and `jarvis doctor`
+reports both under "meetings (optional)" with the command to add them.
 
 ## Quickstart
 
@@ -98,8 +108,11 @@ git clone https://github.com/upendrasengar/jarvis && cd jarvis
 Core is the safe default; use `jarvis onboard --profile meetings` or
 `jarvis onboard --profile full` to add optional capabilities later.
 
-`./jarvis doctor` diagnoses a broken setup; `./jarvis` opens a terminal
-session; `./jarvis digest` runs the morning brief on demand.
+`jarvis help` lists every command, grouped by when you need it.
+`jarvis doctor` diagnoses a broken setup, `jarvis` opens a terminal session,
+and `jarvis digest` runs the morning brief on demand.
+
+Releasing a new version is documented in [docs/releasing.md](docs/releasing.md).
 
 ## Upgrading and uninstalling
 
