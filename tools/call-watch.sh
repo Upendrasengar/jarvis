@@ -64,13 +64,42 @@ notify() {
   bash "$JARVIS_DIR/tools/notify.sh" "$1" "Jarvis"
 }
 
+# Run a command, but never wait forever for it. macOS ships no timeout(1), so
+# the killer is a backgrounded sleep.
+#
+# This exists because the watcher wedged 56 times in one afternoon: the
+# heartbeat went stale for ~3 minutes at a stretch against a 15-second poll,
+# the watchdog restarted it, and it wedged again. Nothing crashed — it was
+# simply blocked, which is why nothing in the log said what was wrong.
+bounded() {   # $1 = seconds, rest = command
+  local secs="$1"; shift
+  local out; out="$(mktemp)"
+  "$@" >"$out" 2>/dev/null &
+  local pid=$!
+  ( sleep "$secs"; kill -9 "$pid" 2>/dev/null ) >/dev/null 2>&1 &
+  local killer=$!
+  wait "$pid" 2>/dev/null
+  local rc=$?
+  # Reap the killer as well as signalling it, or bash announces
+  # "Terminated: 15" into the watcher's log on every single poll.
+  kill "$killer" 2>/dev/null
+  wait "$killer" 2>/dev/null
+  cat "$out"; rm -f "$out"
+  return $rc
+}
+
 # Only query browsers that are actually running — AppleScript would LAUNCH
 # a closed browser otherwise.
+#
+# And bound it. `tell application ... to get URL of tabs` blocks for as long as
+# the browser feels like: a modal dialog, a beachballing tab, or a browser mid
+# profile-load will simply not answer. Unbounded, one stuck browser stalls the
+# entire watch loop — including the checks that notice a call has ended.
 tab_urls() {
   local app
   for app in "${BROWSERS[@]}"; do
     pgrep -xq "$app" || continue
-    osascript -e "tell application \"$app\" to get URL of tabs of windows" 2>/dev/null \
+    bounded 5 osascript -e "tell application \"$app\" to get URL of tabs of windows" \
       | tr ',' '\n' | sed 's/^ *//'
   done
 }
