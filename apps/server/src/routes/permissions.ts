@@ -67,7 +67,13 @@ export function permissionRoutes(app: FastifyInstance) {
     return {
       ...p,
       // screen capture cannot tell "denied" from "never asked" — say so
-      screenNote: p.screen === "denied" ? "denied, or never requested" : "",
+      // A sentence, because it is appended to one. It also has to earn its
+      // place beside a status pill that already says DENIED: what it adds is
+      // that macOS cannot tell the two apart, so "denied" here may only mean
+      // nobody has asked yet.
+      screenNote: p.screen === "denied"
+        ? "macOS reports \"denied\" and \"never requested\" identically, so it may simply not have been asked for yet."
+        : "",
     };
   });
 

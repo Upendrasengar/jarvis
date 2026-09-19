@@ -408,8 +408,10 @@ function MeetingsStep() {
         <>
           {row("Microphone", perms?.microphone, "microphone",
                "Records your side of a call. Without it, notes capture only the other person.")}
-          {row("Screen &amp; System Audio", perms?.screen, "screen",
-               `How Jarvis hears the other side. ${perms?.screenNote || ""}`)}
+          {/* A plain string, not JSX text — HTML entities are not parsed here,
+              so "&amp;" rendered literally as "&amp;" on screen. */}
+          {row("Screen & System Audio", perms?.screen, "screen",
+               `How Jarvis hears the other side.${perms?.screenNote ? ` ${perms.screenNote}` : ""}`)}
           <button
             onClick={() => void refetch()}
             className="mt-3 rounded-full border border-[var(--line)] px-3 py-1 text-[11px] text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
