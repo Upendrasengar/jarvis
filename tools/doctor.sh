@@ -29,7 +29,13 @@ else
 fi
 
 # Core dependencies
-if command -v claude >/dev/null 2>&1; then
+# Present is not the same as working. A binary that aborts on a missing dylib
+# satisfies `command -v` perfectly, and this reported "Claude CLI installed" as
+# a pass on a Mac where every invocation died in dyld — then contradicted
+# itself one check later.
+if command -v claude >/dev/null 2>&1 && ! claude --version >/dev/null 2>&1; then
+  add_check claude-cli "Claude CLI" "core dependencies" blocked     "Claude CLI is installed but will not start"     "Run 'claude --version' to see the error. A crash here usually means a broken Homebrew install — try 'brew doctor' and reinstall Claude Code."
+elif command -v claude >/dev/null 2>&1; then
   CLAUDE_VERSION="$(claude --version 2>/dev/null | head -1)"
   add_check claude-cli "Claude CLI" "core dependencies" pass "Claude CLI installed${CLAUDE_VERSION:+ ($CLAUDE_VERSION)}" ""
   if [[ "${JARVIS_DOCTOR_SKIP_CLAUDE_PROBE:-0}" == "1" ]]; then

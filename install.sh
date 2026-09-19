@@ -22,9 +22,26 @@ echo
 echo "── platform ──"
 [[ "$(uname)" == "Darwin" ]] && ok "macOS" || bad "macOS required (call recording uses ScreenCaptureKit/CoreAudio)"
 
+# Ask a tool for its version, and treat "installed but will not start" as the
+# failure it is. `command -v` is satisfied by a binary that aborts on a missing
+# dylib — which is how this printed "✓ claude CLI ()" and then contradicted
+# itself on the next line, under a screenful of dyld output.
+#   returns 0 = usable (version on stdout), 1 = present but broken, 2 = absent
+probe_version() {
+  local bin="$1"; shift
+  command -v "$bin" >/dev/null 2>&1 || return 2
+  local out
+  out="$("$bin" "$@" 2>/dev/null | head -1 | tr -d '\r')" || return 1
+  [ -n "$out" ] || return 1
+  printf '%s' "$out"
+}
+broken() {   # $1 = label, $2 = how to see the real error
+  bad "$1 is installed but will not start — run: $2"
+}
+
 echo "── core dependencies ──"
-if command -v claude >/dev/null 2>&1; then
-  ok "claude CLI ($(claude --version 2>/dev/null | head -1))"
+if CLAUDE_V="$(probe_version claude --version)"; then
+  ok "claude CLI ($CLAUDE_V)"
   # is it actually logged in? a dead CLI is the #1 cause of silent chat failure
   PROBE_OUT="$(mktemp)"
   ( claude -p --model haiku "Reply with exactly: OK" > "$PROBE_OUT" 2>&1 ) & PROBE_PID=$!
@@ -33,15 +50,30 @@ if command -v claude >/dev/null 2>&1; then
   elif grep -qi "OK" "$PROBE_OUT"; then ok "claude CLI logged in and responding"
   else bad "claude CLI present but NOT working — run \`claude\` in a terminal to log in ($(tail -1 "$PROBE_OUT" | cut -c1-60))"; fi
   rm -f "$PROBE_OUT"
+elif [ $? = 1 ]; then broken "claude CLI" "claude --version"
 else bad "claude CLI — install Claude Code (https://claude.com/claude-code) and log in"; fi
-if command -v node >/dev/null 2>&1; then
-  v="$(node -e 'console.log(process.versions.node.split(".")[0])')"
-  [[ "$v" -ge 20 ]] && ok "node $(node --version)" || bad "node >= 20 (found $(node --version))"
+
+if NODE_V="$(probe_version node --version)"; then
+  nmaj="${NODE_V#v}"; nmaj="${nmaj%%.*}"
+  if [[ "$nmaj" =~ ^[0-9]+$ ]] && [ "$nmaj" -ge 20 ]; then ok "node $NODE_V"
+  else bad "node >= 20 (found $NODE_V)"; fi
+elif [ $? = 1 ]; then broken "node" "node --version"
 else bad "node >= 20"; fi
-command -v pnpm >/dev/null 2>&1 && ok "pnpm $(pnpm --version)" || bad "pnpm — npm i -g pnpm"
-command -v ffmpeg >/dev/null 2>&1 && ok "ffmpeg" || bad "ffmpeg — brew install ffmpeg"
-command -v whisper-cli >/dev/null 2>&1 && ok "whisper-cli" || bad "whisper-cli — brew install whisper-cpp"
-command -v python3 >/dev/null 2>&1 && ok "python3" || bad "python3"
+
+if PNPM_V="$(probe_version pnpm --version)"; then ok "pnpm $PNPM_V"
+elif [ $? = 1 ]; then broken "pnpm" "pnpm --version"
+else bad "pnpm — npm i -g pnpm"; fi
+
+# Optional from here: meetings only. Absent is a normal state, not a problem.
+if FFMPEG_V="$(probe_version ffmpeg -version)"; then ok "ffmpeg"
+elif [ $? = 1 ]; then broken "ffmpeg" "ffmpeg -version"
+else bad "ffmpeg — brew install ffmpeg"; fi
+
+command -v whisper-cli >/dev/null 2>&1 && ok "whisper-cli" || bad "whisper-cli — brew install whisper.cpp"
+
+if PY_V="$(probe_version python3 --version)"; then ok "python3"
+elif [ $? = 1 ]; then broken "python3" "python3 --version"
+else bad "python3"; fi
 
 # ── signing identity ───────────────────────────────────────────────────────
 # Resolved BEFORE anything is built, because the two build steps below sign
