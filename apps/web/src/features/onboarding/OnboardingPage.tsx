@@ -85,22 +85,61 @@ export function OnboardingPage() {
   }
 
   const done = steps.filter((s) => s.status === "complete").length;
+  const remaining = steps.length - done;
+  const nextStep = steps.find((s) => s.status === "incomplete");
   const current = steps.find((s) => s.id === active) ?? steps[0];
   const plan = PLAN[current?.id ?? ""] ?? { title: current?.id ?? "", blurb: "" };
   const required = current?.required ?? true;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-[1040px] gap-6 px-6 py-8 font-sans">
+    // Anchored left and sized to content. It was centred at 1040px with
+    // h-full, so on a wide display two panels holding ~150px of text were
+    // stretched to the full viewport height and stranded between two broad
+    // margins of empty black. Setup is a worklist, not a hero.
+    <div className="w-full px-8 py-7 font-sans">
+      {/* ── progress, stated once and plainly ─────────────────────────── */}
+      <div className="mb-6 max-w-[1180px]">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-[22px] font-semibold text-[var(--bright)] [font-family:var(--display)]">
+            Set up Jarvis
+          </h1>
+          <span className="font-mono text-[10px] uppercase tracking-[1.5px] text-[var(--dim)]">
+            {done} of {steps.length} done
+          </span>
+          {remaining > 0 && nextStep && (
+            <button
+              onClick={() => setActive(nextStep.id)}
+              className="ml-auto rounded-full border border-[var(--cyan)] px-3 py-1 text-[11px] text-[var(--cyan)] hover:bg-[var(--cyan-2)]"
+            >
+              Next: {PLAN[nextStep.id]?.title ?? nextStep.id} →
+            </button>
+          )}
+        </div>
+        {/* One bar beats counting dots down a list. */}
+        <div className="mt-3 h-[3px] w-full overflow-hidden rounded-full bg-[var(--surf-2)]">
+          <div
+            className="h-full rounded-full bg-[var(--cyan)] transition-[width] duration-500"
+            style={{ width: `${steps.length ? (done / steps.length) * 100 : 0}%` }}
+          />
+        </div>
+        <p className="mt-2 text-[12px] text-[var(--dim)]">
+          {remaining === 0
+            ? "Everything is set up. You can revisit any step below."
+            : `${remaining} left — ${remaining === 1 ? "the last one is" : "starting with"} ${PLAN[nextStep?.id ?? ""]?.title ?? ""}.`}
+        </p>
+      </div>
+
+      <div className="flex max-w-[1180px] items-start gap-6">
       {/* ── step list ─────────────────────────────────────────────────── */}
       <div
         ref={listRef}
         tabIndex={0}
         onKeyDown={onKeyDown}
         aria-label="Setup steps"
-        className="w-[260px] shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-3 outline-none [box-shadow:var(--shadow)] focus:border-[var(--cyan-3)]"
+        className="sticky top-7 w-[260px] shrink-0 rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-3 outline-none [box-shadow:var(--shadow)] focus:border-[var(--cyan-3)]"
       >
         <div className="px-2 pb-2 text-[9.5px] tracking-[2px] text-[var(--dim)]">
-          SETUP · {done}/{steps.length}
+          STEPS
         </div>
         {steps.map((s) => {
           const p = PLAN[s.id] ?? { title: s.id };
@@ -191,6 +230,7 @@ export function OnboardingPage() {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
