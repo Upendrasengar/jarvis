@@ -30,6 +30,23 @@ mkdir -p "$JARVIS_DIR/reports"
   echo
 } > "$OUT"
 
+# Projects paused from the Projects page. setProjectStatus() writes
+# `status: inactive` into the project's vault page and calls that "the single
+# source of truth that the Projects page, brain graph, and digest scan all
+# respect" — but this scan never read it. INACTIVE_PATHS was tested below and
+# assigned nowhere, so under `set -u` the whole scan aborted on the first repo
+# and the digest has been broken ever since.
+#
+# Pages carry no repo path, only an id (the filename), so match that against
+# the repo's directory name — which is how active-projects.md refers to them
+# too. A missing or unreadable projects folder simply means nothing is paused.
+PROJECTS_DIR="${BRAIN_DIR:-}/projects"
+INACTIVE_IDS=""
+if [ -d "$PROJECTS_DIR" ]; then
+  INACTIVE_IDS="$(grep -l '^status:[[:space:]]*inactive' "$PROJECTS_DIR"/*.md 2>/dev/null \
+    | while IFS= read -r f; do basename "$f" .md; done)"
+fi
+
 found_any=0
 while IFS= read -r repo; do
   # skip comments / blanks
@@ -40,7 +57,7 @@ while IFS= read -r repo; do
   [[ -d "$repo/.git" ]] || { echo "## $(basename "$repo")"; echo "_not a git repo — skipped_"; echo; continue; } >> "$OUT"
 
   # paused from the Projects page? skip silently until reactivated
-  if [ -n "$INACTIVE_PATHS" ] && printf '%s\n' "$INACTIVE_PATHS" | grep -qxF "$(cd "$repo" && pwd -P)"; then
+  if [ -n "$INACTIVE_IDS" ] && printf '%s\n' "$INACTIVE_IDS" | grep -qxF "$(basename "$repo")"; then
     continue
   fi
 
