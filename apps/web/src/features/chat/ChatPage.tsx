@@ -18,7 +18,7 @@ import { callTitle } from "../calls/hooks";
 import { imagesFromClipboard, processImage, type ChatImage } from "../../lib/image";
 import { ContextRail } from "./ContextRail";
 import { MicrophonePicker } from "../voice/MicrophonePicker";
-import { openMicrophone, savedMicrophone, startRecognition } from "../voice/microphone";
+import { microphoneError, openMicrophone, savedMicrophone, startRecognition } from "../voice/microphone";
 import { setVoicePresence } from "../../lib/live";
 
 // "SOURCES: /calls/x /notes/y" (from recall workers) renders as link chips
@@ -368,7 +368,10 @@ export function ChatPage() {
     setMicError("");
     const saved = savedMicrophone();
     if (!saved) { setPickerOpen(true); return; }
-    void startMic(saved).catch(() => { setMicError(""); setPickerOpen(true); });
+    // Show why it failed rather than silently reopening the picker — a
+    // permission denial repeats for every device, and an unexplained loop is
+    // worse than the original modal.
+    void startMic(saved).catch((err) => { setMicError(microphoneError(err)); setPickerOpen(true); });
     return;
   };
 

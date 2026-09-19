@@ -426,10 +426,12 @@ export function HeaderVoice() {
     setMicError("");
     const saved = savedMicrophone();
     if (!saved) { setPickerOpen(true); return; }
-    void startListening(saved, modeRef.current !== "on-demand").catch(() => {
-      // The remembered device is gone (unplugged, or permissions changed).
-      // That is the one case where asking again is the right thing to do.
-      setMicError("");
+    void startListening(saved, modeRef.current !== "on-demand").catch((err) => {
+      // The remembered device would not open — unplugged, or the browser has
+      // no microphone permission. Offer the picker so another device can be
+      // tried, but SAY WHY: swallowing the reason turns a permission denial
+      // into a loop where every choice fails and nothing explains it.
+      setMicError(microphoneError(err));
       setPickerOpen(true);
     });
   };
