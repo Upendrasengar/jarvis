@@ -28,3 +28,4 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_actions_done ON action_items (done);
 `);
 try { db.exec("ALTER TABLE action_items ADD COLUMN comments TEXT NOT NULL DEFAULT '[]'"); } catch {}
+try { db.exec("ALTER TABLE action_items ADD COLUMN done_at TEXT NOT NULL DEFAULT ''"); } catch {}

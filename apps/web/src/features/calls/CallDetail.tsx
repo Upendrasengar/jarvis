@@ -7,6 +7,7 @@ import {
 } from "./hooks";
 import { copyNotes } from "./copyNotes";
 import { PromptDialog } from "../../components/PromptDialog";
+import { CommentPopover } from "../../components/CommentPopover";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SS from "@jarvis/shared";
@@ -287,7 +288,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
   const [reprocessing, setReprocessing] = useState(false);
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
-  const [commentFor, setCommentFor] = useState<number | null>(null);
+  const [commentFor, setCommentFor] = useState<{ index: number; rect: DOMRect } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flash = (k: "ok" | "err") => {
     setToast(k);
@@ -482,7 +483,8 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
                 noteId={call.id}
                 notes={call.notes}
                 onToggle={(index) => toggle.mutate({ id: call.id, index })}
-                onComment={setCommentFor}
+                onComment={(index, rect) => setCommentFor({ index, rect })}
+                commentingIndex={commentFor?.index ?? null}
                 onSplitLine={(i, before, after) => {
                   const lines = notesRef.current.split("\n");
                   lines.splice(i, 1, before, after);
@@ -528,21 +530,19 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
 
       {call.status !== "recording" && <Rail call={call} />}
 
-      <PromptDialog
-        open={commentFor !== null}
-        title="Add comment"
-        placeholder="Context, resolution, reference…"
-        submitLabel="ADD"
-        onSubmit={(text) => {
-          if (commentFor !== null)
+      {commentFor && (
+        <CommentPopover
+          anchor={commentFor.rect}
+          onSubmit={(text) => {
             fetch("/api/actions/comment", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ callId: call.id, index: commentFor, text }),
+              body: JSON.stringify({ callId: call.id, index: commentFor.index, text }),
             }).then(() => flash("ok")).catch(() => flash("err"));
-        }}
-        onClose={() => setCommentFor(null)}
-      />
+          }}
+          onClose={() => setCommentFor(null)}
+        />
+      )}
 
       {toast && (
         <div

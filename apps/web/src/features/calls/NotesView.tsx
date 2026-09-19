@@ -112,7 +112,9 @@ type Props = {
   // the second would race the first's write.
   onSplitLine?: (lineIndex: number, before: string, after: string) => void;
   onInsertLine?: (afterIndex: number, line: string) => void;
-  onComment?: (index: number) => void;
+  onComment?: (index: number, rect: DOMRect) => void;
+  // checkbox index whose comment box is open, so the row can be marked
+  commentingIndex?: number | null;
   // card mode groups ## sections into the call-notes grid; flat mode (Notes
   // page) renders the document as one flow — freeform notes rarely have the
   // section skeleton the cards assume
@@ -145,7 +147,7 @@ const LAYOUT: Record<string, { order: number; span?: boolean; glyph?: string; co
 let editingLine: number | null = null;
 
 export const NotesView = memo(
-  function NotesView({ notes, onToggle, onEditLine, onSplitLine, onInsertLine, onComment, cards = true }: Props) {
+  function NotesView({ notes, onToggle, onEditLine, onSplitLine, onInsertLine, onComment, commentingIndex, cards = true }: Props) {
     const rootRef = useRef<HTMLDivElement>(null);
     // last line the caret was in — a pasted image inserts after it instead of
     // being dumped at the end of the note
@@ -245,7 +247,7 @@ export const NotesView = memo(
       onInsertLine(after, embeds.join("\n"));
     };
 
-    const editable = (lineIndex: number, prefix: string, className: string, content: string) =>
+    const editable = (lineIndex: number, prefix: string, className: string, content: string, suffix = "") =>
       onEditLine ? (
         <span
           contentEditable
@@ -260,7 +262,7 @@ export const NotesView = memo(
             editingLine = null;
             if (justSplit.current) { justSplit.current = false; return; }
             const next = domToMd(e.currentTarget);
-            if (next && next !== content) onEditLine(lineIndex, prefix + next);
+            if (next && next !== content) onEditLine(lineIndex, prefix + next + suffix);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -278,7 +280,7 @@ export const NotesView = memo(
               focusNext.current = lineIndex + 1;
               onSplitLine(
                 lineIndex,
-                prefix + raw.slice(0, at).replace(/\n+/g, " ").trimEnd(),
+                prefix + raw.slice(0, at).replace(/\n+/g, " ").trimEnd() + suffix,
                 continuationPrefix(prefix) + raw.slice(at).replace(/\n+/g, " ").trimStart(),
               );
               el.blur();
@@ -390,22 +392,32 @@ export const NotesView = memo(
         inCheckboxBlock = true;
         const idx = ++checkboxIndex;
         const checked = box[1] === "x";
+        const doneMark = box[2].match(/\s*<!-- done \d{4}-\d{2}-\d{2} \d{2}:\d{2} -->$/)?.[0] ?? "";
+        const body = doneMark ? box[2].slice(0, box[2].length - doneMark.length) : box[2];
+        const commenting = commentingIndex === idx;
         return (
-          <div key={i} className="group my-[3px] flex items-start gap-2 rounded-lg px-2 py-[6px] hover:bg-[var(--surf-2)]">
+          <div key={i} className={`group my-[3px] flex items-start gap-2 rounded-lg px-2 py-[6px] ${
+            commenting
+              ? "bg-[var(--cyan-2)] [box-shadow:inset_0_0_0_1px_var(--cyan-3)]"
+              : "hover:bg-[var(--surf-2)]"}`}>
             <input type="checkbox" checked={checked} onChange={() => onToggle(idx)} className="chk mt-[2px]" />
             <span className="min-w-0 flex-1">
               {editable(
                 i,
                 `- [${box[1]}] `,
                 checked ? "text-[var(--dim)] line-through" : "",
-                box[2],
+                body,
+                doneMark,
               )}
             </span>
             {onComment && (
               <button
-                onClick={(e) => { e.stopPropagation(); onComment(idx); }}
+                onClick={(e) => { e.stopPropagation(); onComment(idx, e.currentTarget.getBoundingClientRect()); }}
                 title="Add a comment (context, resolution, reference)"
-                className="invisible shrink-0 rounded-full border border-[var(--line)] px-2 py-[1px] text-[10px] text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)] group-hover:visible"
+                className={`shrink-0 rounded-full border px-2 py-[1px] text-[10px] ${
+                  commenting
+                    ? "border-[var(--cyan)] text-[var(--cyan)]"
+                    : "invisible border-[var(--line)] text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)] group-hover:visible"}`}
               >
                 ＋
               </button>
@@ -530,6 +542,7 @@ export const NotesView = memo(
   // edit to some other line by a worker.
   (prev, next) => {
     if (prev.noteId !== next.noteId) return false;
+    if (prev.commentingIndex !== next.commentingIndex) return false;
     if (prev.notes === next.notes) return true;
     if (editingLine === null) return false;
     const a = prev.notes.split("\n");

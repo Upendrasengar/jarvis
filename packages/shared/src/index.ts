@@ -105,6 +105,7 @@ export const ActionItem = z.object({
   owner: z.string(),              // "Me", a name, "Unassigned", or "" for old notes
   text: z.string(),
   done: z.boolean(),
+  doneAt: z.string().default(""),   // when it was checked off; "" for items settled before stamping
   callTitle: z.string(),
   callStarted: z.string(),
   comments: z.array(z.string()),

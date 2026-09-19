@@ -29,6 +29,8 @@
   --surf-hi: rgba(255, 255, 255, 0.045);
   --panel: #0c121b;
   --shadow: 0 1px 0 var(--surf-hi) inset, 0 20px 44px -26px rgba(0, 0, 0, 0.95);
+  --shadow-pop: 0 1px 0 var(--surf-hi) inset, 0 24px 56px -12px rgba(0, 0, 0, 0.8),
+    0 8px 20px -8px rgba(0, 0, 0, 0.6);
   --line: rgba(140, 175, 215, 0.13);
   --line-2: rgba(140, 175, 215, 0.24);
   --cyan: #22d3ee;
@@ -64,6 +66,8 @@ html.light {
   --surf-hi: rgba(255, 255, 255, 0.9);
   --panel: #ffffff;
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 16px 36px -24px rgba(15, 40, 70, 0.35);
+  --shadow-pop: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 24px 56px -12px rgba(15, 40, 70, 0.3),
+    0 8px 20px -8px rgba(15, 40, 70, 0.22);
   --line: rgba(20, 55, 95, 0.13);
   --line-2: rgba(20, 55, 95, 0.24);
   --cyan: #0e7490;

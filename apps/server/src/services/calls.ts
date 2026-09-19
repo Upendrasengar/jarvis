@@ -72,6 +72,29 @@ export function recState(): RecState {
 }
 
 // Toggle the Nth "- [ ]" checkbox in both the reports copy and the vault copy.
+// Completion time, recorded inline as an HTML comment: invisible wherever the
+// markdown is rendered (Obsidian included) but machine-readable, so the
+// Settled ledger can group by when an item was actually closed rather than
+// when its call happened. Dropped again when an item is unchecked.
+export const DONE_MARK = /\s*<!-- done \d{4}-\d{2}-\d{2} \d{2}:\d{2} -->/;
+
+export function nowStamp(d = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// Flip the Nth checkbox. Anchored to line start like parseNotes' own regex —
+// the old /- \[( |x)\]/g also matched indented sub-bullets, so a checkbox
+// inside a comment would shift every index after it.
+export function flipCheckbox(txt: string, index: number, stamp = nowStamp()): string {
+  let i = -1;
+  return txt.replace(/^- \[( |x)\] (.*)$/gm, (line, c: string, rest: string) => {
+    if (++i !== index) return line;
+    const bare = rest.replace(DONE_MARK, "");
+    return c === " " ? `- [x] ${bare} <!-- done ${stamp} -->` : `- [ ] ${bare}`;
+  });
+}
+
 export function toggleCallItem(id: string, index: number): { ok: true } | { error: string } {
   // dedupe — in vault mode both paths can resolve to the same file, and
   // toggling it twice flips the checkbox right back
@@ -79,13 +102,11 @@ export function toggleCallItem(id: string, index: number): { ok: true } | { erro
     notesFileFor(id),
     path.join(BRAIN_CALLS_DIR, `call-${id}.md`),
   ])];
+  const stamp = nowStamp();
   let ok = false;
   for (const f of files) {
     try {
-      let i = -1;
-      const txt = fs.readFileSync(f, "utf8")
-        .replace(/- \[( |x)\]/g, (m, c) => (++i === index ? `- [${c === " " ? "x" : " "}]` : m));
-      fs.writeFileSync(f, txt);
+      fs.writeFileSync(f, flipCheckbox(fs.readFileSync(f, "utf8"), index, stamp));
       ok = true;
     } catch {}
   }

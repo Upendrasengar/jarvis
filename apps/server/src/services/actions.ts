@@ -9,7 +9,7 @@ import type { ActionItem } from "@jarvis/shared";
 import { CALL_NOTES_DIR, REPORTS_DIR } from "../config.js";
 import { NOTES_DIR } from "./notes.js";
 import { db } from "../db/index.js";
-import { toggleCallItem } from "./calls.js";
+import { DONE_MARK, flipCheckbox, toggleCallItem } from "./calls.js";
 
 let lastSignature = "";
 
@@ -44,6 +44,16 @@ function signature(files: Array<{ file: string }>): string {
     .join("|");
 }
 
+// A call source is named "<YYYY-MM-DD>-<HHMM>" — the recording's own stamp.
+// Notes that lack a "**Date/time:**" line used to fall straight through to
+// the file's mtime, which lies loudly: one bulk re-sync restamps every call
+// going back to August as "today", collapsing the whole ledger onto one day
+// and zeroing out every age and overdue calculation downstream.
+export function stampFromSource(source: string): string {
+  const m = source.replace(/^note:/, "").match(/^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})/);
+  return m ? `${m[1]} ${m[2]}:${m[3]}` : "";
+}
+
 function parseNotes(file: string): Omit<ActionItem, "callId">[] {
   let txt = "";
   try { txt = fs.readFileSync(file, "utf8"); } catch { return []; }
@@ -67,13 +77,16 @@ function parseNotes(file: string): Omit<ActionItem, "callId">[] {
       comments.push(c[1].trim());
     }
     const done = m[1] === "x";
+    const doneAt = m[2].match(/<!-- done (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) -->/)?.[1] ?? "";
+    const body = m[2].replace(DONE_MARK, "");
     // "- [ ] Owner: task" — owner is a short leading token before a colon
-    const om = m[2].match(/^([A-Za-z][\w .'-]{0,24}):\s+(.*)$/);
+    const om = body.match(/^([A-Za-z][\w .'-]{0,24}):\s+(.*)$/);
     items.push({
       index: idx,
       owner: om ? om[1] : "",
-      text: om ? om[2] : m[2],
+      text: om ? om[2] : body,
       done,
+      doneAt,
       callTitle: title,
       callStarted: started,
       comments,
@@ -89,16 +102,16 @@ export function reindexActions(force = false): void {
   lastSignature = sig;
 
   const insert = db.prepare(
-    `INSERT INTO action_items (call_id, idx, owner, text, done, call_title, call_started, comments)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO action_items (call_id, idx, owner, text, done, call_title, call_started, comments, done_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   db.transaction(() => {
     db.prepare("DELETE FROM action_items").run();
     for (const { file, source } of files) {
       for (const it of parseNotes(file)) {
-        const started = it.callStarted ||
+        const started = it.callStarted || stampFromSource(source) ||
           new Date(fs.statSync(file).mtimeMs).toISOString().slice(0, 16).replace("T", " ");
-        insert.run(source, it.index, it.owner, it.text, it.done ? 1 : 0, it.callTitle, started, JSON.stringify(it.comments));
+        insert.run(source, it.index, it.owner, it.text, it.done ? 1 : 0, it.callTitle, started, JSON.stringify(it.comments), it.doneAt);
       }
     }
   })();
@@ -107,18 +120,18 @@ export function reindexActions(force = false): void {
 export function listActions(): ActionItem[] {
   reindexActions();
   const rows = db.prepare(
-    `SELECT call_id, idx, owner, text, done, call_title, call_started, comments
+    `SELECT call_id, idx, owner, text, done, call_title, call_started, comments, done_at
      FROM action_items ORDER BY call_started DESC, idx ASC`
   ).all() as Array<{
     call_id: string; idx: number; owner: string; text: string;
-    done: number; call_title: string; call_started: string; comments: string;
+    done: number; call_title: string; call_started: string; comments: string; done_at: string;
   }>;
   return rows.map((r) => {
     let comments: string[] = [];
     try { comments = JSON.parse(r.comments); } catch {}
     return {
       callId: r.call_id, index: r.idx, owner: r.owner, text: r.text,
-      done: !!r.done, callTitle: r.call_title, callStarted: r.call_started, comments,
+      done: !!r.done, doneAt: r.done_at, callTitle: r.call_title, callStarted: r.call_started, comments,
     };
   });
 }
@@ -129,10 +142,7 @@ export function toggleAction(callId: string, index: number) {
     const id = callId.slice(5);
     const file = path.join(NOTES_DIR, id + ".md");
     try {
-      let i = -1;
-      const txt = fs.readFileSync(file, "utf8")
-        .replace(/- \[( |x)\]/g, (m, c) => (++i === index ? `- [${c === " " ? "x" : " "}]` : m));
-      fs.writeFileSync(file, txt);
+      fs.writeFileSync(file, flipCheckbox(fs.readFileSync(file, "utf8"), index));
       r = { ok: true };
     } catch { r = { error: "note not found" }; }
   } else {
