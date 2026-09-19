@@ -64,8 +64,30 @@ if [ ! -t 0 ]; then
     fi
   done
 fi
-# manual invocation (or empty stdin): audit the whole current history
-[ "$got_refs" = 0 ] && audit_range "HEAD"
+# Manual invocation (release.sh, or a person checking before they push).
+#
+# This used to audit ALL of HEAD, which sounds stricter and is actually worse:
+# one historical violation then blocks every future release permanently, and
+# the finding is unactionable because the commit is already public. A single
+# commit authored with a personal email in September 2026 made `release.sh`
+# unable to complete at all.
+#
+# Audit what is actually about to be published — the commits this branch has
+# that its upstream does not — which is the same range the hook checks. With
+# no upstream (a fresh clone, or a branch never pushed) there is no "already
+# published" baseline, so fall back to the full history.
+if [ "$got_refs" = 0 ]; then
+  upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+  if [ -n "$upstream" ] && git rev-parse --verify --quiet "$upstream" >/dev/null; then
+    if [ -n "$(git rev-list "$upstream..HEAD" 2>/dev/null)" ]; then
+      audit_range "$upstream..HEAD"
+    else
+      say "nothing to audit — HEAD matches $upstream"
+    fi
+  else
+    audit_range "HEAD"
+  fi
+fi
 
 if [ "$fail" = 1 ]; then
   say "push rejected. Fix the findings (or, for a false positive, adjust secrets/audit-patterns.txt) and retry."
