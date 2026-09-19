@@ -1,5 +1,6 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // App shell — redesign v2: top status header + left icon rail (D2).
+import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet } from "react-router-dom";
 import { RecordingPill } from "../features/calls/RecordingPill";
 import { HeaderVoice } from "../features/voice/HeaderVoice";
@@ -51,6 +52,31 @@ function RailLink({ to, icon, label }: { to: string; icon: string; label: string
   );
 }
 
+
+// The installed version, where someone reporting a problem can find it without
+// a terminal. Quiet by default — it is reference information, not status — and
+// the tooltip carries the commit, which is what actually identifies a build
+// when two installs claim the same tag.
+function VersionTag() {
+  const { data } = useQuery({
+    queryKey: ["health"],
+    queryFn: async () => (await fetch("/api/health")).json(),
+    staleTime: Infinity,          // cannot change while the server is up
+    retry: false,
+  });
+  const v = data?.version?.version;
+  if (!v) return null;            // server down or too old to report it
+  const commit = data?.version?.commit;
+  return (
+    <span
+      title={commit ? `${v} · ${commit}` : v}
+      className="select-all font-mono text-[8px] tracking-[0.5px] text-[var(--dim)] opacity-60 hover:opacity-100"
+    >
+      {v}
+    </span>
+  );
+}
+
 export function Layout() {
   useLive();
   useWorkerDelivery();
@@ -76,8 +102,9 @@ export function Layout() {
           {RAIL.map((r) => (
             <RailLink key={r.to} {...r} />
           ))}
-          <div className="mt-auto">
+          <div className="mt-auto flex flex-col items-center gap-1">
             <RailLink to="/settings" icon="settings" label="SETUP" />
+            <VersionTag />
           </div>
         </aside>
         <main className="relative min-h-0 min-w-0 flex-1">
