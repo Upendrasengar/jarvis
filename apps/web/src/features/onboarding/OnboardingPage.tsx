@@ -36,7 +36,7 @@ const PLAN: Record<string, { title: string; blurb: string }> = {
   calendar: { title: "Calendar",          blurb: "Lets Jarvis see meetings and prepare for them. Configured in Settings.", },
   meetings: { title: "Meeting recording", blurb: "Record calls and transcribe them locally. Needs microphone and screen permissions.", },
   service:  { title: "Start at login",    blurb: "Keep Jarvis running in the background so calls are captured.", },
-  complete: { title: "Ready",             blurb: "Everything is set up.", },
+  complete: { title: "Ready",             blurb: "", },
 };
 
 export function OnboardingPage() {
@@ -87,6 +87,12 @@ export function OnboardingPage() {
   const done = steps.filter((s) => s.status === "complete").length;
   const remaining = steps.length - done;
   const nextStep = steps.find((s) => s.status === "incomplete");
+  // "Ready" is itself a step, so it is always incomplete while you are looking
+  // at it — exclude it, or the finish screen reports itself as a blocker.
+  const openBlockers = steps.filter(
+    (s) => s.required && s.status === "incomplete" && s.id !== "complete",
+  );
+  const optionalLeft = steps.filter((s) => !s.required && s.status === "incomplete").length;
   const current = steps.find((s) => s.id === active) ?? steps[0];
   const plan = PLAN[current?.id ?? ""] ?? { title: current?.id ?? "", blurb: "" };
   const required = current?.required ?? true;
@@ -196,12 +202,54 @@ export function OnboardingPage() {
           {current?.id === "meetings" && <MeetingsStep />}
           {current?.id === "service" && <ServiceStep />}
           {current?.id === "complete" && (
-            <button
-              onClick={() => navigate("/overview")}
-              className="rounded-full bg-[var(--cyan)] px-5 py-2 text-[13px] font-semibold text-[#02121a]"
-            >
-              Open Jarvis →
-            </button>
+            // "Everything is set up." was a constant, printed whether or not
+            // anything was. On a setup with five steps outstanding — two of
+            // them required — this panel still declared completion and offered
+            // the finish button, which is how someone ends up in a half-built
+            // Jarvis wondering why recording does nothing.
+            openBlockers.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-[13px] text-[var(--text)]">
+                  Not finished yet — {openBlockers.length} required{" "}
+                  {openBlockers.length === 1 ? "step" : "steps"} still to do.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {openBlockers.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => setActive(b.id)}
+                      className="flex items-center gap-2 self-start rounded-lg border border-[var(--line)] px-3 py-1.5 text-[12.5px] text-[var(--text)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+                    >
+                      <span className="h-[6px] w-[6px] rounded-full border border-[var(--dim)]" />
+                      {PLAN[b.id]?.title ?? b.id}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11.5px] text-[var(--dim)]">
+                  You can open Jarvis anyway — the unfinished parts simply will
+                  not work until they are done.
+                </p>
+                <button
+                  onClick={() => navigate("/overview")}
+                  className="self-start rounded-full border border-[var(--line)] px-4 py-1.5 text-[12px] text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+                >
+                  Open Jarvis anyway →
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-[13px] text-[var(--text)]">
+                  Everything required is done.
+                  {optionalLeft > 0 && ` ${optionalLeft} optional ${optionalLeft === 1 ? "step is" : "steps are"} still available whenever you want them.`}
+                </p>
+                <button
+                  onClick={() => navigate("/overview")}
+                  className="self-start rounded-full bg-[var(--cyan)] px-5 py-2 text-[13px] font-semibold text-[#02121a]"
+                >
+                  Open Jarvis →
+                </button>
+              </div>
+            )
           )}
         </div>
 
