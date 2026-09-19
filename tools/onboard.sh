@@ -20,10 +20,39 @@ while [[ $# -gt 0 ]]; do
 done
 case "$REQUESTED_PROFILE" in ""|core|meetings|full) ;; *) echo "invalid profile: $REQUESTED_PROFILE" >&2; exit 2 ;; esac
 
-command -v node >/dev/null 2>&1 || {
-  echo "Jarvis onboarding requires Node.js 20 or newer. Install Node, then rerun: jarvis onboard" >&2
+# Use the runtime Jarvis ships with, not whatever `node` happens to be on PATH.
+# Same precedence as tools/services.sh.
+#
+# This ran bare `node`, which defeated the point of bundling one: on a Mac
+# whose Homebrew node was half-upgraded, every onboarding step died with
+# "Library not loaded: libsimdutf.35.dylib" from a dependency of node itself —
+# on an install that carries a perfectly good interpreter two directories away.
+NODE_BIN="${JARVIS_NODE:-}"
+if [ -z "$NODE_BIN" ] && [ -x "$DATA_DIR/runtime/node" ]; then
+  NODE_BIN="$DATA_DIR/runtime/node"
+fi
+if [ -z "$NODE_BIN" ] && [ -x "$ENGINE_DIR/runtime/node" ]; then
+  NODE_BIN="$ENGINE_DIR/runtime/node"
+fi
+if [ -z "$NODE_BIN" ]; then
+  PINNED="$(head -1 "$DATA_DIR/memory/settings/node-bin.txt" 2>/dev/null | tr -d '[:space:]')"
+  [ -n "$PINNED" ] && [ -x "$PINNED" ] && NODE_BIN="$PINNED"
+fi
+NODE_BIN="${NODE_BIN:-node}"
+
+# Check it RUNS, not that it exists. A node on PATH that aborts on a missing
+# dylib satisfies `command -v` and fails at every use.
+if ! "$NODE_BIN" -e '' >/dev/null 2>&1; then
+  echo "Jarvis onboarding needs a working Node.js." >&2
+  if [ "$NODE_BIN" = "node" ]; then
+    echo "  'node' is not installed, or is installed but cannot start." >&2
+    echo "  This install should carry its own runtime at runtime/node — if it does not," >&2
+    echo "  reinstall Jarvis, or install Node 20+ and rerun: jarvis onboard" >&2
+  else
+    echo "  $NODE_BIN exists but will not run. Try: $NODE_BIN --version" >&2
+  fi
   exit 1
-}
+fi
 
 on_interrupt() {
   printf '\nOnboarding paused. Resume with: jarvis onboard\n' >&2
@@ -31,7 +60,7 @@ on_interrupt() {
 }
 trap on_interrupt INT TERM
 
-state_json() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" status; }
+state_json() { JARVIS_DIR="$DATA_DIR" "$NODE_BIN" "$STATE_TOOL" status; }
 
 # Read the next step, and fail in a language a person can act on.
 #
@@ -65,7 +94,7 @@ next_step() {
     echo "  If the install is incomplete, run: jarvis setup" >&2
     return 1
   fi
-  printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+  printf '%s' "$out" | "$NODE_BIN" -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
     let j; try { j = JSON.parse(s); } catch {
       process.stderr.write("onboarding: progress state is not valid JSON\n");
       process.exit(1);
@@ -73,8 +102,8 @@ next_step() {
     process.stdout.write(j.nextStep ?? "");
   })'
 }
-complete_step() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" complete "$1" >/dev/null; }
-revisit_step() { JARVIS_DIR="$DATA_DIR" node "$STATE_TOOL" revisit "$1" >/dev/null; }
+complete_step() { JARVIS_DIR="$DATA_DIR" "$NODE_BIN" "$STATE_TOOL" complete "$1" >/dev/null; }
+revisit_step() { JARVIS_DIR="$DATA_DIR" "$NODE_BIN" "$STATE_TOOL" revisit "$1" >/dev/null; }
 pause_after() {
   if [[ "${JARVIS_ONBOARD_STOP_AFTER:-}" == "$1" ]]; then on_interrupt; fi
 }
