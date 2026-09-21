@@ -137,8 +137,26 @@ transcribe() { # $1 wav, $2 output prefix
 [ -s mic.wav ]      && { [ -s mic.json ]    || transcribe mic.wav mic; }
 [ -s system16.wav ] && { [ -s system.json ] || transcribe system16.wav system; }
 
+# How loud each channel is, so the merge can tell speech from spill.
+#
+# Someone talking into their own microphone is not 20 dB quieter than the call
+# they are on. A room pickup is. On 2026-09-21 the mic sat at -47.6 dB against
+# system audio at -27.2 dB and carried 39 segments to the system's 245 — it was
+# listening to the speakers, and every word of the other side arrived labelled
+# "Me".
+# Passed as --mic-db=-47.6, not --mic-db -47.6: the values are negative, and
+# argparse reads a bare "-47.6" as an option rather than a value. The space
+# form fails with "unrecognized arguments" — which would have produced no
+# transcript at all.
+level() {   # mean dBFS, or "" when unreadable
+  ffmpeg -hide_banner -nostats -i "$1" -af volumedetect -f null - 2>&1 \
+    | sed -n 's/.*mean_volume: \(-*[0-9.]*\) dB.*/\1/p' | head -1
+}
+MIC_DB="$(level mic.wav)"
+SYS_DB="$(level system16.wav)"
 python3 "$JARVIS_DIR/tools/merge-transcripts.py" \
-  --me mic.json --them system.json > transcript.md
+  --me mic.json --them system.json \
+  ${MIC_DB:+--mic-db="$MIC_DB"} ${SYS_DB:+--sys-db="$SYS_DB"} > transcript.md
 
 # Audio (mic.wav + system16.wav) is kept for 7 days so any call can be
 # re-transcribed after a fix or with a better model; call-watch's startup
