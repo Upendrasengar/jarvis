@@ -109,9 +109,19 @@ def main():
     ap.add_argument("--them", required=True)
     ap.add_argument("--mic-db", type=float, default=None)
     ap.add_argument("--sys-db", type=float, default=None)
+    ap.add_argument("--drop-mic", action="store_true",
+                    help="the owner did not speak; the mic heard only the room")
     args = ap.parse_args()
 
     me, them = load(args.me, "Me"), load(args.them, "Them")
+    if args.drop_mic:
+        # The owner says they did not speak. Then every mic segment is the room,
+        # and no similarity test is needed or trustworthy — whisper hears a
+        # faint copy differently enough that most spill does not match. A
+        # person's own account of whether they talked beats any heuristic.
+        print(f"merge: dropping all {len(me)} mic segment(s) — owner did not speak",
+              file=sys.stderr)
+        me = []
     before = len(me)
     me, dropped = drop_bleed(me, them)
     if dropped:
@@ -123,13 +133,26 @@ def main():
         print("_(no speech detected)_")
         return
 
-    # Coalesce consecutive segments from the same speaker into one line.
+    # Coalesce consecutive segments from the same speaker — but not without
+    # limit. Coalescing only ever broke on a change of speaker, so a call where
+    # one side does all the talking (or where the mic is dropped entirely)
+    # collapsed into a single unbroken paragraph with one timestamp on it:
+    # forty minutes of speech, unnavigable, and useless for citing a moment.
+    #
+    # Break on a pause as well, and on length, so the transcript keeps the
+    # timestamps that make it referenceable.
+    GAP_MS = 10000
+    MAX_CHARS = 700
     merged = []
     for start, speaker, text in segs:
-        if merged and merged[-1][1] == speaker:
-            merged[-1][2] += " " + text
+        last = merged[-1] if merged else None
+        if (last and last[1] == speaker
+                and start - last[3] <= GAP_MS
+                and len(last[2]) + len(text) <= MAX_CHARS):
+            last[2] += " " + text
+            last[3] = start
         else:
-            merged.append([start, speaker, text])
+            merged.append([start, speaker, text, start])
 
     print("## Transcript\n")
     # Only the exact duplicates can be removed. When the mic was clearly
@@ -148,7 +171,7 @@ def main():
               f"> {dropped} of {before} microphone segments were the other side, "
               "picked up from speakers. Obvious duplicates were removed; some "
               "may remain mislabelled as \"Me\". Headphones prevent this.\n")
-    for start, speaker, text in merged:
+    for start, speaker, text, _ in merged:
         print(f"**[{fmt(start)}] {speaker}:** {text}\n")
 
 

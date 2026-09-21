@@ -27,6 +27,10 @@ jarvis_model() {   # $1 = role file stem, $2 = default
 }
 
 SESSION="$1"
+# Absolute, because line 51 cd's into it — a relative path passed on the
+# command line stops resolving the moment that happens, which silently broke
+# the .no-mic check below.
+SESSION="$(cd "$SESSION" 2>/dev/null && pwd)" || SESSION="$1"
 # Multilingual whisper model — handles calls that mix languages. Which size
 # to use lives in memory/settings/whisper-model.txt ("medium" = better
 # names/accuracy at ~2.3x realtime, "small" = faster). Falls back if missing.
@@ -154,8 +158,14 @@ level() {   # mean dBFS, or "" when unreadable
 }
 MIC_DB="$(level mic.wav)"
 SYS_DB="$(level system16.wav)"
+# A ".no-mic" marker in the session says the owner was not speaking on this
+# call — listening in, or dialled in from elsewhere. Then the mic channel is
+# the room, not them, and no amount of matching separates it reliably.
+# Create it and re-run this script to rebuild the notes without it.
+DROP_MIC=""
+[ -f "$SESSION/.no-mic" ] && DROP_MIC="--drop-mic"
 python3 "$JARVIS_DIR/tools/merge-transcripts.py" \
-  --me mic.json --them system.json \
+  --me mic.json --them system.json $DROP_MIC \
   ${MIC_DB:+--mic-db="$MIC_DB"} ${SYS_DB:+--sys-db="$SYS_DB"} > transcript.md
 
 # Audio (mic.wav + system16.wav) is kept for 7 days so any call can be
