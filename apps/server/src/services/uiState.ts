@@ -25,14 +25,28 @@ export type UiState = {
   voice?: "on" | "off";
 };
 
-const FIELDS: Array<keyof UiState> = ["theme", "session", "voice"];
+// null = any string (session ids are opaque); a list = the only values that
+// field may hold. The type above already says this; saying it again in data
+// is what lets the reader ENFORCE it, and is why the loop below now
+// typechecks — assigning one `string` across three different field types
+// never could.
+const FIELDS: { [K in keyof UiState]-?: readonly string[] | null } = {
+  theme: ["dark", "light", "system"],
+  session: null,
+  voice: ["on", "off"],
+};
 
 export function readUiState(): UiState {
   try {
     const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
-    const out: UiState = {};
-    for (const k of FIELDS) if (typeof raw?.[k] === "string") out[k] = raw[k];
-    return out;
+    const out: Record<string, string> = {};
+    for (const [k, allowed] of Object.entries(FIELDS)) {
+      const v = raw?.[k];
+      if (typeof v !== "string") continue;
+      if (allowed && !allowed.includes(v)) continue;   // a stale or hand-edited value
+      out[k] = v;
+    }
+    return out as UiState;
   } catch {
     return {};                        // absent or corrupt reads as "no preference"
   }
