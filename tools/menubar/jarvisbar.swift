@@ -140,6 +140,12 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
         cfg.mediaTypesRequiringUserActionForPlayback = []   // spoken replies autoplay
         let v = WKWebView(frame: .zero, configuration: cfg)
         v.uiDelegate = self
+        // Since macOS 13.3 a WKWebView is invisible to Safari's Web Inspector
+        // unless it opts in. Without this there is no way to see the app's
+        // console or network at all — the dashboard can only be debugged in a
+        // browser, which is exactly the situation where a bug that happens
+        // ONLY in the app cannot be looked at. Local pages, local server.
+        if #available(macOS 13.3, *) { v.isInspectable = true }
         // "Jarvis" on every route tells you nothing. The page already sets a
         // title per view, so follow it and fall back when it is empty.
         titleObs = v.observe(\.title, options: [.new]) { [weak self] _, _ in
@@ -247,8 +253,62 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    // A menu-bar app needs no menu bar of its own — until it opens a WINDOW.
+    // Standard editing shortcuts on macOS are delivered as menu key
+    // equivalents: with no main menu there is no Edit menu, so ⌘V, ⌘C, ⌘X and
+    // ⌘A have nothing to dispatch to and the web view never hears them. The
+    // items target nil so each one travels the responder chain and lands on
+    // the WKWebView, which already implements every one of these selectors.
+    func installMainMenu() {
+        guard NSApp.mainMenu == nil else { return }
+        let main = NSMenu()
+
+        // The FIRST menu is always the application menu, whatever it is named.
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(title: "Hide Jarvis", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        appMenu.addItem(.separator())
+        // NOT NSApp.terminate: quitting Jarvis stops its services and boots
+        // the login job, and ⌘Q must do the same thing the status menu does.
+        let quitItem = NSMenuItem(title: "Quit Jarvis (stops services)", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        appMenu.addItem(quitItem)
+        appItem.submenu = appMenu
+        main.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "Edit")
+        let entries: [(String, Selector, String, NSEvent.ModifierFlags)] = [
+            ("Undo", Selector(("undo:")), "z", [.command]),
+            ("Redo", Selector(("redo:")), "z", [.command, .shift]),
+            ("Cut", #selector(NSText.cut(_:)), "x", [.command]),
+            ("Copy", #selector(NSText.copy(_:)), "c", [.command]),
+            // The one this was all for: pasting a screenshot into the chat box.
+            ("Paste", #selector(NSText.paste(_:)), "v", [.command]),
+            ("Select All", #selector(NSText.selectAll(_:)), "a", [.command]),
+        ]
+        for (title, sel, key, mods) in entries {
+            if title == "Cut" { edit.addItem(.separator()) }
+            let mi = NSMenuItem(title: title, action: sel, keyEquivalent: key)
+            mi.keyEquivalentModifierMask = mods
+            edit.addItem(mi)                         // target nil → responder chain
+        }
+        editItem.submenu = edit
+        main.addItem(editItem)
+
+        let winItem = NSMenuItem()
+        let win = NSMenu(title: "Window")
+        win.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
+        win.addItem(NSMenuItem(title: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        winItem.submenu = win
+        main.addItem(winItem)
+
+        NSApp.mainMenu = main
+    }
+
     func applicationDidFinishLaunching(_ n: Notification) {
         askForNotifications()
+        installMainMenu()
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
