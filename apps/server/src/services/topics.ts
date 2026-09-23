@@ -5,6 +5,7 @@
 // [[new]], so the graph consolidates instead of fragmenting.
 import fs from "node:fs";
 import path from "node:path";
+import { parseFrontmatter } from "@jarvis/shared";
 import { BRAIN_DIR, CALL_NOTES_DIR, REPORTS_DIR } from "../config.js";
 
 const TOPICS_DIR = path.join(BRAIN_DIR, "Topics");
@@ -29,8 +30,8 @@ export function filesFor(kind: "topic" | "tag", name: string, cap = 12):
       try { txt = fs.readFileSync(p, "utf8"); } catch { continue; }
       if (kind === "tag") {
         // a tag counts when it is in the frontmatter tag list or written inline
-        const fm = txt.match(/^---\n([\s\S]*?)\n---/);
-        const inFm = fm ? new RegExp(`^\\s*-\\s*${name}\\s*$`, "im").test(fm[1]) : false;
+        const fm = parseFrontmatter(txt).block;
+        const inFm = fm ? new RegExp(`^\\s*-\\s*${name}\\s*$`, "im").test(fm) : false;
         if (!inFm && !new RegExp(`#${name}\\b`, "i").test(txt)) continue;
       } else if (!needle.test(txt)) continue;
       hits.push(p);

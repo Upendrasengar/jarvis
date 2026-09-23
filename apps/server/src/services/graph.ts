@@ -3,7 +3,7 @@
 // Faithful port of the legacy builder, including its group labels.
 import fs from "node:fs";
 import path from "node:path";
-import type { Graph } from "@jarvis/shared";
+import { parseFrontmatter, type Graph } from "@jarvis/shared";
 import { BRAIN_DIR, PROJECTS_VAULT } from "../config.js";
 import { readVaults } from "./env.js";
 
@@ -37,10 +37,10 @@ export function buildGraph(): Graph {
         }
         // frontmatter tags become #tag nodes — a second clustering axis
         // (kind: #design, #process) orthogonal to topics (what: project names)
-        const fm = txt.match(/^---\n([\s\S]*?)\n---/);
+        const fm = parseFrontmatter(txt).block;
         if (fm) {
-          const block = fm[1].match(/^tags:\s*\n((?:[ \t]+-[ \t]+.*\n?)*)/m);
-          const inlineList = fm[1].match(/^tags:\s*\[([^\]]*)\]/m);
+          const block = fm.match(/^tags:\s*\n((?:[ \t]+-[ \t]+.*\n?)*)/m);
+          const inlineList = fm.match(/^tags:\s*\[([^\]]*)\]/m);
           const tags = block
             ? [...block[1].matchAll(/-[ \t]+(.+)/g)].map((m) => m[1].trim().replace(/^["']|["']$/g, ""))
             : inlineList ? inlineList[1].split(",").map((t) => t.trim()).filter(Boolean) : [];

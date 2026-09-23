@@ -12,6 +12,7 @@
 import { Fragment, memo, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { calloutMeta } from "../../components/Markdown";
+import { frontmatterStart } from "@jarvis/shared";
 import { CodeBlock, Embed, IMAGE_RE, Table } from "../../components/blocks";
 import { uploadPastedImage } from "../../lib/pasteImage";
 import { imagesFromClipboard } from "../../lib/image";
@@ -180,17 +181,24 @@ export const NotesView = memo(
     let checkboxIndex = -1;
     // frontmatter lines render as nothing but KEEP their indexes so inline
     // edits still map to the right source line
+    // fmStart is usually 0, but the generator sometimes opens with a preamble
+    // before the frontmatter; a byte-0 test would then render the whole YAML
+    // header as prose. Locate the fence instead and let the preamble render
+    // as the prose it is.
     let fmEnd = -1;
-    if (notes.startsWith("---\n")) {
-      const close = notes.indexOf("\n---", 3);
-      if (close > 0) fmEnd = notes.slice(0, close + 4).split("\n").length - 1;
+    const fmStart = frontmatterStart(notes) < 0
+      ? -1
+      : notes.slice(0, frontmatterStart(notes)).split("\n").length - 1;
+    if (fmStart >= 0) {
+      const head = notes.split("\n").slice(fmStart);
+      const close = head.findIndex((l, i) => i > 0 && l.trim() === "---");
+      if (close > 0) fmEnd = fmStart + close;
       else {
         // Unterminated frontmatter — hide the YAML run rather than dumping it
         // as prose. Line indexes are preserved either way, so inline edits and
         // checkbox toggles still map to the right source line.
-        const ls = notes.split("\n");
-        const body = ls.findIndex((l, i) => i > 0 && (l.startsWith("# ") || l.startsWith("> ")));
-        if (body > 0) fmEnd = body - 1;
+        const body = head.findIndex((l, i) => i > 0 && (l.startsWith("# ") || l.startsWith("> ")));
+        if (body > 0) fmEnd = fmStart + body - 1;
       }
     }
     // ↳-comment styling applies ONLY to indented bullets directly under a
@@ -305,7 +313,7 @@ export const NotesView = memo(
     const blockAt = new Map<number, { kind: "code"; lang: string; body: string[] } | { kind: "table"; rows: string[] }>();
     const swallowed = new Set<number>();
     for (let i = 0; i < lines.length; i++) {
-      if (swallowed.has(i) || i <= fmEnd) continue;
+      if (swallowed.has(i) || (i >= fmStart && i <= fmEnd)) continue;
       const fence = lines[i].match(/^\s*```(\w*)\s*$/);
       if (fence) {
         const body: string[] = [];
@@ -329,7 +337,7 @@ export const NotesView = memo(
 
     // one markdown line → one element; `section` tweaks list styling per card
     const renderLine = (line: string, i: number, section: string) => {
-      if (i <= fmEnd) return null;                     // frontmatter — metadata, not prose
+      if (i >= fmStart && i <= fmEnd) return null;     // frontmatter — metadata, not prose
       if (swallowed.has(i)) {
         // The checkbox index is ORDINAL and the server counts every "- [ ]"
         // in the file, so a checkbox hidden inside a code fence must still

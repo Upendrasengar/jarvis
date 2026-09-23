@@ -181,6 +181,13 @@ NOTES="$CALL_NOTES_DIR/call-notes-$STAMP.md"
 # Sonnet call, and keep it out of the second brain.
 if ! grep -q '^\*\*\[' transcript.md; then
   {
+    # Frontmatter even here: a stub with no header is a second shape every
+    # reader has to special-case, and that special case is how header-as-prose
+    # bugs hide. Same schema as a real note, minus what silence cannot supply.
+    printf -- '---\ntitle: No speech detected\ntype: call\ncreated: %s\ndate: %s\ntime: "%s"\nduration: 0\nplatform: %s\ntags:\n  - call\n  - no-speech\n---\n\n' \
+      "${STAMP%-*}" "${STAMP%-*}" \
+      "$(printf '%s' "$STAMP" | sed 's/.*-\(..\)\(..\)$/\1:\2/')" \
+      "$(sed -n 's/^mode: *//p;s/^platform: *//p' meta.txt | head -1 || true)"
     echo "# No speech detected"
     echo
     sed 's/^/- /' meta.txt
@@ -254,22 +261,62 @@ The frontmatter topics list connects this call into the knowledge graph:
 2-5 broad recurring themes the call belongs to (projects, workstreams, platforms). STRONGLY prefer these existing topics, exact spelling: ${TOPICS_LIST:-none yet}. Coin a new topic only for a clearly new recurring theme: Title Case, 1-3 words, ONE theme per topic (never mush two themes into one name), no punctuation or slashes inside the brackets.
 Keep it scannable — read in 30 seconds." > "$NOTES"
 
+# "Output ONLY a markdown note" is a request, not a guarantee: the model
+# sometimes opens with an aside (a consent flag, a caveat, an apology) or a
+# stray blank line before the frontmatter. YAML frontmatter only counts as
+# frontmatter at byte 0 — one character in front of it and every reader (the
+# web UI, Obsidian, any parser) dumps the whole header on screen as prose.
+# Cut the preamble deterministically, and keep it beside the audio so nothing
+# the model flagged is lost silently.
+python3 - "$NOTES" "$SESSION/notes-preamble.md" <<'PRE' || true
+import sys
+p, keep = sys.argv[1], sys.argv[2]
+try:
+    t = open(p, encoding="utf8").read()
+except Exception:
+    raise SystemExit(0)
+if t.startswith("---\n"):
+    raise SystemExit(0)                      # already well-formed
+lines = t.split("\n")
+# The opening fence is the first bare '---' immediately followed by a YAML
+# key. A '---' used as a horizontal rule has a blank line or prose after it,
+# so it never matches.
+start = None
+for i, l in enumerate(lines):
+    if l.strip() != "---":
+        continue
+    nxt = lines[i + 1] if i + 1 < len(lines) else ""
+    if nxt[:1].isalpha() and ":" in nxt:
+        start = i
+        break
+if start is None:
+    raise SystemExit(0)                      # nothing to rescue — let the checks below judge it
+preamble = "\n".join(lines[:start]).strip()
+if preamble:
+    try:
+        open(keep, "w", encoding="utf8").write(preamble + "\n")
+    except Exception:
+        pass
+open(p, "w", encoding="utf8").write("\n".join(lines[start:]))
+sys.stderr.write("[process-call] stripped %d chars of preamble before the frontmatter\n" % len(preamble))
+PRE
+
 # The model's stdout IS the note, so a refusal or an apology lands in the file
 # looking like a successful run — that is how a call ended up with "I need
 # write permission for that file" as its entire minutes. A real note always
-# has an H1. Keep the bad output for inspection rather than leaving it in
-# place of the notes.
-if ! grep -q '^# ' "$NOTES"; then
+# opens with frontmatter at byte 0 and carries an H1. Keep the bad output for
+# inspection rather than leaving it in place of the notes.
+if ! head -1 "$NOTES" | grep -qx -- '---' || ! grep -q '^# ' "$NOTES"; then
   cp "$NOTES" "$SESSION/notes-rejected.md" 2>/dev/null || true
   {
     printf -- '---\ntitle: Call at %s\ntype: call\ndate: %s\n---\n\n' \
-      "$(printf '%s' "$STAMP" | sed 's/.*-\(..\)\(..\)$/\1:\2/')" "${STAMP%%-*}"
+      "$(printf '%s' "$STAMP" | sed 's/.*-\(..\)\(..\)$/\1:\2/')" "${STAMP%-*}"
     printf '# Call at %s\n\n' "$(printf '%s' "$STAMP" | sed 's/.*-\(..\)\(..\)$/\1:\2/')"
     printf '> [!warning] Notes generation failed\n'
     printf '> The summariser returned something that is not a note. The transcript below is intact —\n'
     printf '> rerun `bash tools/process-call.sh %s` to try again. What it returned is in notes-rejected.md.\n' "$SESSION"
   } > "$NOTES"
-  echo "[process-call] notes rejected (no H1) — wrote a placeholder, kept the raw output" >&2
+  echo "[process-call] notes rejected (no frontmatter at byte 0, or no H1) — wrote a placeholder, kept the raw output" >&2
 fi
 
 # The model writes this file directly, and roughly one note in a hundred comes

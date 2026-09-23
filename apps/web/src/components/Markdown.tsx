@@ -7,6 +7,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ago, parseStamp } from "../lib/time";
 import { CodeBlock, Embed, IMAGE_RE, Table } from "./blocks";
+import { parseFrontmatter } from "@jarvis/shared";
 
 function callRefs(text: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -111,26 +112,18 @@ export function calloutMeta(type: string) {
   return CALLOUT[type.toLowerCase()] ?? { label: type.toUpperCase(), cls: "border-[var(--line-2)] text-[var(--dim)]" };
 }
 
-// YAML-lite frontmatter: strip it, keep tags for chips
+// YAML-lite frontmatter: strip it, keep tags for chips. Locating the block is
+// @jarvis/shared's job — the server services read the same notes and the rule
+// has to be the same one.
 export function splitFrontmatter(md: string): { body: string; tags: string[] } {
-  let m = md.match(/^---\n([\s\S]*?)\n---\n?/);
-  // Unterminated frontmatter: the generator occasionally omits the closing
-  // ---, and without this the whole YAML block renders as prose. Recover by
-  // treating everything before the first heading/callout as frontmatter.
-  if (!m && md.startsWith("---\n")) {
-    const body = md.search(/^(#|> )/m);
-    if (body > 0) {
-      const head = md.slice(4, body).replace(/\n+$/, "");
-      m = [md.slice(0, body), head] as unknown as RegExpMatchArray;
-    }
-  }
-  if (!m) return { body: md, tags: [] };
+  const { start, block, body } = parseFrontmatter(md);
+  if (start < 0) return { body: md, tags: [] };
   const tags: string[] = [];
-  const tagBlock = m[1].match(/^tags:\s*\n((?:\s+-\s+.*\n?)+)/m);
+  const tagBlock = block.match(/^tags:\s*\n((?:\s+-\s+.*\n?)+)/m);
   if (tagBlock)
     for (const t of tagBlock[1].split("\n"))
       { const v = t.match(/-\s+(.+)/)?.[1]?.trim(); if (v) tags.push(v.replace(/^"|"$/g, "")); }
-  return { body: md.slice(m[0].length), tags };
+  return { body, tags };
 }
 
 type Block =

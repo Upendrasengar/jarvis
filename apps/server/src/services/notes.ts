@@ -6,6 +6,7 @@
 // the note to a recorded call. "- [ ]" lines feed the unified Actions inbox.
 import fs from "node:fs";
 import path from "node:path";
+import { parseFrontmatter } from "@jarvis/shared";
 import { BRAIN_DIR } from "../config.js";
 
 export const NOTES_DIR = path.join(BRAIN_DIR, "Notes");
@@ -26,13 +27,14 @@ const ID_RE = /^(?!\.)[^/\\]+$/;
 const badId = (id: string) => !ID_RE.test(id) || id.includes("..");
 
 function parse(md: string): { title: string; call: string; body: string } {
-  const fm = md.match(/^---\n([\s\S]*?)\n---\n?/);
-  const head = fm?.[1] ?? "";
+  // Tolerant on purpose: a note whose frontmatter is preceded by a preamble
+  // still has a real title and real tags, and a strict byte-0 match would
+  // drop both — silently, since the title falls back to the H1 and looks fine.
+  const { block: head, body } = parseFrontmatter(md);
   const title =
     head.match(/^title:\s*(.+)$/m)?.[1]?.trim() ??
     md.match(/^# (.+)$/m)?.[1] ?? "untitled";
   const call = head.match(/^call:\s*([\w-]+)\s*$/m)?.[1] ?? "";
-  const body = fm ? md.slice(fm[0].length) : md;
   return { title, call, body };
 }
 
