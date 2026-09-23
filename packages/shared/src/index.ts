@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 export { SCREEN_FORMAT } from "./replyFormat.js";
-export { findAction, stripActions, type FoundAction } from "./actionJson.js";
+export { findAction, stripActions, stripLeadingLabel, type FoundAction } from "./actionJson.js";
 export { frontmatterStart, parseFrontmatter, type Frontmatter } from "./frontmatter.js";
 
 // A reference picked in the chat box: @ for a document (note, call), # for a

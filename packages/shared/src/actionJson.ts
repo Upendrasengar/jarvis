@@ -38,6 +38,20 @@ export function findAction(text: string, marker: string): FoundAction | null {
  * closed yet takes everything after it too, so a half-streamed directive is
  * never flashed at the owner as prose.
  */
+// The reply prompts describe the SHAPE of the opening line ("ONE sentence
+// that orients the reader", "ONE short spoken sentence"), and a model asked
+// for a shape will sometimes emit the description as a label instead:
+//   One sentence: pulling next steps from that workshop note now.
+// The wording is phrased to avoid this now, but wording is not a guarantee —
+// so the label is also cut here, where SPOKEN:/SOURCES: are already handled.
+// Anchored to the very start and to a known set of labels: a real answer that
+// happens to open "Screen: ..." is not a shape a note or a reply ever takes.
+const LEAKED_LABEL = /^\s*(one |a )?(short |plain |spoken |single )*(sentence|line|screen|answer|reply)\s*:[ \t]*/i;
+
+export function stripLeadingLabel(text: string): string {
+  return text.replace(LEAKED_LABEL, "");
+}
+
 export function stripActions(text: string, markers: string[]): string {
   let out = text;
   for (const marker of markers) {

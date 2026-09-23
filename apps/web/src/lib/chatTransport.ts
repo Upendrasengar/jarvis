@@ -2,7 +2,7 @@
 // Shared chat transport — used by the chat page (visible conversation) and
 // the header voice bar (background conversation from any tab). Handles the
 // SSE stream and the ACTION:DELEGATE protocol in one place.
-import { findAction, stripActions, type ChatRef } from "@jarvis/shared";
+import { findAction, stripActions, stripLeadingLabel, type ChatRef } from "@jarvis/shared";
 
 // refs ride along on the sent message so the transcript still shows WHAT was
 // referenced — once the pill replaced the inline title, the bubble otherwise
@@ -47,7 +47,7 @@ export async function streamChatTurn(
   let full = "";
   let errText = "";
   let delegated = false;
-  const visible = () => stripActions(full, [DELEGATE, REMIND]);
+  const visible = () => stripLeadingLabel(stripActions(full, [DELEGATE, REMIND]));
 
   const maybeDelegate = () => {
     if (delegated) return;

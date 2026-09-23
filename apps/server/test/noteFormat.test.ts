@@ -1,9 +1,10 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
-// A note whose frontmatter is preceded by prose reached the owner's screen
-// verbatim — header dumped as body text. Fixed at the generator AND at every
-// reader; these lock in the reader half.
+// Two shapes the model emits that used to reach the owner's screen verbatim:
+// a note whose frontmatter is preceded by prose, and a reply that echoes the
+// prompt's own "ONE sentence" instruction as a label. Both were fixed at the
+// generator AND at every reader; these lock in the reader half.
 import { describe, expect, it } from "vitest";
-import { frontmatterStart, parseFrontmatter } from "@jarvis/shared";
+import { frontmatterStart, parseFrontmatter, stripLeadingLabel } from "@jarvis/shared";
 
 const NOTE = '---\ntitle: A Call\ntype: call\ntags:\n  - call\n---\n\n# A Call\n\nBody line.\n';
 
@@ -46,5 +47,26 @@ describe("parseFrontmatter", () => {
 
   it("reports no frontmatter when there is none", () => {
     expect(parseFrontmatter("# Bare note\n").start).toBe(-1);
+  });
+});
+
+describe("stripLeadingLabel", () => {
+  // Seen 2026-09-19 in web chat, verbatim.
+  it("cuts the leaked instruction label", () => {
+    expect(stripLeadingLabel("One sentence: pulling next steps from that note now."))
+      .toBe("pulling next steps from that note now.");
+  });
+
+  it("cuts the variants the prompts can produce", () => {
+    expect(stripLeadingLabel("Sentence: on it.")).toBe("on it.");
+    expect(stripLeadingLabel("ONE SHORT SPOKEN SENTENCE: on it.")).toBe("on it.");
+    expect(stripLeadingLabel("Screen: here is the answer.")).toBe("here is the answer.");
+  });
+
+  it("leaves a real answer alone", () => {
+    const real = "The digest is ready: three projects moved.";
+    expect(stripLeadingLabel(real)).toBe(real);
+    expect(stripLeadingLabel("## Summary\n\nOne sentence: not at the start."))
+      .toBe("## Summary\n\nOne sentence: not at the start.");
   });
 });

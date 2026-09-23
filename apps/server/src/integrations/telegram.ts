@@ -15,7 +15,7 @@ import { beginTurn, budgetNote, sendTurn } from "../services/chatSessions.js";
 import { dispatchDelegate } from "../services/agents.js";
 import { onEvent } from "../live/liveState.js";
 import { createFromAction, setReminderSender } from "./reminders.js";
-import { findAction } from "@jarvis/shared";
+import { findAction, stripLeadingLabel } from "@jarvis/shared";
 
 const SESSION = "telegram";
 const DELIVER_PROMPT =
@@ -61,7 +61,7 @@ function runTurn(message: string, internal = false): Promise<string> {
     const r = sendTurn(SESSION, message + budgetNote(SESSION, internal), {
       onText: (t) => { acc += t; },
       onDone: (finalText) => {
-        let out = finalText ?? acc;
+        let out = stripLeadingLabel(finalText ?? acc);
         const m = findAction(out, "ACTION:DELEGATE");
         if (m) {
           try { dispatchDelegate(JSON.parse(m.json), SESSION); } catch {}

@@ -8,7 +8,7 @@
 // facts behind semicolons. Break the facts apart and let the answer breathe.
 export const SCREEN_FORMAT = [
   "SCREEN FORMAT — structured markdown, the way a good research assistant lays out an answer:",
-  "- Open with ONE sentence that orients the reader (what this is, or the headline finding). Not 'here you go', not an offer to help — a real sentence of substance.",
+  "- Open with a single sentence that orients the reader (what this is, or the headline finding). Not 'here you go', not an offer to help — a real sentence of substance. Write the sentence itself: never label it, never prefix it with 'One sentence:' or similar.",
   "- When the answer spans more than one theme, split it under '## Section' headings. Three to six words each.",
   "- Bullets nest TWO levels: '- **Label**' names the theme, and indented '  - ' children under it carry ONE fact each.",
   "- ONE fact per line, roughly 15 words. Never chain facts behind semicolons — split them into sibling bullets instead.",

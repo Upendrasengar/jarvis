@@ -13,7 +13,7 @@ import { BRAIN_DIR, JARVIS_DIR, PORT, VAULT_DIR, setting } from "../config.js";
 import { readSecrets } from "./env.js";
 import { CLAUDE, WORKER_PATH, readVaults, setVoice } from "./env.js";
 import { recordResult } from "./chatSessions.js";
-import { SCREEN_FORMAT } from "@jarvis/shared";
+import { SCREEN_FORMAT, stripLeadingLabel } from "@jarvis/shared";
 import { pushEvent } from "../live/liveState.js";
 import { modelFor } from "./models.js";
 import { whereThingsAre } from "./whereThings.js";
@@ -155,12 +155,12 @@ export function spawnAgent(project: string, task: string, sessionId = "") {
 function splitChannels(raw: string): { screen: string; spoken: string } {
   const lines = raw.split("\n");
   const i = lines.findIndex((l) => /^\s*SPOKEN:/i.test(l));
-  if (i < 0) return { screen: raw, spoken: "" };
+  if (i < 0) return { screen: stripLeadingLabel(raw), spoken: "" };
   const src = lines.findIndex((l, n) => n > i && /^\s*SOURCES:/i.test(l));
   const end = src > i ? src : lines.length;
   return {
-    screen: [...lines.slice(0, i), ...lines.slice(end)].join("\n").trim(),
-    spoken: lines.slice(i, end).join(" ").replace(/^\s*SPOKEN:\s*/i, "").trim(),
+    screen: stripLeadingLabel([...lines.slice(0, i), ...lines.slice(end)].join("\n").trim()),
+    spoken: stripLeadingLabel(lines.slice(i, end).join(" ").replace(/^\s*SPOKEN:\s*/i, "").trim()),
   };
 }
 
