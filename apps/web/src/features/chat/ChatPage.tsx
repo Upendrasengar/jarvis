@@ -145,7 +145,7 @@ export function ChatPage() {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
   const sessionId = useMemo(() => sessionFromRoute(routeId), [routeId]);
-  const { messages, send, streaming, clear, onReply } = useChatStream(sessionId);
+  const { messages, send, streaming, queued, clear, onReply } = useChatStream(sessionId);
   const [input, setInput] = useState("");
   const [speak, setSpeak] = useState(
     () => (cachedUiState().voice ?? localStorage.getItem("jarvis_voice")) === "on",
@@ -630,7 +630,7 @@ export function ChatPage() {
           </div>
         </div>
         <div className="mt-[7px] text-center text-[9px] uppercase tracking-[2px] text-[var(--dim)]">
-          enter to send · 🎙 to speak
+          {queued ? "queued · finishing the current turn" : "enter to send · 🎙 to speak"}
         </div>
       </div>
     </div>

@@ -43,6 +43,7 @@ export async function streamChatTurn(
   images?: string[],
   refs?: ChatRef[],
   internal = false,
+  onQueued?: () => void,
 ): Promise<string> {
   let full = "";
   let errText = "";
@@ -118,6 +119,10 @@ export async function streamChatTurn(
         // finish() overwrites it with "(no reply)" and the actual reason is
         // lost, which is how a busy turn came to report nothing at all.
         if (ev === "err") { errText = String(JSON.parse(data)); onText?.(errText); continue; }
+        // The turn is waiting behind another one. It is session STATE, not
+        // something Jarvis said — rendering it as text is how three
+        // "busy — finishing previous turn" bubbles ended up in a transcript.
+        if (ev === "queued") { onQueued?.(); continue; }
         if (ev === "done") continue;
         full += JSON.parse(data);
         maybeDelegate();

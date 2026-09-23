@@ -99,10 +99,21 @@ export function chatRoutes(app: FastifyInstance) {
           try { res.write(`data: ${JSON.stringify(finalText)}\n\n`); } catch {}
         try { res.write(`event: done\ndata: 0\n\n`); res.end(); } catch {}
       },
-    }, body.data.images ?? []);
-    if (r.busy) {
+    }, body.data.images ?? [], {
+      queue: true,
+      // If this waits behind another turn, its round budget starts when it
+      // actually starts — not when it joined the queue.
+      onStart: () => beginTurn(body.data.sessionId, internal),
+    });
+    // Queued is not an error and must not be reported as one: the stream
+    // stays open, the message runs the moment the turn ahead of it finishes,
+    // and the reply arrives here. All the client needs is a nudge to show
+    // waiting state rather than a bubble saying Jarvis is busy.
+    if (r.queued) {
+      try { res.write(`event: queued\ndata: 1\n\n`); } catch {}
+    } else if (r.busy) {
       try {
-        res.write(`event: err\ndata: ${JSON.stringify("busy — finishing previous turn")}\n\n`);
+        res.write(`event: err\ndata: ${JSON.stringify("⚠️ Too many messages waiting — give the current one a moment to finish.")}\n\n`);
         res.end();
       } catch {}
     }

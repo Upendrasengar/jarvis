@@ -13,6 +13,10 @@ export type { Msg };
 export function useChatStream(sessionId: string) {
   const [messages, setMessages] = useState<Msg[]>(() => loadTranscript(sessionId));
   const [streaming, setStreaming] = useState(false);
+  // This turn is waiting behind another one (a voice turn or a worker
+  // delivery on the same session). It is a status for the composer strip to
+  // show — never a bubble, and never text attributed to Jarvis.
+  const [queued, setQueued] = useState(false);
   const lastReply = useRef<(text: string) => void>(() => {});
 
   // switching conversations swaps the transcript
@@ -46,12 +50,17 @@ export function useChatStream(sessionId: string) {
       setMessages((m) => m.map((msg) => (msg.id === replyId ? { ...msg, c: "jarvis", t } : msg)));
     const tw = makeTypewriter(setLast);
     try {
-      const finalText = await streamChatTurn(sessionId, message, tw.feed, images.map((i) => i.full), refs);
+      const feed = (t: string) => { setQueued(false); tw.feed(t); };
+      const finalText = await streamChatTurn(
+        sessionId, message, feed, images.map((i) => i.full), refs, false,
+        () => setQueued(true),
+      );
       await tw.finish(finalText || "(no reply)");
       if (finalText) lastReply.current(finalText);
     } catch (e) {
       tw.abort(`(connection lost — ${String(e).slice(0, 80)})`);
     } finally {
+      setQueued(false);
       setStreaming(false);
     }
   }, [sessionId, streaming]);
@@ -61,5 +70,5 @@ export function useChatStream(sessionId: string) {
     setMessages([]);
   }, [sessionId]);
 
-  return { messages, send, streaming, clear, onReply };
+  return { messages, send, streaming, queued, clear, onReply };
 }

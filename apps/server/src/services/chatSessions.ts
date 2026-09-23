@@ -83,12 +83,29 @@ function memoryBrief(): string {
 }
 
 type Turn = { onText: (t: string) => void; onDone: (finalText?: string) => void };
+type Pending = {
+  message: string; turn: Turn; images: string[];
+  // Re-run the caller's per-turn setup when the message finally starts.
+  // The 5-minute round budget is stamped by beginTurn, so a message stamped
+  // at ENQUEUE could reach the CLI with most of its budget already spent
+  // waiting — and refuse to delegate for a slowness that was never its own.
+  onStart?: () => void;
+};
 type Session = {
   child: ChildProcessWithoutNullStreams;
   buf: string;
   active: Turn | null;
+  // Messages sent while a turn was already running. Callers opt in (see
+  // sendTurn): a person typing a second message wants it answered, but a
+  // scheduled heartbeat that arrives mid-turn wants to be SKIPPED, not
+  // stacked up and delivered stale.
+  queue: Pending[];
   idle: ReturnType<typeof setTimeout> | null;
 };
+
+// Deep enough that a fast typist is never told no, shallow enough that a
+// wedged turn cannot bank an afternoon of messages to replay at once.
+const MAX_QUEUE = 3;
 
 const sessions = new Map<string, Session>();
 
@@ -132,7 +149,23 @@ function spawnWarm(sessionId: string): Session {
   }) as ChildProcessWithoutNullStreams;
 
   const spawnedAt = Date.now();
-  const s: Session = { child, buf: "", active: null, idle: null };
+  const s: Session = { child, buf: "", active: null, queue: [], idle: null };
+  // A queued turn starts only after the buffer flush that ended the previous
+  // one has finished. Starting it inline would re-arm s.active while lines
+  // from the turn just closed are still being drained, and those lines would
+  // be attributed to the new turn's stream.
+  const drain = () => setImmediate(() => {
+    if (s.active) return;
+    const next = s.queue.shift();
+    if (!next) return;
+    next.onStart?.();
+    deliver(s, sessionId, next.message, next.turn, next.images);
+  });
+  // The child is gone and the session is about to be dropped, so nothing will
+  // ever answer these. Tell each one rather than letting it hang.
+  const failQueue = (why: string) => {
+    for (const p of s.queue.splice(0)) { p.turn.onText(why); p.turn.onDone(); }
+  };
   child.stdout.on("data", (d: Buffer) => {
     s.buf += d.toString();
     let i: number;
@@ -149,6 +182,7 @@ function spawnWarm(sessionId: string): Session {
         const a = s.active;
         s.active = null;
         a?.onDone(typeof m.result === "string" ? m.result : "");
+        drain();
       }
     }
   });
@@ -164,21 +198,23 @@ function spawnWarm(sessionId: string): Session {
       a.onText(`⚠️ Could not start the claude CLI (${String(e).slice(0, 80)}). Run \`jarvis doctor\`.`);
       a.onDone();
     }
+    failQueue(`⚠️ Could not start the claude CLI (${String(e).slice(0, 80)}). Run \`jarvis doctor\`.`);
     sessions.delete(sessionId);
   });
   child.on("close", (code) => {
     // a resume that dies within 3s means the on-disk session is gone
     if (usedResume && Date.now() - spawnedAt < 3000) { known.delete(sessionId); persist(); }
+    const hint = /log ?in|unauthoriz|authent|api key|billing|credential/i.test(errTail)
+      ? "Claude Code isn't logged in on this machine — open a terminal, run `claude`, and complete the login, then try again."
+      : `The claude CLI exited unexpectedly (code ${code}).`;
     if (s.active) {
       const a = s.active;
       s.active = null;
-      const hint = /log ?in|unauthoriz|authent|api key|billing|credential/i.test(errTail)
-        ? "Claude Code isn't logged in on this machine — open a terminal, run `claude`, and complete the login, then try again."
-        : `The claude CLI exited unexpectedly (code ${code}).`;
       const detail = errTail.trim() ? `\n\n${errTail.trim().split("\n").slice(-3).join("\n")}` : "";
       a.onText(`⚠️ ${hint}${detail}`);
       a.onDone();
     }
+    failQueue(`⚠️ ${hint}`);
     sessions.delete(sessionId);
   });
   sessions.set(sessionId, s);
@@ -288,16 +324,41 @@ export function withPendingContext(sessionId: string, message: string): string {
     `RELAY the worker markdown to the screen essentially AS-IS: keep its bullets, **bold**, and [[wikilinks]], trim only what does not answer the question. Do NOT rewrite it into paragraphs and do NOT expand the voice line into your screen answer. Reproduce any SOURCES: line verbatim as your final line. Condense the voice line into your own SPOKEN line. Do NOT re-delegate what is already answered here:\n${ctx}\n]\n\nUser: ${message}`;
 }
 
+/**
+ * Hand a message to the session's CLI child.
+ *
+ * `queue` decides what happens when a turn is already running. A person's
+ * message opts in: it waits its turn and is answered, instead of being
+ * dropped and reported back as an error string. A scheduled heartbeat leaves
+ * it off — a nudge that arrives mid-turn is better skipped than delivered
+ * late behind three others.
+ *
+ * Returns `queued` when the message is waiting, `busy` when it could not be
+ * accepted at all (queue off, or the queue is already full).
+ */
 export function sendTurn(
   sessionId: string,
   message: string,
   turn: Turn,
   images: string[] = [],
-): { busy: boolean } {
+  opts: { queue?: boolean; onStart?: () => void } = {},
+): { busy: boolean; queued: boolean } {
   const s = getSession(sessionId || "default");
-  if (s.active) return { busy: true };
+  if (s.active) {
+    if (!opts.queue || s.queue.length >= MAX_QUEUE) return { busy: true, queued: false };
+    s.queue.push({ message, turn, images, onStart: opts.onStart });
+    return { busy: true, queued: true };
+  }
+  deliver(s, sessionId || "default", message, turn, images);
+  return { busy: false, queued: false };
+}
+
+function deliver(s: Session, sessionId: string, message: string, turn: Turn, images: string[]) {
   s.active = turn;
-  const text = withPendingContext(sessionId || "default", message);
+  // Resolved at DELIVERY, not at enqueue: a queued message is composed only
+  // once the turn ahead of it has finished, so it picks up any worker results
+  // that landed in the meantime.
+  const text = withPendingContext(sessionId, message);
   // pasted screenshots ride along as standard image content blocks
   const content: unknown[] = [];
   for (const img of images.slice(0, 4)) {
@@ -308,5 +369,4 @@ export function sendTurn(
   s.child.stdin.write(JSON.stringify({
     type: "user", message: { role: "user", content },
   }) + "\n");
-  return { busy: false };
 }

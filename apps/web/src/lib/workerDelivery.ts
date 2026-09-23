@@ -42,6 +42,12 @@ export function useWorkerDelivery() {
       try {
         const reply = await streamChatTurn(sid, DELIVER_PROMPT, undefined, undefined, undefined, true);
         if (!reply) return;
+        // This turn is invisible, so its FAILURES have no home: posting one
+        // appends a bubble that reads as something Jarvis chose to say. That
+        // is how three "busy — finishing previous turn" lines landed in a
+        // transcript. The answer stays parked server-side and folds into the
+        // next reply, which is the documented fallback anyway.
+        if (reply.startsWith("⚠️")) return;
         appendTranscript(sid, [{ c: "jarvis", t: reply }]);
         window.dispatchEvent(new Event("jarvis:transcript"));
         if (shouldSpeak()) await speak(reply);
