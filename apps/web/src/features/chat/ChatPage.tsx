@@ -396,7 +396,12 @@ export function ChatPage() {
     {pickerOpen && <MicrophonePicker onStart={startMic} onClose={() => setPickerOpen(false)} onCancel={() => { stopMic(); setPickerOpen(false); }} />}
     <div className="relative mx-auto flex h-full w-full max-w-[780px] flex-col px-6 py-4">
       {messages.length === 0 && (
-        <div className="absolute inset-x-6 bottom-[120px] top-0 z-10 flex flex-col items-center justify-center gap-2 text-center">
+        // pointer-events-none, because this splash is an OVERLAY, not a layer.
+        // It spans top-0 to 120px above the composer, and a pending image
+        // preview sits inside that band — so its remove button was rendered
+        // above the splash but hit-tested below it, and the ✕ did nothing.
+        // Only the quick-prompt buttons take clicks back.
+        <div className="pointer-events-none absolute inset-x-6 bottom-[120px] top-0 z-10 flex flex-col items-center justify-center gap-2 text-center">
           <span className="blip h-[11px] w-[11px] rounded-full bg-[var(--cyan)] shadow-[0_0_18px_var(--cyan),0_0_44px_var(--cyan-3)]" />
           <div className="mt-2 font-sans text-[17px] font-semibold text-[var(--text)]">Channel open</div>
           <div className="text-[9.5px] uppercase tracking-[1.8px] text-[var(--dim)]">
@@ -407,7 +412,7 @@ export function ChatPage() {
               <button
                 key={q}
                 onClick={() => submit(q)}
-                className="rounded-xl border border-[var(--line)] bg-[var(--surf)] px-3 py-3 text-left font-sans text-[11.5px] text-[var(--dim)] transition [box-shadow:var(--shadow)] hover:-translate-y-px hover:border-[var(--cyan-3)] hover:text-[var(--cyan)]"
+                className="pointer-events-auto rounded-xl border border-[var(--line)] bg-[var(--surf)] px-3 py-3 text-left font-sans text-[11.5px] text-[var(--dim)] transition [box-shadow:var(--shadow)] hover:-translate-y-px hover:border-[var(--cyan-3)] hover:text-[var(--cyan)]"
               >
                 {q}
               </button>
