@@ -205,6 +205,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var micMuted = false
     var muteMinutesLeft = 0
     var startedServer = false
+    // Consecutive failed health polls, and when the Mac last woke. Both feed
+    // the "is the server really down" test in poll() — see the note there.
+    var downPolls = 0
+    var wokeAt = Date.distantPast
 
     // Notifications used to be shelled out with `osascript display notification`
     // from five places. Two problems with that: macOS attributes them to
@@ -309,6 +313,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         askForNotifications()
         installMainMenu()
+        // The wake itself is the signal. Without it the first poll after a
+        // Deep Idle fires into a loopback stack that has not come back yet,
+        // and reads the timeout as a dead server.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.wokeAt = Date()
+            self?.downPolls = 0
+        }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
@@ -338,8 +351,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self else { return }
             let wasUp = self.serverUp
             self.serverUp = h != nil
-            // master switch: first sight of a down server → start it (once)
-            if !self.serverUp && !self.startedServer && !jarvisDir.isEmpty {
+            // One missed poll is not a dead server. The health request times
+            // out after 2.5s against a 3s timer, and on wake from sleep the
+            // loopback stack is routinely slower than that — so a single miss
+            // used to spawn a duplicate server (28 EADDRINUSE in api.log) and,
+            // via services.sh, a browser tab. Ask three times before believing
+            // it, and give a wake its own grace period on top.
+            if self.serverUp {
+                self.downPolls = 0
+            } else if Date().timeIntervalSince(self.wokeAt) > 20 {
+                self.downPolls += 1
+            }
+            if self.downPolls >= 3 && !self.startedServer && !jarvisDir.isEmpty {
                 self.startedServer = true
                 runTool(["start"])
             }

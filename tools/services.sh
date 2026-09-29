@@ -118,7 +118,21 @@ start() {
       fi
     fi
   fi
-  open "http://localhost:$PORT" 2>/dev/null || true
+  # Only a PERSON who just asked for it gets a browser tab.
+  #
+  # This used to sit outside the `if ui_up` above, so a start that did nothing
+  # at all still opened one. The menu-bar app re-runs `start` whenever a single
+  # health poll misses — and on wake from sleep the loopback check misses
+  # routinely — so an idle Mac collected a tab every few seconds. The evidence
+  # was 28 EADDRINUSE lines in api.log: 28 servers spawned against a server
+  # that was already alive and answering.
+  #
+  # A TTY is the honest test for "a person is watching": `jarvis start` in a
+  # terminal has one, the menu-bar app and launchd do not. The bar has its own
+  # window and never wanted a browser in the first place.
+  if [ -t 1 ] && [ "${JARVIS_OPEN_UI:-1}" = "1" ]; then
+    open "http://localhost:$PORT" 2>/dev/null || true
+  fi
 }
 
 stop() {
