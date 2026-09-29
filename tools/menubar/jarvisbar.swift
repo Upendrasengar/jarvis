@@ -67,6 +67,388 @@ func openPage(_ path: String) {
     dashboard.show(u)
 }
 
+// The selection overlay.
+//
+// `screencapture -i` was the obvious choice and is the wrong one here. It is
+// ONE-SHOT, and it draws the system crosshair with nowhere to put a label.
+// This has to stay up for several grabs in a row and say what it is for, so
+// the selection UI is ours; only the pixel grab is delegated, to
+// `screencapture -R`, which takes an explicit rect and needs the same
+// permission we would have needed anyway.
+final class SelectionView: NSView {
+    var onCommit: ((NSRect) -> Void)?
+    var onEnd: (() -> Void)?
+    // The bar gets out of the way for the duration of the drag: it sits over
+    // the screen you are framing, and you cannot select what is behind it.
+    var onDragStart: (() -> Void)?
+    var onDragAbort: (() -> Void)?          // released without a usable rect
+    private var anchor: NSPoint?
+    private var drag: NSPoint?
+    private var cursor: NSPoint = .zero
+    // Mirrors what the bar is actually holding. It is not a tally of drags:
+    // removing a thumbnail has to count, and a drag refused at the cap must
+    // not. The page reports it; this only draws it.
+    var shots = 0 { didSet { needsDisplay = true } }
+    var maxShots = 4
+    private var atMax: Bool { shots >= maxShots }
+
+    override var acceptsFirstResponder: Bool { true }
+    override var isFlipped: Bool { false }
+
+    // The bar deliberately holds key status so you can type while framing, so
+    // this view lives in a window that is NOT key. AppKit spends the first
+    // click on such a window activating it and delivers no mouseDown — which
+    // is why the first drag did nothing and the second worked.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    // mouseMoved only reaches the KEY window by default, and this window is
+    // not it — without an always-active tracking area the cursor label sits
+    // wherever the pointer happened to enter.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds,
+                                       options: [.activeAlways, .mouseMoved, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    private func selection() -> NSRect? {
+        guard let a = anchor, let d = drag else { return nil }
+        let r = NSRect(x: min(a.x, d.x), y: min(a.y, d.y), width: abs(a.x - d.x), height: abs(a.y - d.y))
+        return (r.width < 4 || r.height < 4) ? nil : r
+    }
+
+    override func draw(_ dirty: NSRect) {
+        NSColor(white: 0, alpha: 0.25).setFill()
+        bounds.fill()
+        if let sel = selection() {
+            // Punch the selection clear so you can see what you are framing.
+            NSColor.clear.set()
+            sel.fill(using: .copy)
+            NSColor.white.setStroke()
+            let p = NSBezierPath(rect: sel)
+            p.lineWidth = 1
+            p.stroke()
+        }
+        drawLabel()
+    }
+
+    // The label rides with the cursor, which is the part that makes the mode
+    // legible — a bare dimmed screen says nothing about what it wants.
+    private func drawLabel() {
+        let text: String
+        if atMax          { text = "\(shots) captured · max — remove one to add another · ⏎ when done" }
+        else if shots == 0 { text = "Drag to take a screenshot" }
+        else               { text = "\(shots) captured · drag for another · ⏎ when done" }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .foregroundColor: NSColor.black,
+        ]
+        let size = (text as NSString).size(withAttributes: attrs)
+        let pad: CGFloat = 8
+        var box = NSRect(x: cursor.x + 14, y: cursor.y - size.height - 14,
+                         width: size.width + pad * 2, height: size.height + pad)
+        // Keep it on screen when the cursor is near an edge.
+        if box.maxX > bounds.maxX { box.origin.x = cursor.x - box.width - 14 }
+        if box.minY < bounds.minY { box.origin.y = cursor.y + 14 }
+        NSColor(white: 0.96, alpha: 0.98).setFill()
+        NSBezierPath(roundedRect: box, xRadius: 6, yRadius: 6).fill()
+        (text as NSString).draw(at: NSPoint(x: box.minX + pad, y: box.minY + pad / 2), withAttributes: attrs)
+    }
+
+    override func mouseMoved(with e: NSEvent)   { cursor = convert(e.locationInWindow, from: nil); needsDisplay = true }
+    override func mouseDown(with e: NSEvent) {
+        anchor = convert(e.locationInWindow, from: nil)
+        drag = anchor
+        needsDisplay = true
+        onDragStart?()
+    }
+    override func mouseDragged(with e: NSEvent) { drag = convert(e.locationInWindow, from: nil); cursor = drag!; needsDisplay = true }
+
+    override func mouseUp(with e: NSEvent) {
+        defer { anchor = nil; drag = nil; needsDisplay = true }
+        // A click, or a rect too small to be meant — put the bar back, since
+        // nothing is going to capture and restore it.
+        guard let sel = selection() else { onDragAbort?(); return }
+        // Refuse rather than capture-and-silently-drop: the page caps at
+        // maxShots, so a grab past it used to vanish while the label happily
+        // counted it.
+        guard !atMax else { onDragAbort?(); return }
+        // Window coords → screen coords. The overlay spans every display, so
+        // its own origin is the offset.
+        let onScreen = NSRect(x: sel.minX + (window?.frame.minX ?? 0),
+                              y: sel.minY + (window?.frame.minY ?? 0),
+                              width: sel.width, height: sel.height)
+        onCommit?(onScreen)
+    }
+
+    override func keyDown(with e: NSEvent) {
+        // 53 = Esc, 36 = Return. Both mean "done"; Esc before the first grab
+        // simply means you changed your mind.
+        if e.keyCode == 53 || e.keyCode == 36 { onEnd?() } else { super.keyDown(with: e) }
+    }
+}
+
+final class CaptureOverlay: NSWindow {
+    override var canBecomeKey: Bool { true }
+}
+
+// The floating ask-bar: click the icon, type, usually with a screenshot of
+// whatever you were looking at already attached.
+//
+// An NSPanel rather than a second NSWindow, because it has to appear OVER
+// another app without stealing that app's Dock slot or activating Jarvis. A
+// plain panel will not take keystrokes though — canBecomeKey is false for
+// non-activating panels — so the subclass below opts back in. Without it you
+// get a bar you cannot type into.
+final class QuickPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
+// Both web views share ONE data store. They are separate WKWebViews on the
+// same origin, and without sharing they get separate localStorage — the
+// ask-bar would be a different browser from the dashboard, with its own idea
+// of the theme and the session. (WKProcessPool would have been the other half
+// of this before macOS 12; it has had no effect since.)
+let sharedStore = WKWebsiteDataStore.nonPersistent()
+
+// A notification is the only way this app can speak when no window is up —
+// which is exactly the case when a screenshot fails before the bar appears.
+func notifyUser(_ text: String) {
+    let c = UNMutableNotificationContent()
+    c.title = "Jarvis"
+    c.body = text
+    UNUserNotificationCenter.current().add(
+        UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil))
+}
+
+final class QuickBar: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    private var panel: QuickPanel?
+    private var web: WKWebView?
+    private var pending: [String] = []    // captures that beat the page load
+    private var loaded = false
+    private let width: CGFloat = 720
+    private var overlay: CaptureOverlay?
+    private weak var selView: SelectionView?
+    private var shotCount = 0
+
+    // Anchored to the BOTTOM, above the Dock. visibleFrame already excludes
+    // the Dock and the menu bar, so minY is the top of the Dock rather than
+    // the bottom of the screen — the gap below is deliberate breathing room,
+    // not a Dock allowance.
+    //
+    // Bottom-anchored matters for more than taste: a row of captures makes
+    // the panel taller, and growing from a fixed bottom edge pushes it UPWARD,
+    // leaving the composer under the cursor where it started. Anchoring the
+    // top would slide the input down out from under you mid-capture.
+    private func frame(height: CGFloat) -> NSRect {
+        let vis = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        return NSRect(x: vis.midX - width / 2,
+                      y: vis.minY + 28,
+                      width: width, height: height)
+    }
+
+    func show(capture: Bool) {
+        if panel == nil { build() }
+        guard let p = panel else { return }
+        p.setFrame(frame(height: p.frame.height > 0 ? p.frame.height : 96), display: true)
+        p.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        // Reload rather than reuse. Keeping the page alive across opens meant
+        // the bar kept whatever bundle it happened to load at launch, so a
+        // rebuilt dashboard only reached it when the whole app was restarted —
+        // a stale UI that no amount of reopening could clear. The page is on
+        // localhost and weighs nothing; a fresh load every time is the honest
+        // trade for never wondering which version you are looking at.
+        //
+        // didFinish does the focusing, and any capture taken while this is in
+        // flight queues in `pending` and is drained there.
+        loaded = false
+        web?.reload()
+        if capture { beginCapture() }
+    }
+
+    func close() {
+        endCapture()
+        panel?.orderOut(nil)
+    }
+
+    private func build() {
+        let cfg = WKWebViewConfiguration()
+        cfg.websiteDataStore = sharedStore
+        cfg.userContentController.add(self, name: "resize")
+        cfg.userContentController.add(self, name: "close")
+        cfg.userContentController.add(self, name: "submit")
+        cfg.userContentController.add(self, name: "count")
+        let v = WKWebView(frame: NSRect(x: 0, y: 0, width: width, height: 96), configuration: cfg)
+        if #available(macOS 13.3, *) { v.isInspectable = true }
+        // The page paints its own rounded card; anything the web view draws
+        // behind it would show as an opaque rectangle with square corners.
+        v.setValue(false, forKey: "drawsBackground")
+        v.navigationDelegate = self
+        v.load(URLRequest(url: URL(string: "http://localhost:\(port())/bar")!))
+        web = v
+
+        let p = QuickPanel(contentRect: frame(height: 96),
+                           styleMask: [.borderless, .nonactivatingPanel],
+                           backing: .buffered, defer: false)
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        p.hasShadow = false                  // the card draws its own
+        p.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 2)
+        p.isMovableByWindowBackground = true
+        p.hidesOnDeactivate = false
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        p.contentView = v
+        panel = p
+    }
+
+    func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
+        loaded = true
+        // Focus belongs here now that every open reloads: evaluating into the
+        // old page from show() would land on a document about to be replaced.
+        w.evaluateJavaScript("window.__jarvisFocus && window.__jarvisFocus()")
+        selView?.shots = 0                 // a reloaded page holds no captures
+        shotCount = 0
+        // Grabs taken before the page finished loading — drain them in order.
+        let queued = pending
+        pending = []
+        for d in queued { attach(d) }
+    }
+
+    // MARK: capture mode
+    //
+    // The overlay stays up across grabs: drag, the shot appears in the bar,
+    // drag again. Return or Esc ends it. It spans every display as one window
+    // so a selection can start on one screen and the maths stays in one
+    // coordinate space.
+    private func beginCapture() {
+        if !CGPreflightScreenCaptureAccess() {
+            CGRequestScreenCaptureAccess()
+            notifyUser("Jarvis needs Screen Recording permission to grab a screenshot. "
+                     + "System Settings → Privacy & Security → Screen Recording → enable Jarvis, then try again.")
+            return
+        }
+        if overlay != nil { return }
+        let span = NSScreen.screens.reduce(NSRect.zero) { $0.isEmpty ? $1.frame : $0.union($1.frame) }
+        let w = CaptureOverlay(contentRect: span, styleMask: [.borderless],
+                               backing: .buffered, defer: false)
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.hasShadow = false
+        w.level = .floating                       // the bar sits above this
+        w.ignoresMouseEvents = false
+        w.acceptsMouseMovedEvents = true
+        w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        let v = SelectionView(frame: NSRect(origin: .zero, size: span.size))
+        v.onCommit = { [weak self] r in self?.grab(r) }
+        v.onEnd = { [weak self] in self?.endCapture() }
+        v.onDragStart = { [weak self] in self?.panel?.orderOut(nil) }
+        v.onDragAbort = { [weak self] in self?.panel?.makeKeyAndOrderFront(nil) }
+        v.shots = shotCount                      // a re-opened overlay starts truthful
+        selView = v
+        w.contentView = v
+        overlay = w
+        w.orderFront(nil)
+        w.makeFirstResponder(v)
+        // The BAR keeps key status — you must be able to type while the
+        // overlay is live. The overlay only needs the mouse, and its Esc/Return
+        // arrive through the local monitor below.
+        panel?.makeKeyAndOrderFront(nil)
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] e in
+            guard self?.overlay != nil else { return e }
+            if e.keyCode == 53 { self?.endCapture(); return nil }   // Esc ends capture, not the bar
+            return e
+        }
+    }
+
+    private func endCapture() {
+        overlay?.orderOut(nil)
+        overlay = nil
+    }
+
+    // The grab itself is still the system's, via -R: same pixels, same
+    // permission, and none of the colour-space work a CGImage round trip
+    // would have needed.
+    private func grab(_ rectInScreen: NSRect) {
+        // Cocoa is bottom-left origin; screencapture wants top-left, measured
+        // from the top of the MAIN display.
+        let mainTop = NSScreen.screens.first?.frame.maxY ?? rectInScreen.maxY
+        let x = Int(rectInScreen.minX.rounded())
+        let y = Int((mainTop - rectInScreen.maxY).rounded())
+        let w = Int(rectInScreen.width.rounded())
+        let h = Int(rectInScreen.height.rounded())
+        let tmp = NSTemporaryDirectory() + "jarvis-shot-\(UUID().uuidString).png"
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        p.arguments = ["-x", "-R\(x),\(y),\(w),\(h)", tmp]   // -x: no shutter sound
+        // The bar is already hidden (mouseDown did that); the dimming goes too,
+        // or the shot comes back dimmed with our own selection border baked
+        // into it. Both are restored together once the pixels are on disk.
+        overlay?.orderOut(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            // Off the main thread: waitUntilExit here would freeze the overlay
+            // and the bar for as long as screencapture takes.
+            DispatchQueue.global(qos: .userInitiated).async {
+                try? p.run()
+                p.waitUntilExit()
+                let data = try? Data(contentsOf: URL(fileURLWithPath: tmp))
+                try? FileManager.default.removeItem(atPath: tmp)
+                DispatchQueue.main.async {
+                    self.overlay?.orderFront(nil)
+                    self.panel?.makeKeyAndOrderFront(nil)
+                    if let d = data, !d.isEmpty {
+                        self.deliver("data:image/png;base64," + d.base64EncodedString())
+                    }
+                }
+            }
+        }
+    }
+
+    private func deliver(_ dataUrl: String) {
+        if loaded { attach(dataUrl) } else { pending.append(dataUrl) }
+    }
+
+    private func attach(_ dataUrl: String) {
+        // Through JSON so the base64 payload cannot terminate the string
+        // literal it is being embedded in.
+        guard let j = try? JSONSerialization.data(withJSONObject: [dataUrl]),
+              let arr = String(data: j, encoding: .utf8) else { return }
+        web?.evaluateJavaScript("window.__jarvisAttach && window.__jarvisAttach(\(arr)[0])")
+    }
+
+    func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
+        if m.name == "close" { close(); return }
+        // The bar is the only thing that knows how many images it holds —
+        // captures ADD and the thumbnail ✕ REMOVES, and the overlay label has
+        // to say the truth after either.
+        if m.name == "count", let n = m.body as? NSNumber {
+            shotCount = n.intValue
+            selView?.shots = shotCount
+            return
+        }
+        // Sending hands the whole turn to the dashboard chat and gets out of
+        // the way. The bar is a launcher, not a second place your conversation
+        // lives — the answer belongs with the rest of the history.
+        if m.name == "submit" {
+            // Passed through as opaque JSON. Swift has no business knowing the
+            // shape of an image the page built and the page will consume.
+            guard let d = try? JSONSerialization.data(withJSONObject: m.body),
+                  let json = String(data: d, encoding: .utf8) else { return }
+            endCapture()
+            panel?.orderOut(nil)
+            dashboard.submit(payload: json)
+            return
+        }
+        if m.name == "resize", let h = m.body as? NSNumber, let p = panel {
+            let want = max(96, min(640, CGFloat(truncating: h)))
+            if abs(p.frame.height - want) > 1 { p.setFrame(frame(height: want), display: true, animate: false) }
+        }
+    }
+}
+
+let quickBar = QuickBar()
+
 // Jarvis in its own window rather than a browser tab.
 //
 // A WKWebView, not Electron: the system already has a renderer, and shipping a
@@ -123,6 +505,26 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
         return img
     }
 
+    // A turn handed over from the ask-bar. The window comes to the front on
+    // /chat and the page is told to send it, so the question and its answer
+    // land in the real transcript rather than in a panel that vanishes.
+    //
+    // The page may still be loading (first ever open), and evaluating into a
+    // half-built React tree does nothing silently — so this retries briefly
+    // rather than dropping the turn the owner just typed.
+    func submit(payload json: String) {
+        show(URL(string: "http://localhost:\(port())/chat")!)
+        var tries = 0
+        func attempt() {
+            tries += 1
+            web?.evaluateJavaScript("!!window.__jarvisSubmit && (window.__jarvisSubmit(\(json)), true)") { r, _ in
+                if (r as? Bool) == true || tries > 40 { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { attempt() }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { attempt() }
+    }
+
     func show(_ url: URL) {
         NSApp.setActivationPolicy(.regular)     // a window needs a Dock presence
         if NSApp.applicationIconImage == nil || !iconSet {
@@ -136,7 +538,7 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
             return
         }
         let cfg = WKWebViewConfiguration()
-        cfg.websiteDataStore = .nonPersistent()
+        cfg.websiteDataStore = sharedStore   // shared with the ask-bar panel
         cfg.mediaTypesRequiringUserActionForPlayback = []   // spoken replies autoplay
         let v = WKWebView(frame: .zero, configuration: cfg)
         v.uiDelegate = self
@@ -209,6 +611,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // the "is the server really down" test in poll() — see the note there.
     var downPolls = 0
     var wokeAt = Date.distantPast
+    // Held rather than assigned to item.menu — see applicationDidFinishLaunching.
+    var barMenu: NSMenu?
+
+    // Left click opens the ask-bar with the crosshair live. Right click (or
+    // control-click, which is the same gesture on a trackpad) is the menu that
+    // used to own every click: recording, mute, dashboard, quit.
+    @objc func iconClicked() {
+        let e = NSApp.currentEvent
+        let wantsMenu = e?.type == .rightMouseUp
+            || e?.modifierFlags.contains(.control) == true
+        if wantsMenu {
+            guard let menu = barMenu else { return }
+            menuNeedsUpdate(menu)
+            item.menu = menu
+            item.button?.performClick(nil)
+            // Detach immediately or the menu owns the NEXT left click too.
+            DispatchQueue.main.async { self.item.menu = nil }
+            return
+        }
+        quickBar.show(capture: true)
+    }
 
     // Notifications used to be shelled out with `osascript display notification`
     // from five places. Two problems with that: macOS attributes them to
@@ -325,7 +748,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         let menu = NSMenu()
         menu.delegate = self
-        item.menu = menu
+        // NOT item.menu — assigning a menu hands EVERY click to it, and the
+        // left click is wanted for the ask-bar. The menu is popped by hand on
+        // a right click instead, so nothing in it becomes unreachable.
+        barMenu = menu
+        if let b = item.button {
+            b.target = self
+            b.action = #selector(iconClicked)
+            b.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
         render()
         poll()
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in

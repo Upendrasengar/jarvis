@@ -294,6 +294,19 @@ export function ChatPage() {
       if (text) submit(text, !!voice);
     };
     window.addEventListener("jarvis:send", onSend);
+
+    // A turn handed over from the floating ask-bar (the menu-bar icon). It
+    // arrives with its screenshots ALREADY scaled — the bar ran them through
+    // processImage before showing you the thumbnails — so they go straight to
+    // send() rather than back through pendingImgs, which would re-encode them
+    // and cost a second round of JPEG loss.
+    (window as unknown as { __jarvisSubmit: (p: { text: string; images: ChatImage[] }) => void })
+      .__jarvisSubmit = ({ text, images }) => {
+        const v = (text ?? "").trim() || (images?.length ? "What do you see here?" : "");
+        if (!v) return;
+        void send(v, images ?? [], []);
+      };
+
     return () => window.removeEventListener("jarvis:send", onSend);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);

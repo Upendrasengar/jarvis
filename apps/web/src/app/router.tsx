@@ -14,6 +14,7 @@ import { SettingsPage } from "../features/settings/SettingsPage";
 import { LogsPage } from "../features/logs/LogsPage";
 import { NotesPage } from "../features/notes/NotesPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
+import { QuickBarPage } from "../features/quickbar/QuickBarPage";
 
 // The window title is how this app is identified in Mission Control, cmd-tab
 // and the Window menu. Nothing set a per-view title, so every route read
@@ -62,6 +63,9 @@ export function AppRoutes() {
       <PageTitle />
       <SetupGate />
     <Routes>
+      {/* Outside Layout on purpose: the ask-bar is a bare floating panel, and
+          the sidebar/chrome Layout adds has no place in it. */}
+      <Route path="/bar" element={<QuickBarPage />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/overview" replace />} />
         <Route path="/overview" element={<OverviewPage />} />
