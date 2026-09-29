@@ -1,6 +1,7 @@
 // Jarvis · © 2026 Upendra Sengar · MIT License · https://github.com/Upendrasengar/jarvis
 // App shell — redesign v2: top status header + left icon rail (D2).
 import { useQuery } from "@tanstack/react-query";
+import { JarvisMark } from "../components/JarvisMark";
 import { NavLink, Outlet } from "react-router-dom";
 import { RecordingPill } from "../features/calls/RecordingPill";
 import { HeaderVoice } from "../features/voice/HeaderVoice";
@@ -33,69 +34,6 @@ const RAIL: Array<{ to: string; icon: string; label: string }> = [
 ];
 
 // ── the wordmark's mark ────────────────────────────────────────────────────
-// Change MARK to try another. All three are drawn in the rail's convention —
-// 24x24, stroked, currentColor — so the mark and the navigation read as one
-// set rather than a logo bolted onto a UI.
-//
-// Note what the dot was doing: it pulses (`blip`), so it read as a liveness
-// indicator, not decoration. An icon that merely sits there loses that, so the
-// glow and the pulse are kept on the wrapper and the mark rides inside them.
-const MARK: "core" | "brain" | "wave" = "brain";
-
-const MARKS: Record<string, React.ReactNode> = {
-    // concentric core — echoes the overview icon and the neural-core motif,
-    // and stays legible at 16px where a detailed mark turns to mush
-    core: (
-        <>
-            <circle cx="12" cy="12" r="8.5" />
-            <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
-        </>
-    ),
-    // the menu-bar mascot, for continuity with the Mac app
-    // Lucide's "brain" (https://lucide.dev), ISC licensed — vendored as one
-    // path set rather than pulling in the package, since this is the only icon
-    // needed from it and the engine artifact ships its dependencies.
-    //
-    //   Copyright (c) for portions of Lucide are held by Cole Bemis
-    //   2013-2022 as part of Feather (MIT). All other copyright (c) for
-    //   Lucide are held by Lucide Contributors 2022. ISC License.
-    //
-    // It replaces a hand-drawn approximation: the Mac icon uses Apple's SF
-    // Symbol "brain", whose artwork is licensed for Apple-platform apps and
-    // cannot be shipped in a web page. Lucide is the honest way to get the
-    // same mascot.
-    brain: (
-        <>
-            <path d="M12 18V5" />
-            <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" />
-            <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" />
-            <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" />
-            <path d="M18 18a4 4 0 0 0 2-7.464" />
-            <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
-            <path d="M6 18a4 4 0 0 1-2-7.464" />
-            <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
-        </>
-    ),
-    // a spoken waveform — Jarvis is voice-first before it is anything else
-    wave: (
-        <path d="M3 12h2.2 M7.4 7.5v9 M11.7 4.5v15 M16 8.5v7 M20.3 10.8v2.4" />
-    ),
-};
-
-function JarvisMark() {
-    return (
-        // 18px at Lucide's native stroke-width of 2. The brain is eight paths
-        // in a 24-unit box; thinned to 1.8 and shrunk to 16px its folds close
-        // up and it reads as a smudge. Detailed icons need their design weight.
-        <span className="blip inline-flex h-[18px] w-[18px] items-center justify-center text-[var(--cyan)] [filter:drop-shadow(0_0_6px_var(--cyan-3))]">
-            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {MARKS[MARK]}
-            </svg>
-        </span>
-    );
-}
-
 function RailLink({ to, icon, label }: { to: string; icon: string; label: string }) {
     return (
         <NavLink
