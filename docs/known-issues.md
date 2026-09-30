@@ -3,7 +3,7 @@
 Observed, not yet fixed. One entry per issue: what was seen, where it comes
 from, and what a fix would have to touch. Delete an entry when it ships.
 
-_2026-09-19 entries shipped 2026-09-22; two Mac-app bugs shipped 2026-09-23._
+_2026-09-19 entries shipped 2026-09-22; Mac-app bugs 2026-09-23 and 2026-09-30._
 
 ## Fixed
 
@@ -83,18 +83,57 @@ app is permanently in a first-run state the browser rarely sees.
 Fixed with `pointer-events-none` on the splash and `pointer-events-auto` on
 the quick-prompt buttons.
 
+### 2026-09-30 — the app lost your conversation on every launch
+
+`jarvisbar.swift` used `WKWebsiteDataStore.nonPersistent()`, so localStorage
+was thrown away at every launch. `loadTranscript()` reads localStorage, so the
+app opened with an empty chat every time while a browser on the same machine
+kept its history. It also made the app permanently first-run, which is what
+hid the pointer-events bug above.
+
+It was non-persistent because a cached bundle once kept the dashboard hours
+out of date. That is the server's job and the server does it — every response
+carries `cache-control: no-store`, index.html and hashed assets alike — so
+there was nothing cacheable left to go stale, and the workaround was pure
+cost. Now `.default()`, shared by the dashboard and the ask-bar.
+
 ## Open
 
-### `.nonPersistent()` costs the app its conversation history
+### 2026-09-30 — a recording auto-started again right after a manual stop
 
-Not just cache — the transcript too, on every launch. The comment in
-`jarvisbar.swift` says it was chosen because a persistent store served
-hours-old bundles during development. That bought less than it costs now:
-bundles are content-hashed, so a stale cache cannot
-shadow a new build. Switching to `.default()` would give the app persistent
-history and match the browser. Owner's call — not changed.
+**Seen:** a Firefox call auto-recorded. Mic muted mid-call, call ended, mic
+unmuted, recording stopped by hand — and a new recording started immediately
+with no call in progress.
 
+**Where it comes from:** `tools/call-watch.sh:399`. Firefox has no tab URL to
+read, so a sustained mic hold IS the signal on its own:
 
+```bash
+elif ! voice_listening && [ -n "$(firefox_mic_pid)" ]; then
+  firefox_hits=$((firefox_hits + 1))
+  if [ "$firefox_hits" -ge 2 ]; then start_recording "Firefox (browser)" firefox
+```
+
+Leaving a meeting does not reliably make Firefox release the mic — a "you left
+the meeting" page, a tab still open with the permission live, or a slow
+teardown all keep the handle. After the manual stop the watcher returns to
+idle, sees the mic still held for two consecutive polls (30s), and concludes a
+new call has begun. The rule is working as written; the rule is too weak.
+
+Every other detector has a corroborating signal — Teams desktop checks that
+Teams holds the mic, Teams web needs a Teams tab AND a mic hold. Firefox has
+only the mic, so anything holding it for 30s looks like a meeting.
+
+**The mute is a red herring.** `mic_muted()` is consulted in exactly two
+places, the silence check (`:426`) and the device probe (`:302`). It does not
+gate detection, so muting cannot start a recording. It may have mattered only
+for timing: mute expires after an hour and the Firefox stop rule has a 60s
+grace, so the sequence lands in the window where the watcher re-arms.
+
+**A fix would have to:** refuse to auto-start within N seconds of a MANUAL
+stop — stopping by hand is an explicit "no", and restarting seconds later
+contradicts it — and/or require a longer sustained hold before re-arming after
+any recording ends. Owner asked to leave it until it recurs.
 
 ## Notes for whoever reads this next
 
