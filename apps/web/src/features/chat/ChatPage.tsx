@@ -5,7 +5,7 @@ import { createRecognition } from "../voice/speechRecognition";
 // Voice: 🎙 fills the composer via speech recognition; 🔈 reads replies aloud.
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { cachedUiState, fetchUiState, saveUiState } from "../../lib/uiState";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { Markdown } from "../../components/Markdown";
@@ -144,6 +144,7 @@ function sessionFromRoute(param: string | undefined): string {
 export function ChatPage() {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const sessionId = useMemo(() => sessionFromRoute(routeId), [routeId]);
   const { messages, send, streaming, queued, clear, onReply } = useChatStream(sessionId);
   const [input, setInput] = useState("");
@@ -270,6 +271,23 @@ export function ChatPage() {
     closeMenu();
     void send(v, imgs, sending);
   };
+
+  // Arriving from a note or call page's "Ask Jarvis" button. The reference
+  // travels in router state rather than the message text: the chat carries the
+  // REFERENCE and the worker resolves it to a path, which is the whole reason
+  // inlining a note's content blew the core-memory budget.
+  //
+  // Cleared from history immediately, or a browser Back into this route would
+  // re-attach a pill you had deliberately removed.
+  useEffect(() => {
+    const incoming = (location.state as { ref?: ChatRef } | null)?.ref;
+    if (!incoming) return;
+    setRefs((r) => (r.some((x) => x.kind === incoming.kind && x.id === incoming.id)
+      ? r
+      : [...r, incoming]));
+    navigate(location.pathname, { replace: true, state: null });
+    inputRef.current?.focus();
+  }, [location.state, location.pathname, navigate]);
 
   const onPaste = async (e: React.ClipboardEvent) => {
     const files = imagesFromClipboard(e);

@@ -278,6 +278,7 @@ function StatusScene({ tone, title, sub, extra }: {
 }
 
 export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: () => void }) {
+  const navigate = useNavigate();
   const toggle = useToggleItem();
   const del = useDeleteCall();
   const save = useUpdateNotes();
@@ -379,6 +380,23 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
                       className="rounded-lg border border-[var(--line)] px-3 py-1 text-[10px] tracking-wider text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
                     >
                       {copied ? "✓ COPIED" : "COPY"}
+                    </button>
+                  )}
+                  {call.notes && (
+                    <button
+                      onClick={() =>
+                        // Hand the call over as a REFERENCE, not as text. The
+                        // chat carries the pill; the worker resolves it to a
+                        // path and reads the file. Pasting the notes into the
+                        // message instead is what blew the core-memory budget.
+                        navigate("/chat", {
+                          state: { ref: { kind: "call", id: call.id, title: callTitle(call) } },
+                        })
+                      }
+                      title="Ask Jarvis about this call — opens chat with it attached"
+                      className="rounded-lg border border-[var(--line)] px-3 py-1 text-[10px] tracking-wider text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+                    >
+                      ASK JARVIS
                     </button>
                   )}
                   {call.notes && (

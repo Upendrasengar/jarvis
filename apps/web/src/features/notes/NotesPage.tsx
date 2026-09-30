@@ -221,6 +221,20 @@ export function NotesPage() {
                     >
                       {copied ? "✓ COPIED" : "COPY"}
                     </button>
+                    <button
+                      onClick={() =>
+                        // Same contract as the call page: hand over a
+                        // REFERENCE, not the note's text. The worker resolves
+                        // the pill to a path and reads the file itself.
+                        navigate("/chat", {
+                          state: { ref: { kind: "note", id: meta.id, title: meta.title } },
+                        })
+                      }
+                      title="Ask Jarvis about this note — opens chat with it attached"
+                      className="rounded-lg border border-[var(--line)] px-3 py-1 text-[10px] tracking-wider text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]"
+                    >
+                      ASK JARVIS
+                    </button>
                     <button onClick={() => setDraft(mdRef.current)} className="rounded-lg border border-[var(--line)] px-3 py-1 text-[10px] tracking-wider text-[var(--dim)] hover:border-[var(--cyan)] hover:text-[var(--cyan)]">
                       EDIT
                     </button>
