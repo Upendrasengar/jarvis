@@ -240,7 +240,18 @@ final class QuickPanel: NSPanel {
 // ask-bar would be a different browser from the dashboard, with its own idea
 // of the theme and the session. (WKProcessPool would have been the other half
 // of this before macOS 12; it has had no effect since.)
-let sharedStore = WKWebsiteDataStore.nonPersistent()
+//
+// PERSISTENT, as of now. It was non-persistent because during development a
+// cached bundle kept the dashboard hours out of date — but that is the
+// server's job and the server does it: every response carries
+// `cache-control: no-store`, index.html and hashed assets alike, so nothing
+// is cacheable to go stale in the first place.
+//
+// What the workaround cost was the conversation. loadTranscript() reads
+// localStorage, and a store thrown away at every launch meant the app opened
+// with an empty chat every single time while a browser on the same machine
+// kept its history.
+let sharedStore = WKWebsiteDataStore.default()
 
 // A notification is the only way this app can speak when no window is up —
 // which is exactly the case when a screenshot fails before the bar appears.
@@ -600,11 +611,8 @@ let quickBar = QuickBar()
 // second copy of Chromium to display a local page would cost more than the
 // rest of the app put together.
 //
-// The data store is NON-PERSISTENT on purpose. During development a browser
-// cached the built bundle so stubbornly that the dashboard kept serving a
-// version hours old — new tabs, cache-busting queries and even no-store
-// fetches returned the stale copy. A window that keeps no cache always shows
-// what the server is actually serving.
+// The data store is shared and persistent — see sharedStore above for why it
+// stopped being non-persistent.
 final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
     private var window: NSWindow?
     private var web: WKWebView?
