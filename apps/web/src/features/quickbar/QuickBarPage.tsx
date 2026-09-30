@@ -21,6 +21,7 @@ type Host = {
   close?: { postMessage: (s: string) => void };
   submit?: { postMessage: (b: { text: string; images: ChatImage[] }) => void };
   count?: { postMessage: (n: number) => void };
+  capture?: { postMessage: (s: string) => void };
 };
 const MAX_IMAGES = 4;   // chat.ts caps the request at 4
 
@@ -99,11 +100,27 @@ export function QuickBarPage() {
     setImgs([]);
   }, [text, imgs]);
 
+  // Esc leaves capture mode so you can scroll the page you are framing — the
+  // overlay swallows the mouse, so there is no other way to reach it. Nothing
+  // is discarded when it does, so this is the way back in.
+  const armCapture = useCallback(() => {
+    if (imgs.length >= MAX_IMAGES) return;
+    host().capture?.postMessage("arm");
+  }, [imgs.length]);
+
   return (
     <div ref={rootRef} className="px-4 pb-4 pt-2">
       {/* Rounded far enough to read as a pill at rest, and still right once a
-          row of captures makes it taller. */}
-      <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surf)] px-3 py-2 [box-shadow:0_10px_40px_rgba(0,0,0,.28)]">
+          row of captures makes it taller.
+
+          The shadow is the theme's own --shadow, not a hand-rolled one. A flat
+          `0 10px 40px rgba(0,0,0,.28)` put a grey halo around the pill: pure
+          black at a single blur reads as a smudge, and it did not follow the
+          theme. --shadow is tinted (rgba(15,40,70,…) in light, near-black in
+          dark), carries a 1px inset highlight along the top edge, and uses a
+          negative spread so it stays tight under the card instead of bleeding
+          out around it. */}
+      <div className="rounded-[28px] border border-[var(--line)] bg-[var(--surf)] px-3 py-2 [box-shadow:var(--shadow)]">
         {imgs.length > 0 && (
           <div className="mb-1 flex flex-wrap items-center gap-2 px-2 pt-1">
             {imgs.map((im, i) => (
@@ -133,11 +150,27 @@ export function QuickBarPage() {
             onKeyDown={(e) => {
               // Esc dismisses the bar, and only Swift can close a window.
               if (e.key === "Escape") { host().close?.postMessage("esc"); return; }
+              if (e.metaKey && e.shiftKey && e.key.toLowerCase() === "s") { e.preventDefault(); armCapture(); return; }
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
             }}
             placeholder={imgs.length ? "Ask about this…" : "What can I help you with today?"}
             className="flex-1 resize-none bg-transparent py-[10px] font-sans text-[16px] leading-[1.35] text-[var(--text)] outline-none placeholder:text-[var(--dim)]"
           />
+          <button
+            onClick={armCapture}
+            disabled={imgs.length >= MAX_IMAGES}
+            title={imgs.length >= MAX_IMAGES ? "Maximum of 4 captures" : "Take a screenshot  (⌘⇧S)"}
+            className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl text-[var(--dim)] transition hover:bg-[var(--surf-2)] hover:text-[var(--cyan)] disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-[var(--dim)]"
+          >
+            {/* viewfinder — four corners, the shape the overlay draws */}
+            <svg viewBox="0 0 24 24" className="h-[19px] w-[19px]" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 8V6a2 2 0 0 1 2-2h2" />
+              <path d="M16 4h2a2 2 0 0 1 2 2v2" />
+              <path d="M20 16v2a2 2 0 0 1-2 2h-2" />
+              <path d="M8 20H6a2 2 0 0 1-2-2v-2" />
+            </svg>
+          </button>
           <button
             onClick={send}
             title="Send"
