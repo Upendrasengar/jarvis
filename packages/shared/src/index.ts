@@ -120,7 +120,12 @@ export const ToggleActionBody = z.object({
   index: z.number().int().min(0),
 });
 export const CommentActionBody = z.object({
-  callId: z.string().regex(/^(note:)?[\w-]+$/),
+  // Same rule as ToggleActionBody above, for the same reason: a note id is an
+  // Obsidian FILENAME, so it carries spaces, parentheses and punctuation.
+  // [\w-]+ rejected every note whose title was not a slug — the 400 landed
+  // before any of the comment logic ran, which is why toggling a checkbox on a
+  // note worked and commenting on the same line did not.
+  callId: z.string().regex(/^(note:)?(?!\.)[^/\\]+$/).refine((v) => !v.includes("..")),
   index: z.number().int().min(0),
   text: z.string().min(1).max(500),
 });

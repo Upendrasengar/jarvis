@@ -340,7 +340,12 @@ export function NotesPage() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ callId: `note:${selected}`, index: commentFor, text }),
-            }).then(invalidate).catch(() => flash("err"));
+            })
+              // fetch only rejects on a NETWORK failure, so a 400 resolved
+              // here and ran invalidate() as if it had worked. That is how a
+              // schema rejecting every non-slug note id stayed invisible.
+              .then((r) => { if (!r.ok) throw new Error(String(r.status)); invalidate(); flash("ok"); })
+              .catch(() => flash("err"));
         }}
         onClose={() => setCommentFor(null)}
       />
