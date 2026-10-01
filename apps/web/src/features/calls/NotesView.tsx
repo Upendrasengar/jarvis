@@ -28,6 +28,34 @@ function em(text: string, key: number) {
   );
 }
 
+// Standard markdown links: [label](url) and [label](<url>). The angle-bracket
+// form is CommonMark's escape hatch for URLs carrying parens — a ServiceNow
+// catalog link is full of them — and without it the whole thing rendered as
+// literal text. data-md carries the source so an inline edit round-trips it.
+const MD_LINK = /\[([^\]]+)\]\((?:<([^>]+)>|([^)\s]+))\)/g;
+const SAFE_HREF = /^(https?:\/\/|mailto:)/i;
+
+function mdLinks(text: string, keyBase: number): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0, k = 0, m: RegExpExecArray | null;
+  MD_LINK.lastIndex = 0;
+  while ((m = MD_LINK.exec(text))) {
+    const href = (m[2] ?? m[3] ?? "").trim();
+    if (!SAFE_HREF.test(href)) continue;
+    if (m.index > last) out.push(em(text.slice(last, m.index), keyBase * 1000 + k++));
+    out.push(
+      <a key={`l${keyBase}-${k++}`} data-md={m[0]} contentEditable={false}
+        href={href} target="_blank" rel="noreferrer noopener"
+        className="text-[var(--cyan)] underline decoration-dotted underline-offset-2 hover:text-[var(--bright)]">
+        {m[1]}
+      </a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(em(text.slice(last), keyBase * 1000 + k++));
+  return out;
+}
+
 // Obsidian [[target|label]] — rendered as a real link; data-md carries the
 // original markdown so domToMd can round-trip it through an inline edit
 function wiki(text: string, keyBase: number) {
@@ -36,7 +64,7 @@ function wiki(text: string, keyBase: number) {
   const re = /(!?)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
   let last = 0, k = 0, m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    if (m.index > last) out.push(em(text.slice(last, m.index), keyBase * 100 + k++));
+    if (m.index > last) out.push(...mdLinks(text.slice(last, m.index), keyBase * 100 + k++));
     const target = m[2].trim();
     const label = (m[3] ?? target).trim();
     if (m[1] === "!" && IMAGE_RE.test(target)) {
@@ -56,7 +84,7 @@ function wiki(text: string, keyBase: number) {
     );
     last = m.index + m[0].length;
   }
-  if (last < text.length) out.push(em(text.slice(last), keyBase * 100 + k++));
+  if (last < text.length) out.push(...mdLinks(text.slice(last), keyBase * 100 + k++));
   return <Fragment>{out}</Fragment>;
 }
 

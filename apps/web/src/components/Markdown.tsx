@@ -30,6 +30,36 @@ function callRefs(text: string): ReactNode[] {
   return out;
 }
 
+// Standard markdown links: [label](url) and [label](<url>). The angle-bracket
+// form is CommonMark's escape hatch for URLs carrying parens or spaces, which
+// is exactly what a ServiceNow catalog link looks like — and without it the
+// whole thing rendered as literal text.
+//
+// Only http(s) and mailto become links. A relative or javascript: destination
+// in a note is not something to hand a click to.
+const MD_LINK = /\[([^\]]+)\]\((?:<([^>]+)>|([^)\s]+))\)/g;
+const SAFE_HREF = /^(https?:\/\/|mailto:)/i;
+
+function mdLinks(text: string, rest: (s: string) => ReactNode[]): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0, k = 0, m: RegExpExecArray | null;
+  MD_LINK.lastIndex = 0;
+  while ((m = MD_LINK.exec(text))) {
+    const href = (m[2] ?? m[3] ?? "").trim();
+    if (!SAFE_HREF.test(href)) continue;
+    if (m.index > last) out.push(...rest(text.slice(last, m.index)));
+    out.push(
+      <a key={`l${k++}`} href={href} target="_blank" rel="noreferrer noopener"
+        className="text-[var(--cyan)] underline decoration-dotted underline-offset-2 hover:text-[var(--bright)]">
+        {m[1]}
+      </a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(...rest(text.slice(last)));
+  return out;
+}
+
 // Obsidian [[target|label]] / [[target]] — call targets open the call page,
 // anything else is a topic and opens the brain graph
 function wikiLinks(text: string): ReactNode[] {
@@ -37,7 +67,7 @@ function wikiLinks(text: string): ReactNode[] {
   const re = /(!?)\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
   let last = 0, k = 0, m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    if (m.index > last) out.push(...callRefs(text.slice(last, m.index)));
+    if (m.index > last) out.push(...mdLinks(text.slice(last, m.index), callRefs));
     const target = m[2].trim();
     const label = (m[3] ?? target).trim();
     if (m[1] === "!" && IMAGE_RE.test(target)) {
@@ -61,7 +91,7 @@ function wikiLinks(text: string): ReactNode[] {
     );
     last = m.index + m[0].length;
   }
-  if (last < text.length) out.push(...callRefs(text.slice(last)));
+  if (last < text.length) out.push(...mdLinks(text.slice(last), callRefs));
   return out;
 }
 

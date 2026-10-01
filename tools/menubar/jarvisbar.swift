@@ -615,7 +615,7 @@ let quickBar = QuickBar()
 //
 // The data store is shared and persistent — see sharedStore above for why it
 // stopped being non-persistent.
-final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
+final class DashboardWindow: NSObject, WKUIDelegate, WKNavigationDelegate, NSWindowDelegate {
     private var window: NSWindow?
     private var web: WKWebView?
     private var iconSet = false
@@ -706,6 +706,7 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
         cfg.mediaTypesRequiringUserActionForPlayback = []   // spoken replies autoplay
         let v = WKWebView(frame: .zero, configuration: cfg)
         v.uiDelegate = self
+        v.navigationDelegate = self
         // Since macOS 13.3 a WKWebView is invisible to Safari's Web Inspector
         // unless it opts in. Without this there is no way to see the app's
         // console or network at all — the dashboard can only be debugged in a
@@ -741,6 +742,36 @@ final class DashboardWindow: NSObject, WKUIDelegate, NSWindowDelegate {
         window = w
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // A link in a note points at ServiceNow, Jira, a Teams thread. Letting the
+    // web view follow it REPLACES the dashboard with that site, inside a
+    // window with no back button and no address bar — the app is simply gone
+    // until it is relaunched. Anything that is not the local dashboard goes to
+    // the real browser instead.
+    func webView(_ w: WKWebView,
+                 decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let u = navigationAction.request.url else { return decisionHandler(.allow) }
+        let local = (u.host == "localhost" || u.host == "127.0.0.1") && u.port == port()
+        if local || u.scheme == "about" || u.scheme == "data" || u.scheme == "blob" {
+            return decisionHandler(.allow)
+        }
+        if u.scheme == "http" || u.scheme == "https" || u.scheme == "mailto" {
+            NSWorkspace.shared.open(u)
+        }
+        decisionHandler(.cancel)
+    }
+
+    // target="_blank" asks for a NEW window, which a nil return quietly drops.
+    // Markdown links carry it, so without this they would do nothing at all.
+    func webView(_ w: WKWebView, createWebViewWith config: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction,
+                 windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let u = navigationAction.request.url, u.scheme == "http" || u.scheme == "https" {
+            NSWorkspace.shared.open(u)
+        }
+        return nil
     }
 
     // The dashboard's voice feature calls getUserMedia. Without this the
