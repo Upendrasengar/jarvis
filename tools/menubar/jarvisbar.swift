@@ -393,6 +393,8 @@ final class QuickBar: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         }
     }
 
+    var isOpen: Bool { panel?.isVisible == true }
+
     func close() {
         followTimer?.invalidate()
         followTimer = nil
@@ -796,6 +798,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.popUp(positioning: nil,
                        at: NSPoint(x: 0, y: b.bounds.height + 5),
                        in: b)
+            return
+        }
+        // The icon TOGGLES. Clicking it while the bar is up and having nothing
+        // happen reads as a dead button — the obvious reading of a second
+        // click is "put it away", and Esc was the only way to do that.
+        if quickBar.isOpen {
+            dbg("iconClicked: left click -> close (bar was open)")
+            quickBar.close()
             return
         }
         dbg("iconClicked: left click -> show(capture: true)")
