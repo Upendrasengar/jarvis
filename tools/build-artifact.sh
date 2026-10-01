@@ -42,8 +42,32 @@ export PATH="$NODE_DIR:$PATH"
 
 NODE_VERSION="$("$NODE_BIN" -p 'process.version')"
 NODE_ABI="$("$NODE_BIN" -p 'process.versions.modules')"
-ARCH="$(uname -m)"
-say "building with $NODE_BIN ($NODE_VERSION, ABI $NODE_ABI, $ARCH)"
+# Which architecture this artifact is FOR. Defaults to the host, so the
+# ordinary native build is byte-for-byte the command it always was.
+#
+# Cross-building was previously called "not something to guess at", on the
+# assumption that the arch-bound parts get compiled. They do not: the bundled
+# Node is a DOWNLOAD from nodejs.org, and better-sqlite3 ships a darwin-x64
+# prebuild that npm selects with --cpu/--os. Only the Swift binaries are
+# genuinely compiled, and swiftc cross-targets. So the honest constraint is
+# much weaker than "you need an Intel Mac".
+#
+# What this CANNOT do is test the result. An x86_64 artifact assembled here is
+# unverified until someone runs it on an Intel Mac — see the arch audit at the
+# end, which at least proves every shipped binary is the arch it claims.
+HOST_ARCH="$(uname -m)"
+ARCH="${JARVIS_TARGET_ARCH:-$HOST_ARCH}"
+case "$ARCH" in arm64|x86_64) ;; *) fail "unsupported target architecture: $ARCH" ;; esac
+CROSS=0
+[ "$ARCH" != "$HOST_ARCH" ] && CROSS=1
+if [ "$CROSS" = 1 ]; then
+  # The ABI self-check below EXECUTES the bundled runtime, so the host has to
+  # be able to run the target's binaries.
+  arch -"$ARCH" /usr/bin/true 2>/dev/null \
+    || fail "cannot run $ARCH binaries on this $HOST_ARCH Mac — install Rosetta (softwareupdate --install-rosetta)"
+  say "CROSS-BUILDING for $ARCH on a $HOST_ARCH host — the result is untested until it runs on one"
+fi
+say "building with $NODE_BIN ($NODE_VERSION, ABI $NODE_ABI, target $ARCH)"
 
 echo "── web ──"
 pnpm --filter @jarvis/web build >/dev/null 2>&1 || fail "vite build failed"
@@ -51,14 +75,40 @@ pnpm --filter @jarvis/web build >/dev/null 2>&1 || fail "vite build failed"
 ok "web built"
 
 echo "── native ──"
+# A cross build compiles into a SCRATCH tree and leaves the working copy
+# alone. Overwriting the developer's own JarvisAudio.app with a foreign-arch
+# binary would break the machine cutting the release — the same hazard the
+# signing note below describes, in a worse form: an app that cannot even
+# launch, with its recording grants attached to a binary that no longer runs.
+SWIFT_TARGET=""
+XBIN=""
+if [ "$CROSS" = 1 ]; then
+  # macos13.0: the floor the source already assumes (#available(macOS 13.3)
+  # guards imply support below it), and lower than the host would default to.
+  SWIFT_TARGET="-target ${ARCH}-apple-macos13.0"
+  XBIN="$(mktemp -d)"
+fi
 for pair in "tools/call-capture/audiocap.swift:tools/call-capture/JarvisAudio.app/Contents/MacOS/audiocap" \
             "tools/menubar/jarvisbar.swift:tools/menubar/JarvisBar.app/Contents/MacOS/jarvisbar"; do
   src="${pair%%:*}"; dst="${pair##*:}"
+  [ "$CROSS" = 1 ] && dst="$XBIN/$dst"
   mkdir -p "$(dirname "$dst")"
-  swiftc -O "$src" -o "$dst" 2>/dev/null || fail "swiftc failed for $src"
+  # shellcheck disable=SC2086
+  swiftc -O $SWIFT_TARGET "$src" -o "$dst" 2>/dev/null || fail "swiftc failed for $src ($ARCH)"
 done
-for b in miccheck; do
-  [ -f "tools/call-capture/$b.swift" ] && swiftc -O "tools/call-capture/$b.swift" -o "tools/call-capture/bin/$b" 2>/dev/null || true
+# miccheck natively; a cross build also needs bin/audiocap, which doctor.sh
+# and logs.ts check for and nothing has ever built — until now it shipped as
+# whatever stale copy sat in the working tree, which on a cross build is the
+# wrong architecture entirely.
+BIN_HELPERS="miccheck"
+[ "$CROSS" = 1 ] && BIN_HELPERS="miccheck audiocap"
+for b in $BIN_HELPERS; do
+  [ -f "tools/call-capture/$b.swift" ] || continue
+  mdst="tools/call-capture/bin/$b"
+  [ "$CROSS" = 1 ] && mdst="$XBIN/$mdst"
+  mkdir -p "$(dirname "$mdst")"
+  # shellcheck disable=SC2086
+  swiftc -O $SWIFT_TARGET "tools/call-capture/$b.swift" -o "$mdst" 2>/dev/null || true
 done
 # Sign with the CONFIGURED identity, not ad-hoc. This step compiles into the
 # working tree, so `-s -` re-signed the developer's own installed apps ad-hoc
@@ -73,9 +123,13 @@ if [ -n "$SIGN_ID" ] && ! security find-identity -p codesigning 2>/dev/null | gr
   SIGN_ID=""
 fi
 SIGN_ID="${SIGN_ID:--}"
-codesign --force -s "$SIGN_ID" tools/call-capture/JarvisAudio.app >/dev/null 2>&1 || true
-codesign --force -s "$SIGN_ID" tools/menubar/JarvisBar.app >/dev/null 2>&1 || true
-ok "swift binaries built and signed${SIGN_ID:+ as '$SIGN_ID'}"
+if [ "$CROSS" = 0 ]; then
+  codesign --force -s "$SIGN_ID" tools/call-capture/JarvisAudio.app >/dev/null 2>&1 || true
+  codesign --force -s "$SIGN_ID" tools/menubar/JarvisBar.app >/dev/null 2>&1 || true
+fi
+# A cross build signs the STAGED copies instead, after staging — the working
+# tree holds no foreign-arch binaries to sign.
+ok "swift binaries built${CROSS:+ for $ARCH}${SIGN_ID:+ and signed as '$SIGN_ID'}"
 
 echo "── production dependencies ──"
 # Built with npm rather than `pnpm deploy`: deploy requires the workspace to
@@ -105,8 +159,43 @@ cat > "$STAGE/deps/package.json" <<JSON
 JSON
 # --omit=dev keeps it to runtime; the pinned node is what compiles or selects
 # the better-sqlite3 binary, which is the whole point of the ABI pin above.
-( cd "$STAGE/deps" && PATH="$(dirname "$NODE_BIN"):$PATH" npm install --omit=dev --no-audit --no-fund ) \
+# --cpu/--os pin which prebuilt binary npm resolves. Without them a cross
+# build quietly installs the HOST's better-sqlite3 and ships an artifact that
+# dies at dlopen on the machine it was built for.
+NPM_ARCH=""
+NODE_NPM_ARCH="$([ "$ARCH" = x86_64 ] && echo x64 || echo arm64)"
+if [ "$CROSS" = 1 ]; then
+  # --cpu/--os pick which optional dependency npm RESOLVES. They do not reach
+  # the postinstall scripts, and both arch-bound packages here fetch their own
+  # binary from one: better-sqlite3 via prebuild-install, esbuild via its own
+  # downloader. Those read npm_config_arch/npm_config_platform. Passing only
+  # the flags resolved the right package names and then let the scripts
+  # download host binaries over the top.
+  NPM_ARCH="--cpu=$NODE_NPM_ARCH --os=darwin"
+  export npm_config_arch="$NODE_NPM_ARCH"
+  export npm_config_platform=darwin
+  export npm_config_target_arch="$NODE_NPM_ARCH"
+fi
+# shellcheck disable=SC2086
+( cd "$STAGE/deps" && PATH="$(dirname "$NODE_BIN"):$PATH" npm install --omit=dev --no-audit --no-fund $NPM_ARCH ) \
   >/dev/null 2>&1 || fail "npm install of production dependencies failed"
+unset npm_config_arch npm_config_platform npm_config_target_arch
+
+# esbuild resolves its platform package correctly (@esbuild/darwin-x64 lands
+# with the right binary inside) and then its install script downloads a HOST
+# binary over the wrapper regardless — it reads os.arch(), not npm_config_arch.
+# At runtime esbuild prefers the platform package, so the artifact would
+# probably have worked; shipping an arm64 executable in an x86_64 archive is
+# still a lie, and the audit at the end rightly refuses it. Put the correct
+# slice where the wrapper lives and drop what the downloader left behind.
+if [ "$CROSS" = 1 ]; then
+  ESB_PLAT="$STAGE/deps/node_modules/@esbuild/darwin-$NODE_NPM_ARCH/bin/esbuild"
+  if [ -x "$ESB_PLAT" ] && [ -e "$STAGE/deps/node_modules/esbuild/bin/esbuild" ]; then
+    cp "$ESB_PLAT" "$STAGE/deps/node_modules/esbuild/bin/esbuild"
+    rm -f "$STAGE"/deps/node_modules/esbuild/lib/downloaded-* 2>/dev/null || true
+    say "esbuild wrapper replaced with the darwin-$NODE_NPM_ARCH slice"
+  fi
+fi
 ok "production dependencies resolved ($(du -sh "$STAGE/deps/node_modules" | cut -f1))"
 
 echo "── staging ──"
@@ -126,6 +215,22 @@ mkdir -p "$STAGE/node_modules/@jarvis"
 cp -R packages/shared "$STAGE/node_modules/@jarvis/shared"
 # build inputs the user will never need
 rm -rf "$STAGE/tools/tests" "$STAGE/apps/web/src"
+# The copy above took tools/ wholesale, which on a cross build means the
+# HOST's binaries. Replace them with the ones compiled for the target, then
+# sign the staged bundles — the working tree is deliberately left as it was.
+if [ "$CROSS" = 1 ]; then
+  for rel in tools/call-capture/JarvisAudio.app/Contents/MacOS/audiocap \
+             tools/menubar/JarvisBar.app/Contents/MacOS/jarvisbar \
+             tools/call-capture/bin/miccheck \
+             tools/call-capture/bin/audiocap; do
+    [ -f "$XBIN/$rel" ] || continue
+    mkdir -p "$(dirname "$STAGE/$rel")"
+    cp "$XBIN/$rel" "$STAGE/$rel"
+  done
+  codesign --force -s "$SIGN_ID" "$STAGE/tools/call-capture/JarvisAudio.app" >/dev/null 2>&1 || true
+  codesign --force -s "$SIGN_ID" "$STAGE/tools/menubar/JarvisBar.app" >/dev/null 2>&1 || true
+  rm -rf "$XBIN"
+fi
 ok "staged"
 
 echo "── node runtime ──"
@@ -160,7 +265,10 @@ rm -rf "$NODE_TMP"
 
 # It must be the SAME ABI the native modules were just built against,
 # otherwise this ships a runtime guaranteed to fail at dlopen.
-BUNDLED_ABI="$("$STAGE/runtime/node" -p 'process.versions.modules' 2>/dev/null || echo "")"
+RUN_AS=""
+[ "$CROSS" = 1 ] && RUN_AS="arch -$ARCH"
+# shellcheck disable=SC2086
+BUNDLED_ABI="$($RUN_AS "$STAGE/runtime/node" -p 'process.versions.modules' 2>/dev/null || echo "")"
 [ "$BUNDLED_ABI" = "$NODE_ABI" ]   || fail "bundled runtime is ABI ${BUNDLED_ABI:-unknown}, but the modules were built for $NODE_ABI"
 
 # Self-contained means it references only the OS. A link into /opt/homebrew or
@@ -196,6 +304,33 @@ if grep -rlqE '(sk-[A-Za-z0-9]{16,}|xoxb-[A-Za-z0-9-]{16,}|BEGIN (RSA |OPENSSH )
   fail "a credential-shaped string is present in the artifact"
 fi
 ok "no user data, no secrets"
+
+# ── architecture audit ──────────────────────────────────────────────────────
+# The one check that makes a cross build worth trusting. Everything above can
+# succeed while quietly shipping a host-arch binary: npm can fall back, a
+# swiftc flag can be dropped, a cp can take the wrong file. This reads the
+# Mach-O headers of every binary actually in the artifact and refuses if one
+# is not the architecture the archive is about to claim in its name.
+#
+# It runs for native builds too. A native build cannot really get this wrong,
+# which is exactly why the check costs nothing to leave on.
+MACH_ARCH="$([ "$ARCH" = x86_64 ] && echo "x86_64" || echo "arm64")"
+bad=""
+while IFS= read -r bin; do
+  info="$(file -b "$bin" 2>/dev/null || true)"
+  case "$info" in
+    *Mach-O*)
+      # A universal binary is fine as long as it CONTAINS the target slice.
+      printf '%s' "$info" | grep -q "$MACH_ARCH" || bad="$bad\n   $(printf '%s' "${bin#$STAGE/}") → $info" ;;
+  esac
+done <<EOF
+$(find "$STAGE" -type f \( -perm -u+x -o -name '*.node' -o -name '*.dylib' \) 2>/dev/null)
+EOF
+if [ -n "$bad" ]; then
+  printf "  \033[31m✗\033[0m these binaries are not %s:%b\n" "$MACH_ARCH" "$bad" >&2
+  fail "the artifact claims $ARCH but carries foreign-architecture binaries"
+fi
+ok "every Mach-O in the artifact is $MACH_ARCH"
 
 echo "── archive ──"
 mkdir -p "$OUT"
