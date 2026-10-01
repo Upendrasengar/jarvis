@@ -284,6 +284,55 @@ else
   add_check login-service "Login service" runtime optional "The Jarvis login service is not loaded" "Run 'jarvis service install' to start Jarvis at login."
 fi
 
+# ── memory ──────────────────────────────────────────────────────────────────
+# "Is Jarvis eating my RAM" is a fair question with a surprising answer: most
+# of the footprint is usually ONE warm `claude -p` child, which the server
+# idle-kills after 15 minutes. Reporting the total without that breakdown
+# invites the wrong conclusion, so both are printed.
+#
+# Only processes under this install are counted — matching on "jarvis" alone
+# also catches an editor indexing the repo, which is not Jarvis's memory.
+JARVIS_PIDS="$(pgrep -f "$ROOT/" 2>/dev/null | tr '\n' ' ')"
+BAR_PID="$(pgrep -f 'JarvisBar.app/Contents/MacOS/jarvisbar' 2>/dev/null | head -1)"
+# Chat sessions are `claude` children of whichever Jarvis process spawned
+# them. Do NOT go looking for "the server pid": `tsx src/index.ts` is a
+# LAUNCHER whose child is the process that actually runs the code and owns
+# the port, so matching the launcher finds a child that is itself a launcher
+# and no sessions at all. Asking every Jarvis pid for its claude children
+# sidesteps the question entirely.
+SESSION_PIDS=""
+for _p in $JARVIS_PIDS; do
+  SESSION_PIDS="$SESSION_PIDS $(pgrep -P "$_p" -f '^claude' 2>/dev/null | tr '\n' ' ')"
+done
+
+rss_of() {   # total RSS in KB for the pids given, each counted once
+  local total=0 kb
+  for pid in $(printf '%s\n' $1 | sort -u); do
+    kb="$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ')"
+    [[ -n "$kb" ]] && total=$((total + kb))
+  done
+  printf '%s' "$total"
+}
+
+TOTAL_KB="$(rss_of "$JARVIS_PIDS $SESSION_PIDS $BAR_PID")"
+if [[ "$TOTAL_KB" -gt 0 ]]; then
+  SESS_KB="$(rss_of "$SESSION_PIDS")"
+  N_SESS="$(printf '%s' "$SESSION_PIDS" | wc -w | tr -d ' ')"
+  TOTAL_MB=$((TOTAL_KB / 1024))
+  SESS_MB=$((SESS_KB / 1024))
+  REST_MB=$((TOTAL_MB - SESS_MB))
+  SUMMARY="${TOTAL_MB} MB resident — ${REST_MB} MB Jarvis, ${SESS_MB} MB in ${N_SESS} warm chat session(s)"
+  # A single warm session is normal and transient. SEVERAL mean they are not
+  # being reaped, which is the shape of a real leak rather than a big number.
+  if [[ "$N_SESS" -gt 2 ]]; then
+    add_check memory "Memory" runtime warning "$SUMMARY" "More than two chat sessions are warm at once; they should idle-kill after 15 minutes. Run 'jarvis restart' if the count keeps climbing."
+  elif [[ "$TOTAL_MB" -gt 1500 ]]; then
+    add_check memory "Memory" runtime warning "$SUMMARY" "Higher than expected for Jarvis. Run 'jarvis restart' and check again."
+  else
+    add_check memory "Memory" runtime pass "$SUMMARY" ""
+  fi
+fi
+
 json_escape() {
   local value="$1"
   value="${value//\\/\\\\}"; value="${value//\"/\\\"}"
