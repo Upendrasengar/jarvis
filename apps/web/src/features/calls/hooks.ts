@@ -78,15 +78,72 @@ export function useSetAutorecord() {
   return useMutation({ mutationFn: api.setAutorecord, onSettled: done });
 }
 
+export function useProcessQueue() {
+  return useQuery({ queryKey: ["process-queue"], queryFn: api.processQueue, refetchInterval: 15_000 });
+}
+
+export function useSetProcessPolicy() {
+  const done = invalidator([["process-queue"], ["calls"]]);
+  return useMutation({ mutationFn: api.setProcessPolicy, onSettled: done });
+}
+
+export function useProcessPause() {
+  const done = invalidator([["process-queue"]]);
+  return useMutation({
+    mutationFn: ({ on, minutes }: { on: boolean; minutes?: number }) => api.setProcessPause(on, minutes),
+    onSettled: done,
+  });
+}
+
 export function useRecordingControls() {
-  const done = invalidator([["calls"], ["recstate"]]);
+  const done = invalidator([["calls"], ["recstate"], ["process-queue"]]);
   const stop = useMutation({
-    mutationFn: api.stopRecording,
-    onSettled: () => setTimeout(done, 2000),
+    // the server waits for the session to end before answering, so a short
+    // settle is enough for the card to flip
+    mutationFn: (id?: string) => api.stopRecording(id),
+    onSettled: () => setTimeout(done, 1000),
   });
   const start = useMutation({
     mutationFn: api.startRecording,
     onSettled: () => setTimeout(done, 2500),
   });
   return { stop, start };
+}
+
+// Live assist: polled fast while the call runs — the list is meant to be
+// read mid-sentence, so a 30s refetch would feel dead.
+// After the call the same endpoint serves the recap (history), so it is
+// fetched once for any call and only polled while recording.
+export function useLiveAssist(id: string | null, recording: boolean) {
+  return useQuery({
+    queryKey: ["live", id],
+    queryFn: () => api.liveAssist(id as string),
+    enabled: !!id,
+    refetchInterval: recording ? 5_000 : false,
+  });
+}
+
+export function useSetLiveAssist() {
+  const done = invalidator([["live"]]);
+  return useMutation({
+    mutationFn: ({ id, on }: { id: string; on: boolean }) => api.setLiveAssist(id, on),
+    onSettled: done,
+  });
+}
+
+export function useLiveDone() {
+  const done = invalidator([["live"]]);
+  return useMutation({
+    mutationFn: ({ id, itemId, on }: { id: string; itemId: string; on: boolean }) => api.liveDone(id, itemId, on),
+    onSettled: done,
+  });
+}
+
+export function useLiveDefault() {
+  return useQuery({ queryKey: ["live-default"], queryFn: api.liveDefault });
+}
+
+export function useSetLiveDefault() {
+  const done = invalidator([["live-default"], ["live"]]);
+  return useMutation({ mutationFn: api.setLiveDefault, onSettled: done });
 }

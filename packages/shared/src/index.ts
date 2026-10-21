@@ -19,7 +19,9 @@ export const ChatRef = z.object({
 });
 export type ChatRef = z.infer<typeof ChatRef>;
 
-export const CallStatus = z.enum(["recording", "processing", "done", "failed", "empty"]);
+// queued = recorded and waiting for the processing policy to allow a run
+// (idle machine, a time window, or an explicit Process now).
+export const CallStatus = z.enum(["recording", "queued", "processing", "done", "failed", "empty"]);
 export type CallStatus = z.infer<typeof CallStatus>;
 
 export const Call = z.object({
@@ -98,6 +100,94 @@ export const UpdateNotesBody = z.object({
 });
 export const DeleteCallBody = z.object({ id: z.string().regex(/^[\w-]+$/) });
 export const AutorecordBody = z.object({ on: z.boolean() });
+
+// When finished calls get transcribed — mirrors memory/settings/process-policy.txt,
+// which tools/process-queue.sh reads. "window" is HH:MM-HH:MM local, may cross
+// midnight.
+export const ProcessPolicy = z.object({
+  mode: z.enum(["now", "idle", "window", "manual"]),
+  window: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/).optional(),
+});
+export type ProcessPolicy = z.infer<typeof ProcessPolicy>;
+
+// data/process-queue.json, written by tools/process-queue.sh on every tick.
+export const ProcessQueueState = z.object({
+  updatedAt: z.number(),
+  policy: ProcessPolicy,
+  pausedUntil: z.number(),          // epoch ms, 0 = not paused
+  running: z.string().nullable(),   // session id being transcribed
+  pending: z.array(z.string()),     // session ids waiting, oldest first
+  waiting: z.string(),              // human reason nothing is starting ("" = would start)
+  idleSecs: z.number(),
+  power: z.string(),
+});
+export type ProcessQueueState = z.infer<typeof ProcessQueueState>;
+
+export const ProcessPauseBody = z.object({ on: z.boolean(), minutes: z.number().int().min(1).max(1440).optional() });
+export const StopRecBody = z.object({ id: z.string().regex(/^[\w-]+$/).optional() });
+
+// Live assist — a small local whisper model transcribes the call AS IT RUNS
+// and the quick model keeps a short grouped list on the call page (written by
+// tools/live-assist.sh into <session>/live/). Opt-in per call.
+export const LiveGroup = z.enum(["ask", "mention", "agreed", "watch"]);
+export type LiveGroup = z.infer<typeof LiveGroup>;
+export const LiveItem = z.object({
+  id: z.string(),
+  group: LiveGroup,
+  text: z.string(),
+  why: z.string().default(""),
+});
+export type LiveItem = z.infer<typeof LiveItem>;
+export const LiveAssistState = z.object({
+  updatedAt: z.number().default(0),
+  summary: z.string().default(""),
+  items: LiveItem.array().default([]),
+  rounds: z.number().default(0),
+  model: z.string().default(""),
+  error: z.string().default(""),
+});
+export type LiveAssistState = z.infer<typeof LiveAssistState>;
+export const LiveStatus = z.object({
+  at: z.number().default(0),
+  paused: z.string().default(""),        // "" = transcribing; else why it is holding
+  transcriptSecs: z.number().default(0),
+  whisper: z.string().default(""),
+  lastRoundMs: z.number().default(0),
+  model: z.string().default(""),
+});
+export type LiveStatus = z.infer<typeof LiveStatus>;
+// Everything live assist ever showed for a call, from live/history.jsonl.
+// current = on screen now; done = the owner ticked it; earlier = the model
+// dropped it (addressed, or superseded) — kept so nothing vanishes silently.
+export const LiveHistoryItem = z.object({
+  id: z.string(),
+  group: LiveGroup,
+  text: z.string(),
+  why: z.string().default(""),
+  firstAt: z.number(),
+  lastAt: z.number(),
+  status: z.enum(["current", "done", "earlier"]),
+});
+export type LiveHistoryItem = z.infer<typeof LiveHistoryItem>;
+export const LiveAssistInfo = z.object({
+  id: z.string(),
+  history: LiveHistoryItem.array().default([]),               // oldest first
+  summaries: z.array(z.object({ at: z.number(), text: z.string() })).default([]),
+  enabled: z.boolean(),      // what this session wants (per-call flag, else the default)
+  running: z.boolean(),      // the script is alive right now
+  defaultOn: z.boolean(),
+  state: LiveAssistState.nullable(),
+  status: LiveStatus.nullable(),
+  transcript: z.string(),    // tail of live/transcript.md
+  done: z.array(z.string()), // item ids the owner ticked off
+  log: z.string(),           // last lines of live/assist.log
+});
+export type LiveAssistInfo = z.infer<typeof LiveAssistInfo>;
+export const LiveToggleBody = z.object({ id: z.string().regex(/^[\w-]+$/), on: z.boolean() });
+export const LiveDoneBody = z.object({
+  id: z.string().regex(/^[\w-]+$/), itemId: z.string().regex(/^[\w-]{1,40}$/), done: z.boolean(),
+});
+export const LiveDefaultBody = z.object({ on: z.boolean() });
 
 // Actions inbox — every "- [ ] Owner: task" across all call notes, indexed.
 export const ActionItem = z.object({

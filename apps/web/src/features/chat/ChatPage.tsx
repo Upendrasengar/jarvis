@@ -9,6 +9,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useChatStream } from "./useChatStream";
 import { speak as speakAloud } from "../../lib/tts";
 import { Markdown } from "../../components/Markdown";
+import { CopyChip } from "../../components/blocks";
 import { MentionMenu } from "./MentionMenu";
 import { ActivityRows } from "./ActivityRows";
 import { useMentions, type Mention } from "./useMentions";
@@ -501,7 +502,7 @@ export function ChatPage() {
             {divider}
             <div
               key={i}
-              className={`relative max-w-[88%] self-start whitespace-pre-wrap pl-6 font-sans text-[13.5px] leading-relaxed ${groupFirst ? "pt-5" : "pt-[2px]"}`}
+              className={`group relative max-w-[88%] self-start whitespace-pre-wrap pl-6 font-sans text-[13.5px] leading-relaxed ${groupFirst ? "pt-5" : "pt-[2px]"}`}
             >
               {groupFirst && (
                 <>
@@ -520,6 +521,13 @@ export function ChatPage() {
                 return (
                   <>
                     <Markdown md={display} />
+                    {/* whole-reply copy, rich + plain, shown on hover so the
+                        transcript does not grow a button per message */}
+                    {!(last && streaming) && (
+                      <span className="mt-1 flex opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+                        <CopyChip md={display} title="Copy this reply with formatting" />
+                      </span>
+                    )}
                     <SourceChips sources={sources} />
                     {/* only the newest reply offers them — older ones would be
                         a wall of stale buttons down the transcript */}

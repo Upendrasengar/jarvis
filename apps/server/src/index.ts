@@ -31,6 +31,7 @@ import { startTelegram } from "./integrations/telegram.js";
 import { startDigestCron } from "./integrations/digestCron.js";
 import { startCalendar } from "./integrations/calendar.js";
 import { startReminders } from "./integrations/reminders.js";
+import { startLiveAssist } from "./services/liveAssist.js";
 
 // bodyLimit raised for pasted screenshots (4 × ~7MB data URLs)
 const app = Fastify({ logger: { level: "warn" }, bodyLimit: 32 * 1024 * 1024 });
@@ -48,6 +49,7 @@ startTelegram();
 startDigestCron();
 startCalendar();
 startReminders();
+startLiveAssist();
 
 callRoutes(app);
 contentRoutes(app);

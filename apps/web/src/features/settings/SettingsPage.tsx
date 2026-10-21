@@ -297,8 +297,8 @@ function RemindersSection() {
         ))}
       </div>
       <p className="mt-2 font-sans text-[10.5px] text-[var(--dim)]">
-        The heartbeat's checklist lives in memory/HEARTBEAT.md; cadence and quiet hours in
-        memory/settings/heartbeat-minutes.txt and heartbeat-quiet.txt.
+        The heartbeat's checklist lives in memory/HEARTBEAT.md; it pulses at 08:00 and 19:00
+        local time; quiet hours in memory/settings/heartbeat-quiet.txt.
       </p>
     </section>
   );

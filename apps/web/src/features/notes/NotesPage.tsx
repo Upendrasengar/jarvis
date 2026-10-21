@@ -9,7 +9,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as S from "@jarvis/shared";
 import { NotesView } from "../calls/NotesView";
-import { copyNotes } from "../calls/copyNotes";
+import { copyNotes } from "../../lib/copyRich";
 import { PromptDialog } from "../../components/PromptDialog";
 import { TagChips } from "../../components/TagChips";
 

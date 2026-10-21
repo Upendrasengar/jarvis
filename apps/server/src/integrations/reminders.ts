@@ -21,6 +21,7 @@ const FILE = path.join(JARVIS_DIR, "data", "reminders.json");
 const SESSION = "reminders";
 const TICK_MS = 30_000;
 const HEARTBEAT_ID = "heartbeat";
+const HEARTBEAT_CRON = "0 8,19 * * *";   // 08:00 and 19:00 local
 
 export type Schedule =
   | { kind: "at"; at: string }              // "YYYY-MM-DD HH:MM" local, one-shot
@@ -345,14 +346,23 @@ function ensureHeartbeat() {
   const md = path.join(MEMORY_MD_DIR, "HEARTBEAT.md");
   try { if (!fs.existsSync(md)) fs.writeFileSync(md, DEFAULT_HEARTBEAT_MD); } catch {}
   const db = load();
-  if (db.jobs.some((j) => j.id === HEARTBEAT_ID)) return;
-  const everyMin = Number(setting("heartbeat-minutes") ?? 45);
+  const existing = db.jobs.find((j) => j.id === HEARTBEAT_ID);
+  if (existing) {
+    // migrate older installs (interval schedule) in place — same job, new cadence
+    if (existing.schedule.kind !== "cron" || existing.schedule.expr !== HEARTBEAT_CRON) {
+      existing.schedule = { kind: "cron", expr: HEARTBEAT_CRON };
+      existing.state = {};
+      save(db);
+      console.log(`[reminders] heartbeat migrated to cron ${HEARTBEAT_CRON}`);
+    }
+    return;
+  }
   db.jobs.push({
     id: HEARTBEAT_ID,
     name: "Heartbeat — proactive check",
     enabled: true,
     createdAt: new Date().toISOString(),
-    schedule: { kind: "every", everyMs: Math.max(10, everyMin) * 60_000 },
+    schedule: { kind: "cron", expr: HEARTBEAT_CRON },
     payload: {
       kind: "agentTurn",
       prompt: (() => { try { return fs.readFileSync(md, "utf8"); } catch { return DEFAULT_HEARTBEAT_MD; } })(),
@@ -360,7 +370,7 @@ function ensureHeartbeat() {
     state: {},
   });
   save(db);
-  console.log(`[reminders] heartbeat installed (every ${everyMin}m, quiet ${setting("heartbeat-quiet") ?? "22-8"})`);
+  console.log(`[reminders] heartbeat installed (cron ${HEARTBEAT_CRON}, quiet ${setting("heartbeat-quiet") ?? "22-8"})`);
 }
 
 export function startReminders() {

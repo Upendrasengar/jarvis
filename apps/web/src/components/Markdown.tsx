@@ -6,7 +6,16 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ago, parseStamp } from "../lib/time";
-import { CodeBlock, Embed, IMAGE_RE, Table } from "./blocks";
+import { CodeBlock, CopyChip, Embed, IMAGE_RE, Table } from "./blocks";
+
+// The whole run of consecutive "> " lines starting at `from` — one quoted
+// block, which is how a drafted email or message arrives inside a reply.
+// Copying it as a unit is what makes it pasteable into a mail composer.
+function quoteRun(lines: string[], from: number): string {
+  const out: string[] = [];
+  for (let j = from; j < lines.length && /^>/.test(lines[j]); j++) out.push(lines[j]);
+  return out.join("\n");
+}
 import { parseFrontmatter } from "@jarvis/shared";
 
 function callRefs(text: string): ReactNode[] {
@@ -242,10 +251,14 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
         if (co) {
           const meta = calloutMeta(co[1]);
           railColor = meta.cls.split(" ")[0];
+          const calloutFirst = !/^>/.test(body.split("\n")[i - 1] ?? "");
           return (
-            <div key={i} className={`mt-4 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pt-2 ${nextIsQuote ? "pb-1" : "rounded-b-lg pb-2 mb-3"} ${railColor}`}>
+            <div key={i} className={`relative mt-4 flex items-center gap-2 rounded-t-lg border-l-2 bg-[var(--surf-2)] px-3 pr-16 pt-2 ${nextIsQuote ? "pb-1" : "rounded-b-lg pb-2 mb-3"} ${railColor}`}>
               <span className={`text-[8.5px] tracking-[2px] ${meta.cls.split(" ")[1]}`}>{meta.label}</span>
               {co[2] && <span className="text-[12.5px] font-semibold text-[var(--bright)]">{inline(co[2])}</span>}
+              {calloutFirst && (
+                <CopyChip md={quoteRun(body.split("\n"), i)} title="Copy this block with formatting — pastes clean into Gmail or Outlook" className="absolute right-2 top-1.5" />
+              )}
             </div>
           );
         }
@@ -254,11 +267,17 @@ export function Markdown({ md, onLedgerToggle, ledgerState, ledgerTitle, afterH2
           // continuation of a callout (or a plain quote) — same rail, and the
           // last line closes the box instead of chopping flush
           const prev = body.split("\n")[i - 1] ?? "";
-          const railCls = /^>/.test(prev) ? "" : "mt-4 rounded-t-lg pt-2";
+          const firstOfRun = !/^>/.test(prev);
+          // first line of a quoted block carries the copy chip: the block is
+          // one unit (a drafted email), so one button copies all of it
+          const railCls = firstOfRun ? "relative mt-4 rounded-t-lg pt-2 pr-16" : "";
           const endCls = nextIsQuote ? "py-[3px]" : "rounded-b-lg pt-[3px] pb-2.5 mb-3";
           const qi = q[1].match(/^- (.*)$/);
           return (
             <div key={i} className={`border-l-2 ${railColor || "border-[var(--line-2)]"} bg-[var(--surf-2)] px-3 ${endCls} ${railCls}`}>
+              {firstOfRun && (
+                <CopyChip md={quoteRun(body.split("\n"), i)} title="Copy this block with formatting — pastes clean into Gmail or Outlook" className="absolute right-2 top-1.5" />
+              )}
               {qi ? <span className="flex gap-2"><span className="text-[var(--dim)]">•</span><span>{inline(qi[1])}</span></span>
                   : q[1] ? inline(q[1]) : "\u00a0"}
             </div>

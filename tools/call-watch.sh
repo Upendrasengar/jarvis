@@ -71,10 +71,11 @@ notify() {
 # heartbeat went stale for ~3 minutes at a stretch against a 15-second poll,
 # the watchdog restarted it, and it wedged again. Nothing crashed — it was
 # simply blocked, which is why nothing in the log said what was wrong.
-bounded() {   # $1 = seconds, rest = command
+bounded() {   # $1 = seconds, rest = command   (BOUNDED_STDERR=1 keeps stderr)
   local secs="$1"; shift
   local out; out="$(mktemp)"
-  "$@" >"$out" 2>/dev/null &
+  if [ "${BOUNDED_STDERR:-0}" = 1 ]; then "$@" >"$out" 2>&1 &
+  else "$@" >"$out" 2>/dev/null & fi
   local pid=$!
   ( sleep "$secs"; kill -9 "$pid" 2>/dev/null ) >/dev/null 2>&1 &
   local killer=$!
@@ -148,18 +149,28 @@ mic_muted() {
 #
 # audiocap does the same check in Swift for the JarvisAudio.app path; this
 # covers the ffmpeg path used until that app's mic grant exists.
+#
+# Every ffmpeg call here is bounded. Opening an avfoundation device can block
+# indefinitely — a device mid-reconfiguration while the browser grabs it, a
+# Bluetooth headset half-connected — and on 2026-10-13 that probe hung the
+# watcher past the watchdog's 150s three times in a row, each restart leaving
+# the system recorder it had already launched running as an orphan. A device
+# that does not answer in a few seconds is not the live mic; move on.
 pick_live_mic() {
   local probe dir spec
   local -a candidates=(":default")
   while IFS= read -r idx; do candidates+=(":$idx"); done < <(
-    ffmpeg -hide_banner -f avfoundation -list_devices true -i "" 2>&1 \
+    BOUNDED_STDERR=1 bounded 8 ffmpeg -hide_banner -f avfoundation -list_devices true -i "" \
       | sed -n '/AVFoundation audio devices/,$p' \
       | sed -n 's/.*\[\([0-9]\{1,\}\)\].*/\1/p')
   dir="$(mktemp -d)"; probe="$dir/probe.wav"
   for spec in "${candidates[@]}"; do
     rm -f "$probe"
-    ffmpeg -hide_banner -loglevel error -y -f avfoundation -i "$spec" \
-      -ac 1 -ar 16000 -t 1 "$probe" 2>/dev/null || continue
+    # keep the watchdog informed: this loop is the one place the watcher
+    # legitimately spends longer than a poll interval
+    touch "$JARVIS_DIR/data/watcher-heartbeat" 2>/dev/null
+    bounded 6 ffmpeg -hide_banner -loglevel error -y -f avfoundation -i "$spec" \
+      -ac 1 -ar 16000 -t 1 "$probe" >/dev/null || continue
     if [ -s "$probe" ] && ! is_silent "$probe"; then
       rm -rf "$dir"; printf '%s' "$spec"; return 0
     fi
@@ -234,13 +245,29 @@ voice_listening() {
   [ $(( $(date +%s) - $(stat -f %m "$f" 2>/dev/null || echo 0) )) -lt 90 ]
 }
 
+# A stop request that lands while start_recording is still launching
+# recorders is deferred to the end of the launch. Bash runs trap handlers
+# between commands, so a stop in the middle of a start would tear the
+# session down and then watch the start carry on launching the mic into a
+# session that no longer exists.
+starting=0
+stop_requested=0
+
 start_recording() {
   local url="$1"
   mode="${2:-browser}"
+  starting=1
   rec_started=$(date +%s)
   silence_checked=0
   session="$CALLS_DIR/$(date +%Y-%m-%d-%H%M)"
   mkdir -p "$session"
+  # Own the session BEFORE any recorder is launched. The cleanup trap only
+  # stops a recording it knows about; the watcher used to flip this flag
+  # last, after the mic probe, so a kill during the probe left the system
+  # recorder it had already started running with nobody to stop it. The
+  # owner pid lets a later watcher tell "someone's live call" from "orphan".
+  recording=1
+  echo "$$" > "$session/.watcher"
   {
     echo "url: $url"
     echo "mode: $mode"
@@ -309,12 +336,32 @@ CALPY
       -ac 1 -ar 16000 "$session/mic.wav" 2>> "$session/capture.log" &
     ffmpeg_pid=$!
     echo "$(date '+%H:%M:%S') mic: ffmpeg $mic_spec (pid $ffmpeg_pid)"
+    # The probe answered, but the real capture can still block on open and
+    # never create the file (2026-10-13 09:12: ":0" probed fine, then hung,
+    # and the owner's side of a 20-minute call was simply absent). ffmpeg
+    # writes the header within a second of the device opening; give it five,
+    # then fall back to the system default rather than record nothing.
+    local waited=0
+    while [ $waited -lt 5 ] && [ ! -s "$session/mic.wav" ]; do sleep 1; waited=$((waited + 1)); done
+    if [ ! -s "$session/mic.wav" ] && [ "$mic_spec" != ":default" ]; then
+      echo "$(date '+%H:%M:%S') mic: $mic_spec did not open — retrying with :default"
+      kill -9 "$ffmpeg_pid" 2>/dev/null; wait "$ffmpeg_pid" 2>/dev/null
+      ffmpeg -hide_banner -loglevel error -f avfoundation -i ":default" \
+        -ac 1 -ar 16000 "$session/mic.wav" 2>> "$session/capture.log" &
+      ffmpeg_pid=$!
+    fi
   fi
 
   recording=1
   misses=0
   notify "🔴 Recording call — remember to tell participants"
   echo "$(date '+%H:%M:%S') recording started: $url -> $session"
+  starting=0
+  if [ "$stop_requested" = 1 ]; then
+    stop_requested=0
+    echo "$(date '+%H:%M:%S') stop requested during start — stopping now"
+    stop_recording
+  fi
 }
 
 stop_recording() {
@@ -329,13 +376,87 @@ stop_recording() {
   done
   kill -9 "$ffmpeg_pid" "$audiocap_pid" 2>/dev/null
   wait "$ffmpeg_pid" "$audiocap_pid" 2>/dev/null
+  # Belt and braces: anything still writing into this session dir goes too.
+  # A stop that lands between launching audiocap and learning its pid would
+  # otherwise leave it running — the exact orphan this file exists to prevent.
+  for _p in $(session_recorder_pids "$session"); do kill -9 "$_p" 2>/dev/null; done
   recording=0
-  notify "Call ended — transcribing & writing notes"
   echo "$(date '+%H:%M:%S') recording stopped: $session"
-  nohup bash "$JARVIS_DIR/tools/process-call.sh" "$session" \
-    >> "$session/process.log" 2>&1 &
   session=""; audiocap_pid=""; ffmpeg_pid=""; mode=""
+  # Hand the session to the queue instead of whisper directly. Under the
+  # "now" policy this starts it immediately, exactly as before; under
+  # "idle"/"window"/"manual" it waits for a good moment (process-queue.sh).
+  bash "$JARVIS_DIR/tools/process-queue.sh" tick
+  if grep -q '"running": *"[0-9]' "$JARVIS_DIR/data/process-queue.json" 2>/dev/null; then
+    notify "Call ended — transcribing & writing notes"
+  else
+    notify "Call ended — saved; notes will be written when the Mac is free"
+  fi
 }
+
+# ── orphaned sessions ─────────────────────────────────────────────────────
+# A session with no "ended:" line belongs to a live watcher — or to one that
+# died mid-call. The recorder processes do not die with the watcher: the
+# watchdog's kill -9 leaves audiocap writing system.wav at 1.4 GB/hour, the
+# UI shows a RECORDING card nobody can stop, and the next watcher used to
+# skip it precisely BECAUSE a recorder was still alive. Ownership is the test
+# now, not liveness: a recorder whose watcher is gone is an orphan.
+
+# Every recorder writing into a session dir — audiocap (system), audiocap
+# --mic, or the ffmpeg mic fallback. Fixed-string match on the path, so a
+# regex character in the install path cannot break it.
+session_recorder_pids() {   # $1 = session dir
+  ps -axo pid=,command= 2>/dev/null \
+    | grep -F -- "$1/" | grep -E 'audiocap|ffmpeg' | awk '{print $1}'
+}
+
+# 0 when the watcher that owns the session is alive and is not this process.
+# A pid alone is not enough: pids get reused, so the live process must also
+# look like a watcher.
+owner_alive() {             # $1 = session dir
+  local pid
+  pid="$(head -1 "$1/.watcher" 2>/dev/null | tr -cd '0-9')"
+  [ -n "$pid" ] && [ "$pid" != "$$" ] && kill -0 "$pid" 2>/dev/null \
+    && ps -o command= -p "$pid" 2>/dev/null | grep -q 'call-watch'
+}
+
+heal_orphans() {
+  local m d p healed=0
+  local -a pids=()
+  for m in "$CALLS_DIR"/*/meta.txt; do
+    [ -f "$m" ] || continue
+    grep -q '^ended:' "$m" && continue
+    d="$(dirname "$m")"
+    [ -n "${session:-}" ] && [ "$d" = "$session" ] && continue   # ours — stop_recording's job
+    owner_alive "$d" && continue                                # another live watcher's call
+    for p in $(session_recorder_pids "$d"); do pids+=("$p"); done
+    echo "ended: $(date '+%Y-%m-%d %H:%M:%S')" >> "$m"
+    echo "$(date '+%H:%M:%S') healing orphaned session: $d"
+    healed=$((healed + 1))
+  done
+  if [ ${#pids[@]} -gt 0 ]; then
+    # TERM first so audiocap closes the WAV header cleanly; -9 for anything
+    # that ignores it (a recorder blocked on a dead device does)
+    kill -TERM "${pids[@]}" 2>/dev/null
+    local i=0
+    while [ $i -lt 5 ]; do
+      sleep 1; i=$((i + 1))
+      for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && continue 2; done
+      break
+    done
+    kill -9 "${pids[@]}" 2>/dev/null
+  fi
+  [ "$healed" -gt 0 ] && bash "$JARVIS_DIR/tools/process-queue.sh" tick
+  return 0
+}
+
+# `call-watch.sh --heal`: run the sweep and exit. The server uses this when
+# the UI asks to stop or discard a session the live watcher does not own —
+# the same code path, so the two can never disagree about what an orphan is.
+if [ "${1:-}" = "--heal" ]; then
+  heal_orphans
+  exit 0
+fi
 
 cleanup() {
   [ "$recording" = 1 ] && stop_recording
@@ -346,7 +467,13 @@ trap cleanup INT TERM
 # Manual controls, signalled by the UI (or `pkill -USR1/-USR2 -f call-watch`):
 # USR1 = stop the current recording immediately; USR2 = start one right now
 # (for meetings Jarvis can't detect, e.g. in apps it doesn't know about).
-on_usr1() { [ "$recording" = 1 ] && { echo "$(date '+%H:%M:%S') manual stop"; stop_recording; }; }
+on_usr1() {
+  if [ "$starting" = 1 ]; then stop_requested=1; return; fi
+  [ "$recording" = 1 ] && { echo "$(date '+%H:%M:%S') manual stop"; stop_recording; }
+  # Stop means stop everything: an orphan from an earlier watcher must not
+  # survive the button that exists to stop it.
+  heal_orphans
+}
 on_usr2() { [ "$recording" = 0 ] && { echo "$(date '+%H:%M:%S') manual start"; start_recording "manual recording" manual; }; }
 trap on_usr1 USR1
 trap on_usr2 USR2
@@ -357,26 +484,24 @@ RETENTION_DAYS="$(tr -cd '0-9' < "$JARVIS_DIR/memory/settings/retention-days.txt
 [ -n "$RETENTION_DAYS" ] || RETENTION_DAYS=7
 find "$CALLS_DIR" -name '*.wav' -mtime +"$RETENTION_DAYS" -delete 2>/dev/null
 
-# Heal sessions orphaned by a crash or restart: meta has no "ended:" and no
-# recorder is writing into them → finalize and send to processing.
-for m in "$CALLS_DIR"/*/meta.txt; do
-  [ -f "$m" ] || continue
-  grep -q '^ended:' "$m" && continue
-  d="$(dirname "$m")"
-  pgrep -f "audiocap $d/system.wav" >/dev/null && continue
-  echo "ended: $(date '+%Y-%m-%d %H:%M:%S')" >> "$m"
-  echo "$(date '+%H:%M:%S') healing stale session: $d"
-  nohup bash "$JARVIS_DIR/tools/process-call.sh" "$d" >> "$d/process.log" 2>&1 &
-done
+# Heal sessions orphaned by a crash or restart — see heal_orphans above.
+heal_orphans
 
 echo "$(date '+%H:%M:%S') call-watch running (poll ${POLL}s)"
 mkdir -p "$JARVIS_DIR/data"
 webteams_hits=0
 firefox_hits=0
+queue_ticks=0
 while true; do
   # liveness heartbeat — the server's watchdog kills+restarts us if this
   # goes stale (a wedged watcher looks alive but stops beating)
   touch "$JARVIS_DIR/data/watcher-heartbeat" 2>/dev/null
+  # The processing queue rides on this loop: once a minute, ask whether now
+  # is a good time to transcribe a finished call (process-queue.sh decides).
+  queue_ticks=$((queue_ticks + 1))
+  if [ $((queue_ticks % 4)) = 0 ]; then
+    bounded 20 bash "$JARVIS_DIR/tools/process-queue.sh" tick
+  fi
   urls="$(tab_urls)"
   match="$(grep -Ei "$MEETING_RE" <<<"$urls" | head -1 || true)"
   if [ "$recording" = 0 ]; then
@@ -425,6 +550,12 @@ while true; do
       silence_checked=1
       if mic_muted; then
         echo "$(date '+%H:%M:%S') mic is muted by choice — skipping the silence check"
+      elif [ ! -s "$session/mic.wav" ]; then
+        # is_silent treats a missing file as "unknown, not silent" — right
+        # for a probe, wrong here: no file 45s in means the recorder never
+        # opened the device, and that is the one failure worth a popup.
+        echo "$(date '+%H:%M:%S') WARNING: mic recorder never started — your side is not being recorded"
+        notify "⚠️ Jarvis can't hear you — your side of this call is NOT being recorded"
       elif is_silent "$session/mic.wav"; then
         echo "$(date '+%H:%M:%S') WARNING: mic channel is silent — your side is not being recorded"
         notify "⚠️ Jarvis can't hear you — your side of this call is NOT being recorded"

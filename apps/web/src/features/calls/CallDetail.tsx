@@ -3,18 +3,20 @@ import { useEffect, useRef, useState } from "react";
 import type { Call } from "@jarvis/shared";
 import { NotesView } from "./NotesView";
 import {
-  callHost, callTitle, useDeleteCall, useRecordingControls, useToggleItem, useUpdateNotes,
+  callHost, callTitle, useDeleteCall, useLiveAssist, useProcessQueue, useRecordingControls, useToggleItem, useUpdateNotes,
 } from "./hooks";
-import { copyNotes } from "./copyNotes";
+import { copyNotes } from "../../lib/copyRich";
 import { PromptDialog } from "../../components/PromptDialog";
 import { CommentPopover } from "../../components/CommentPopover";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as SS from "@jarvis/shared";
 import { TagChips } from "../../components/TagChips";
+import { LiveAssist, LiveRecap, LiveToggle } from "./LiveAssist";
 
 const STATE: Record<string, { label: string; cls: string }> = {
   recording: { label: "RECORDING", cls: "text-[var(--red)] blip" },
+  queued: { label: "QUEUED", cls: "text-[var(--dim)]" },
   processing: { label: "TRANSCRIBING", cls: "text-[var(--amber)] blip" },
   done: { label: "NOTES READY", cls: "text-[var(--green)]" },
   failed: { label: "NEEDS RERUN", cls: "text-[var(--amber)]" },
@@ -244,10 +246,10 @@ function Rail({ call }: { call: Call }) {
 
 // in-progress states get a real scene, not a lonely sentence: animated
 // equalizer, staged copy, and ghost cards where the notes will land
-function StatusScene({ tone, title, sub, extra }: {
-  tone: "red" | "amber"; title: string; sub: string; extra?: React.ReactNode;
+function StatusScene({ tone, title, sub, extra, ghosts = true }: {
+  tone: "red" | "amber" | "dim"; title: string; sub: string; extra?: React.ReactNode; ghosts?: boolean;
 }) {
-  const color = tone === "red" ? "text-[var(--red)]" : "text-[var(--amber)]";
+  const color = tone === "red" ? "text-[var(--red)]" : tone === "amber" ? "text-[var(--amber)]" : "text-[var(--dim)]";
   return (
     <div className="mt-10">
       <div className="flex flex-col items-center gap-3">
@@ -261,9 +263,17 @@ function StatusScene({ tone, title, sub, extra }: {
           ))}
         </div>
         <div className="font-sans text-[14px] font-semibold text-[var(--bright)]">{title}</div>
-        <div className="font-sans text-[12px] text-[var(--dim)]">{sub} {extra}</div>
+        {/* the copy is centered and capped so a long reason wraps as a
+            paragraph under the title instead of running flush-left across
+            the page; the control gets its own row beneath it */}
+        <div className="max-w-[520px] text-center font-sans text-[12px] leading-relaxed text-[var(--dim)]">{sub}</div>
+        {extra && (
+          <div className="mt-1 flex flex-col items-center gap-2 text-center font-sans text-[12px] text-[var(--dim)]">
+            {extra}
+          </div>
+        )}
       </div>
-      <div className="mt-10 grid gap-4 opacity-50 xl:grid-cols-2">
+      {ghosts && <div className="mt-10 grid gap-4 opacity-50 xl:grid-cols-2">
         {[3, 5].map((rows, k) => (
           <div key={k} className="animate-pulse rounded-2xl border border-[var(--line)] bg-[var(--surf)] p-5">
             <div className="mb-4 h-[13px] w-[130px] rounded bg-[var(--surf-2)]" />
@@ -272,7 +282,7 @@ function StatusScene({ tone, title, sub, extra }: {
             ))}
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -283,6 +293,8 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
   const del = useDeleteCall();
   const save = useUpdateNotes();
   const { stop } = useRecordingControls();
+  const { data: queue } = useProcessQueue();
+  const live = useLiveAssist(call?.id ?? null, call?.status === "recording");
   const [armed, setArmed] = useState(false);
   const [draft, setDraft] = useState<string | null>(null); // non-null = editing
   const [toast, setToast] = useState<null | "ok" | "err">(null);
@@ -343,13 +355,30 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
             <h1 className="text-[26px] leading-tight text-[var(--bright)] [font-family:var(--display)]">{callTitle(call)}</h1>
             <span className="flex shrink-0 gap-2 pt-1">
               {call.status === "recording" ? (
-                <button
-                  onClick={() => stop.mutate()}
-                  disabled={stop.isPending}
-                  className="blip rounded-lg border border-[rgba(255,107,132,.5)] bg-[rgba(255,107,132,.08)] px-3 py-1 text-[10px] tracking-wider text-[var(--red)]"
-                >
-                  {stop.isPending ? "STOPPING…" : "■ STOP & SAVE"}
-                </button>
+                <>
+                  <LiveToggle id={call.id} info={live.data} />
+                  <button
+                    onClick={() => stop.mutate(call.id)}
+                    disabled={stop.isPending || del.isPending}
+                    className="blip rounded-lg border border-[rgba(255,107,132,.5)] bg-[rgba(255,107,132,.08)] px-3 py-1 text-[10px] tracking-wider text-[var(--red)]"
+                  >
+                    {stop.isPending ? "STOPPING…" : "■ STOP & SAVE"}
+                  </button>
+                  {/* Discard: stop AND delete. For the phantom detection, the
+                      pre-join tab, the 20-second join-and-leave — a recording
+                      that was never a call and should not get transcribed. */}
+                  <button
+                    onClick={() => {
+                      if (!armed) { setArmed(true); setTimeout(() => setArmed(false), 2500); return; }
+                      del.mutate(call.id, { onSuccess: onDeleted });
+                    }}
+                    disabled={stop.isPending || del.isPending}
+                    title="Stop this recording and delete it — nothing gets transcribed"
+                    className="rounded-lg border border-[var(--line)] px-3 py-1 text-[10px] tracking-wider text-[var(--dim)] hover:border-[var(--red)] hover:text-[var(--red)] disabled:opacity-50"
+                  >
+                    {del.isPending ? "DISCARDING…" : armed ? "SURE?" : "DISCARD"}
+                  </button>
+                </>
               ) : draft !== null ? (
                 <>
                   <button
@@ -423,10 +452,47 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
           </div>
 
           {call.status === "recording" && (
+            <>
+              <StatusScene
+                tone="red"
+                title="Recording — both sides captured"
+                sub="Stop & Save ends it now; otherwise it stops ~30s after the call ends. Audio never leaves this machine."
+                ghosts={!live.data?.enabled}
+              />
+              <LiveAssist id={call.id} info={live.data} />
+            </>
+          )}
+          {call.status === "queued" && (
             <StatusScene
-              tone="red"
-              title="Recording — both sides captured"
-              sub="Stop & Save ends it now; otherwise it stops ~30s after the call ends. Audio never leaves this machine."
+              tone="dim"
+              title="Recorded — waiting to transcribe"
+              sub={
+                queue?.waiting
+                  ? `Holding because: ${queue.waiting}. Audio is safe on disk; notes are written when the queue is allowed to run.`
+                  : "Next in line — the queue starts it within a minute."
+              }
+              extra={
+                <button
+                  onClick={async () => {
+                    setReprocessing(true);
+                    await fetch("/api/calls/reprocess", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id: call.id }),
+                    }).catch(() => {});
+                    qc.invalidateQueries({ queryKey: ["calls"] });
+                    qc.invalidateQueries({ queryKey: ["process-queue"] });
+                  }}
+                  disabled={reprocessing}
+                  className={`rounded-full border px-4 py-1.5 font-sans text-[12px] ${
+                    reprocessing
+                      ? "cursor-default border-[var(--line)] text-[var(--dim)]"
+                      : "cursor-pointer border-[var(--cyan-3)] text-[var(--cyan)] hover:bg-[var(--cyan-2)]"
+                  }`}
+                >
+                  {reprocessing ? "⟳ starting…" : "▶ Process now"}
+                </button>
+              }
             />
           )}
           {call.status === "processing" && !call.notes && (
@@ -441,7 +507,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
                   {/* A stalled run needs a plain statement and a way out, not
                       its shell output — the raw log lives behind the link. */}
                   {call.lastLogAge > 3 * 60_000 && (
-                    <div className="mb-2 text-[var(--amber)]">
+                    <div className="text-[var(--amber)]">
                       No progress for {Math.round(call.lastLogAge / 60_000)} minutes — this run has probably stopped.
                     </div>
                   )}
@@ -532,6 +598,7 @@ export function CallDetail({ call, onDeleted }: { call: Call | null; onDeleted: 
               </div>
             </div>
           ) : null}
+          {call.status !== "recording" && <LiveRecap info={live.data} />}
 
           {call.transcript.trim() && (
             <details className="mt-7">

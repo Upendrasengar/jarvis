@@ -107,6 +107,19 @@ fi
 # dashboard's attention bucket both read it.
 bash "$JARVIS_DIR/tools/triage-actions.sh" || true
 
+# 1.7 calls recorded but not yet transcribed. The processing policy
+# (memory/settings/process-policy.txt) can hold a session for hours, and a
+# digest that silently omits a meeting that happened is worse than one that
+# says "two calls are waiting". No LLM; process-queue.sh owns the rule.
+PENDING_CALLS="$(bash "$JARVIS_DIR/tools/process-queue.sh" pending 2>/dev/null | tr '\n' ' ')"
+if [ -n "${PENDING_CALLS// /}" ]; then
+  {
+    echo
+    echo "## CALLS AWAITING TRANSCRIPTION (recorded, notes not written yet — policy: $(head -1 "$JARVIS_DIR/memory/settings/process-policy.txt" 2>/dev/null || echo now))"
+    for s in $PENDING_CALLS; do echo "- $s"; done
+  } >> "$DIGESTS_DIR/raw-$DATE.md"
+fi
+
 # 2. LLM step: the model COMPOSES the digest; this script writes it.
 #
 # It used to be handed --allowedTools "Read,Write" and told to write the file
@@ -150,6 +163,8 @@ written AGAINST the previous digest — what moved since it, what is STILL \
 stalled and for how long, what's new (flag uncommitted work as at-risk), \
 a per-project bullet line, then — only if there \
 were real calls since the previous digest — a 'Calls' section with one line per call (title + outcome), \
+then — ONLY if the raw file has a CALLS AWAITING TRANSCRIPTION section — one line: how many \
+calls are recorded but not yet transcribed and that 'Process now' in the Calls tab runs them, \
 then — ONLY if the raw file has a TODAY'S MEETINGS section — a 'Today' \
 section listing those meetings, cross-referencing open action items that \
 involve the same people or topics, \

@@ -4,6 +4,31 @@
 // image embeds. Kept here so the two renderers cannot drift — they already
 // did once over inline code.
 import { useState, type ReactNode } from "react";
+import { copyRich } from "../lib/copyRich";
+
+// ---------------------------------------------------------------- copy ----
+// Rich copy chip: the markdown goes to the clipboard as HTML + plain text, so
+// a paste into Gmail/Outlook keeps paragraphs and bold. Same reserved-space,
+// opacity-swap rule as the code block's button — a control that appears on
+// hover must not reflow what is under the pointer.
+export function CopyChip({ md, title = "Copy with formatting", className = "" }: {
+  md: string; title?: string; className?: string;
+}) {
+  const [state, setState] = useState<"idle" | "ok" | "err">("idle");
+  return (
+    <button
+      onClick={async (e) => {
+        e.stopPropagation();
+        setState((await copyRich(md)) ? "ok" : "err");
+        setTimeout(() => setState("idle"), 1400);
+      }}
+      title={title}
+      className={`rounded-lg border border-[var(--line-2)] bg-[var(--surf-2)] px-2 py-[2px] font-mono text-[10px] text-[var(--dim)] transition hover:text-[var(--cyan)] ${className}`}
+    >
+      {state === "ok" ? "copied" : state === "err" ? "failed" : "copy"}
+    </button>
+  );
+}
 
 // ---------------------------------------------------------------- code ----
 export function CodeBlock({ lang, body }: { lang: string; body: string[] }) {

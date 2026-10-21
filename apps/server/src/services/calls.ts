@@ -7,6 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Call, RecState } from "@jarvis/shared";
 import { BRAIN_CALLS_DIR, CALLS_DIR, CALL_NOTES_DIR, MEMORY_DIR, VAULT_DIR } from "../config.js";
+import { killProcessing, stopSession } from "./processQueue.js";
+import { killLive } from "./liveAssist.js";
 
 // notes file resolution: our writer uses call-notes-<id>.md; Obsidian-
 // converted vaults often use call-<id>.md — read whichever exists,
@@ -39,19 +41,24 @@ export function listCalls(): Call[] {
     try { notes = fs.readFileSync(notesFileFor(d), "utf8"); } catch {}
     // failed = the processor said so (FAILED.txt) or went silent 30+ min
     const failedMark = fs.existsSync(path.join(sess, "FAILED.txt"));
+    // process-call.sh holds .processing for the life of a run (rmdir on
+    // exit). Audio with no lock is a session nobody has started on — queued
+    // by the processing policy, not failed. It used to read as "failed"
+    // after 15 quiet minutes, which under a wait-for-idle policy would have
+    // flagged every call recorded during a working day.
+    const locked = fs.existsSync(path.join(sess, ".processing"));
     let stale = false;
     try {
       stale = Date.now() - fs.statSync(path.join(sess, "process.log")).mtimeMs > STALE_MS;
     } catch {
-      // no process.log at all: processing never started — judge by how long
-      // ago the recording ended (meta.txt mtime)
-      try { stale = !!ended && Date.now() - fs.statSync(path.join(sess, "meta.txt")).mtimeMs > 15 * 60e3; } catch {}
+      // lock held but no log yet: judge by the lock's own age
+      try { stale = Date.now() - fs.statSync(path.join(sess, ".processing")).mtimeMs > 15 * 60e3; } catch {}
     }
     const status =
       !ended && hasAudio ? "recording" :
       notes              ? "done" :
       failedMark         ? "failed" :
-      hasAudio           ? (stale ? "failed" : "processing") :
+      hasAudio           ? (locked ? (stale ? "failed" : "processing") : "queued") :
       transcript         ? "failed" : "empty";
     let lastLog = "";
     let lastLogAge = 0;
@@ -113,14 +120,16 @@ export function toggleCallItem(id: string, index: number): { ok: true } | { erro
   return ok ? { ok: true } : { error: "notes not found" };
 }
 
-// Delete a call entirely: session dir, notes, vault copy. Refuses while the
-// session is still being recorded.
-export function deleteCall(id: string): { ok: true } | { error: string } {
+// Delete a call entirely: session dir, notes, vault copy. A session still
+// recording is stopped first (its recorders killed — there used to be no way
+// out of a RECORDING card whose watcher had died), and a processor working
+// on it is killed so whisper does not run on to the end over a deleted dir.
+export async function deleteCall(id: string): Promise<{ ok: true } | { error: string }> {
   const sess = path.join(CALLS_DIR, id);
-  try {
-    const meta = fs.readFileSync(path.join(sess, "meta.txt"), "utf8");
-    if (!/^ended:/m.test(meta)) return { error: "call is still recording" };
-  } catch {}
+  await killLive(id);
+  const stopped = await stopSession(id);
+  if ("error" in stopped) return stopped;
+  await killProcessing(id);
   try { fs.rmSync(sess, { recursive: true, force: true }); } catch {}
   try { fs.rmSync(path.join(CALL_NOTES_DIR, `call-notes-${id}.md`), { force: true }); } catch {}
   try { fs.rmSync(path.join(CALL_NOTES_DIR, `call-${id}.md`), { force: true }); } catch {}

@@ -101,8 +101,20 @@ command -v ffmpeg >/dev/null 2>&1 \
 # system.wav (48 kHz float stereo, ~1.4 GB/hr) is deleted once the 16 kHz
 # copy exists — the conversion is lossless for speech purposes and the small
 # copy is what the 7-day re-run retention keeps.
+#
+# Politeness. Transcription used to run at full priority the moment a call
+# ended — the exact minute the owner is back at the keyboard — and the Mac
+# crawled. Queue-started runs now go in the background tier (taskpolicy -b:
+# lowest CPU/IO priority, efficiency cores on Apple Silicon) at nice 19.
+# When the owner presses Process now (JARVIS_PROCESS_FG=1) they are waiting
+# for it, so only nice applies and the run keeps the performance cores.
+QUIET="nice -n 19"
+if [ "${JARVIS_PROCESS_FG:-0}" != 1 ] && command -v taskpolicy >/dev/null 2>&1; then
+  QUIET="taskpolicy -b nice -n 19"
+fi
+echo "priority: $QUIET"
 if [ -s system.wav ]; then
-  ffmpeg -y -hide_banner -loglevel error -i system.wav -ac 1 -ar 16000 system16.wav
+  $QUIET ffmpeg -y -hide_banner -loglevel error -i system.wav -ac 1 -ar 16000 system16.wav
   [ -s system16.wav ] && rm -f system.wav
 fi
 
@@ -124,14 +136,14 @@ WFLAGS="-np -mc 0 -sns"
 # UTF-8 mid-Devanagari (this once silently killed the pipeline), and it must
 # NEVER abort processing — hence the '|| true'.
 transcribe() { # $1 wav, $2 output prefix
-  "$WHISPER" -m "$MODEL" -f "$1" -oj -of "$2" -l auto $WFLAGS $VAD_FLAGS
+  $QUIET "$WHISPER" -m "$MODEL" -f "$1" -oj -of "$2" -l auto $WFLAGS $VAD_FLAGS
   local lang
   lang="$(python3 -c "import json,pathlib;print(json.loads(pathlib.Path('$2.json').read_text(errors='replace'))['result']['language'])" 2>/dev/null || true)"
   case " $LANGS " in
     *" $lang "*) ;;   # accepted
     *) [ -z "$lang" ] && return 0
        echo "detected '$lang' — retrying pinned to $RETRY_LANG"
-       "$WHISPER" -m "$MODEL" -f "$1" -oj -of "$2" -l "$RETRY_LANG" $WFLAGS $VAD_FLAGS ;;
+       $QUIET "$WHISPER" -m "$MODEL" -f "$1" -oj -of "$2" -l "$RETRY_LANG" $WFLAGS $VAD_FLAGS ;;
   esac
 }
 
@@ -153,6 +165,11 @@ transcribe() { # $1 wav, $2 output prefix
 # form fails with "unrecognized arguments" — which would have produced no
 # transcript at all.
 level() {   # mean dBFS, or "" when unreadable
+  # A missing channel is "unreadable", not an error. ffmpeg exits 254 on a
+  # file that is not there, and under set -e that killed the run before the
+  # merge could drop the channel — a call whose mic never opened was left
+  # NEEDS RERUN forever instead of getting notes from the side it did capture.
+  [ -s "$1" ] || { echo ""; return 0; }
   ffmpeg -hide_banner -nostats -i "$1" -af volumedetect -f null - 2>&1 \
     | sed -n 's/.*mean_volume: \(-*[0-9.]*\) dB.*/\1/p' | head -1
 }
@@ -164,6 +181,15 @@ SYS_DB="$(level system16.wav)"
 # Create it and re-run this script to rebuild the notes without it.
 DROP_MIC=""
 [ -f "$SESSION/.no-mic" ] && DROP_MIC="--drop-mic"
+# No mic file at all = the recorder never opened the device. Same treatment,
+# and the notes say so, so a one-sided transcript is not mistaken for a call
+# where the owner sat silent.
+MIC_MISSING=""
+if [ ! -s mic.wav ]; then
+  DROP_MIC="--drop-mic"
+  MIC_MISSING="note: the owner's microphone was NOT captured on this call (recorder failed to open the device) — only the other side is in the transcript. Say so in one line under the summary."
+  echo "mic.wav missing — notes will be written from the far side only"
+fi
 python3 "$JARVIS_DIR/tools/merge-transcripts.py" \
   --me mic.json --them system.json $DROP_MIC \
   ${MIC_DB:+--mic-db="$MIC_DB"} ${SYS_DB:+--sys-db="$SYS_DB"} > transcript.md
@@ -209,8 +235,35 @@ TOPICS_DIR="$BRAIN_DIR/Topics"
 mkdir -p "$TOPICS_DIR" 2>/dev/null || true
 TOPICS_LIST="$(ls "$TOPICS_DIR" 2>/dev/null | sed 's/\.md$//' | paste -sd ', ' - || true)"
 
+# Live assist (tools/live-assist.sh) leaves live/history.jsonl + live/done.txt
+# when it ran during the call. An item the owner ticked is a fact about the
+# call the transcript may not carry cleanly: a ticked "ask" was asked, a
+# ticked "agreed" was confirmed by the owner in the moment. Passed as hints.
+LIVE_TICKED="$(python3 - "$SESSION/live/history.jsonl" "$SESSION/live/done.txt" <<'LIVEPY' 2>/dev/null || true
+import json, sys
+hp, dp = sys.argv[1:]
+try: done = {l.strip() for l in open(dp) if l.strip()}
+except Exception: done = set()
+if not done: sys.exit(0)
+seen = {}
+for line in open(hp):
+    try: r = json.loads(line)
+    except Exception: continue
+    for it in r.get("items", []):
+        if it.get("id") in done: seen[it["id"]] = it
+for it in seen.values():
+    print(f"- [{it.get('group','')}] {it.get('text','')}")
+LIVEPY
+)"
+
 {
   cat meta.txt
+  [ -n "$MIC_MISSING" ] && echo "$MIC_MISSING"
+  if [ -n "$LIVE_TICKED" ]; then
+    echo
+    echo "live-assist-ticked: the owner ticked these suggestions off DURING the call (ask = they asked it; agreed = they confirmed it; mention = they raised it). Hints, not transcript — use them to resolve what the transcript leaves unclear, never to add things the call did not contain:"
+    echo "$LIVE_TICKED"
+  fi
   echo
   cat transcript.md
 } | claude -p --model "$(jarvis_model model-worker sonnet)" \

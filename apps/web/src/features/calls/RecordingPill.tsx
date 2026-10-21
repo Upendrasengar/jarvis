@@ -35,7 +35,7 @@ export function RecordingPill() {
       <span
         role="button"
         title="Stop & save now"
-        onClick={(e) => { e.stopPropagation(); stop.mutate(); }}
+        onClick={(e) => { e.stopPropagation(); stop.mutate(data.id); }}
         className="hidden h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--red)] text-[9px] text-white group-hover:flex"
       >
         ■
